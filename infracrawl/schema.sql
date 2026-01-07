@@ -28,6 +28,13 @@ CREATE TABLE IF NOT EXISTS crawler_configs (
 
 CREATE INDEX IF NOT EXISTS idx_crawler_configs_name ON crawler_configs (name);
 
+-- Migrations tracking table (records applied SQL migration filenames)
+CREATE TABLE IF NOT EXISTS migrations (
+  id SERIAL PRIMARY KEY,
+  filename TEXT UNIQUE NOT NULL,
+  applied_at TIMESTAMPTZ DEFAULT now()
+);
+
 -- Ensure pages table has config_id column for association
 ALTER TABLE pages ADD COLUMN IF NOT EXISTS config_id INTEGER;
 CREATE INDEX IF NOT EXISTS idx_pages_config ON pages (config_id);

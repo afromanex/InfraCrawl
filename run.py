@@ -10,7 +10,9 @@ from infracrawl.repository.configs import ConfigsRepository
 from infracrawl import config
 from infracrawl.services.crawler import Crawler
 from infracrawl.services.config_service import ConfigService
-from infracrawl.api.server import create_server
+from infracrawl.api.server import create_app
+import uvicorn
+import os
 
 
 pages_repo = PagesRepository()
@@ -36,18 +38,23 @@ def main():
         print(f"Warning: could not load configs: {e}")
 
     # Start control HTTP server
-    server_port = 8000
+    port_env = os.getenv("INFRACRAWL_PORT") or os.getenv("PORT")
+    try:
+        server_port = int(port_env) if port_env else 8000
+    except Exception:
+        server_port = 8000
     # Instantiate the crawler once and pass its `crawl` method as the callback
     crawler = Crawler(
         pages_repo=pages_repo,
         links_repo=links_repo,
         configs_repo=configs_repo
     )
-    server = create_server(pages_repo, links_repo, config_service, crawler.crawl, host='0.0.0.0', port=server_port)
+
+    app = create_app(pages_repo, links_repo, config_service, crawler.crawl)
 
     def serve():
-        print(f"Control server listening on 0.0.0.0:{server_port}")
-        server.serve_forever()
+        print(f"Control server (FastAPI/uvicorn) listening on 0.0.0.0:{server_port}")
+        uvicorn.run(app, host='0.0.0.0', port=server_port)
 
     t = threading.Thread(target=serve, daemon=True)
     t.start()

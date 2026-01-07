@@ -16,13 +16,14 @@ services:
       - DATABASE_URL=postgresql://infracrawl:infracrawl_pass@db:5432/infracrawl_db
       - PYTHONUNBUFFERED=1
       - PYTHONPATH=/app
+      - INFRACRAWL_PORT=8002
     depends_on:
       - db
     volumes:
       - .:/app
     command: python run.py
     ports:
-      - "8000:8000"
+      - "8002:8000"
     restart: unless-stopped
 
   test:
