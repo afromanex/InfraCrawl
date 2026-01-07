@@ -12,34 +12,31 @@ from infracrawl.repository.pages import PagesRepository
 from infracrawl.repository.links import LinksRepository
 from infracrawl.repository.configs import ConfigsRepository
 from infracrawl.domain import Link
+from infracrawl.domain.crawl_context import CrawlContext
 
 logger = logging.getLogger(__name__)
 
 
 class Crawler:
-    def _should_skip_due_to_depth(self, depth: int) -> bool:
+    def _should_skip_due_to_depth(self, context: CrawlContext, depth: int) -> bool:
         if depth < 0:
             logger.debug("Skipping (max depth reached) at depth %s", depth)
             return True
         return False
 
-    def _should_skip_due_to_robots(self, url: str, config_id: int | None) -> bool:
+    def _should_skip_due_to_robots(self, url: str, context: CrawlContext) -> bool:
         cfg_robots = True
-        if config_id is not None:
-            cfg = self.configs_repo.get_config_by_id(config_id)
-            if cfg:
-                cfg_robots = cfg.robots
+        if context and context.config is not None:
+            cfg_robots = context.config.robots
         if not self._allowed_by_robots(url, cfg_robots):
             logger.info("Skipping (robots) %s", url)
             return True
         return False
 
-    def _should_skip_due_to_refresh(self, url: str, config_id: int | None) -> bool:
+    def _should_skip_due_to_refresh(self, url: str, context: CrawlContext) -> bool:
         cfg_refresh_days = None
-        if config_id is not None:
-            cfg = self.configs_repo.get_config_by_id(config_id)
-            if cfg:
-                cfg_refresh_days = cfg.refresh_days
+        if context and context.config is not None:
+            cfg_refresh_days = context.config.refresh_days
         if cfg_refresh_days is not None:
             page = self.pages_repo.get_page_by_url(url)
             if page and page.fetched_at:
@@ -68,10 +65,11 @@ class Crawler:
                     pass
         return False
 
-    def _fetch_and_store(self, url: str, config_id: int | None):
+    def _fetch_and_store(self, url: str, context: CrawlContext):
         try:
             status, body = self.fetch(url)
             fetched_at = datetime.utcnow().isoformat()
+            config_id = context.config.config_id if (context and context.config) else None
             page_id = self.pages_repo.upsert_page(url, body, status, fetched_at, config_id=config_id)
             logger.info("Fetched %s -> status %s, page_id=%s", url, status, page_id)
             return body
@@ -79,11 +77,11 @@ class Crawler:
             logger.warning("Failed to fetch %s: %s", url, e)
             return None
 
-    def _process_links(self, url: str, body: str, from_id: int, start_url: str, depth: int, config_id: int | None, visited: set, _crawl_from):
+    def _process_links(self, url: str, body: str, from_id: int, context: CrawlContext, depth: int, _crawl_from):
         links = self.extract_links(url, body)
         for link_url, anchor in links:
-            if not self._same_host(start_url, link_url):
-                logger.debug("Skipping (external) %s -> not same host as %s", link_url, start_url)
+            if not self._same_host(context.start_url, link_url):
+                logger.debug("Skipping (external) %s -> not same host as %s", link_url, context.start_url)
                 continue
             to_id = self.pages_repo.ensure_page(link_url)
             link_obj = Link(link_id=None, link_from_id=from_id, link_to_id=to_id, anchor_text=anchor)
@@ -124,28 +122,29 @@ class Crawler:
         fetched are created with NULL content.
         """
         max_depth = max_depth if max_depth is not None else config.DEFAULT_DEPTH
-        visited = set()
+        config_obj = self.configs_repo.get_config_by_id(config_id) if config_id is not None else None
+        context = CrawlContext(start_url, max_depth, config_obj)
 
         def _crawl_from(url: str, depth: int):
-            if url in visited:
+            if context.is_visited(url):
                 logger.debug("Skipping (visited) %s", url)
                 return
-            visited.add(url)
+            context.mark_visited(url)
 
             from_id = self.pages_repo.ensure_page(url)
 
-            if self._should_skip_due_to_depth(depth):
+            if self._should_skip_due_to_depth(context, depth):
                 return
-            if self._should_skip_due_to_robots(url, config_id):
+            if self._should_skip_due_to_robots(url, context):
                 return
-            if self._should_skip_due_to_refresh(url, config_id):
+            if self._should_skip_due_to_refresh(url, context):
                 return
 
-            body = self._fetch_and_store(url, config_id)
+            body = self._fetch_and_store(url, context)
             if body is None:
                 return
 
             time.sleep(self.delay)
-            self._process_links(url, body, from_id, start_url, depth, config_id, visited, _crawl_from)
+            self._process_links(url, body, from_id, context, depth, _crawl_from)
 
-        _crawl_from(start_url, max_depth)
+        _crawl_from(context.start_url, context.max_depth)
