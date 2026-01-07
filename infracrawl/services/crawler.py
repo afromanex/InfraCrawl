@@ -55,16 +55,33 @@ class Crawler:
         return False
 
     def _fetch_and_store(self, url: str, context: CrawlContext):
+        # First, attempt to fetch the URL. Network/fetch errors are surfaced separately.
         try:
             status, body = self.fetch(url)
-            fetched_at = datetime.utcnow().isoformat()
-            config_id = context.config.config_id if (context and context.config) else None
+        except Exception as e:
+            logger.error("Fetch error for %s: %s", url, e, exc_info=True)
+            return None
+
+        # Record fetch time and attempt to persist the page. Storage failures are separate.
+        fetched_at = datetime.utcnow().isoformat()
+        config_id = context.config.config_id if (context and context.config) else None
+        try:
             page_id = self.pages_repo.upsert_page(url, body, status, fetched_at, config_id=config_id)
             logger.info("Fetched %s -> status %s, page_id=%s", url, status, page_id)
-            return body
         except Exception as e:
-            logger.warning("Failed to fetch %s: %s", url, e)
+            logger.error("Storage error while saving %s: %s", url, e, exc_info=True)
             return None
+
+        # Non-2xx status codes are still recorded but logged for visibility.
+        try:
+            sc = int(status)
+            if sc < 200 or sc >= 300:
+                logger.warning("Non-success status for %s: %s", url, status)
+        except Exception:
+            # If status isn't parseable, just ignore this check.
+            pass
+
+        return body
 
     def _process_links(self, url: str, body: str, from_id: int, context: CrawlContext, depth: int, _crawl_from=None):
         # Delegate link extraction, persistence and scheduling to LinkProcessor
