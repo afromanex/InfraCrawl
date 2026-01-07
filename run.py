@@ -73,13 +73,12 @@ class ControlHandler(BaseHTTPRequestHandler):
                     self.end_headers()
                     self.wfile.write(b"config not found")
                     return
-                cfg_id = cfg.config_id
-                root_urls = cfg.root_urls
-                cfg_max_depth = cfg.max_depth
-                use_depth = depth if depth is not None else cfg_max_depth
+                use_depth = depth if depth is not None else cfg.max_depth
+                if depth is not None:
+                    cfg = type(cfg)(cfg.config_id, cfg.name, cfg.config_path, root_urls=cfg.root_urls, max_depth=use_depth, robots=cfg.robots, refresh_days=cfg.refresh_days)
 
                 # spawn a single crawl thread which will iterate the config's root URLs
-                thread = threading.Thread(target=_start_crawl, args=(None, use_depth, cfg), daemon=True)
+                thread = threading.Thread(target=_start_crawl, args=(cfg,), daemon=True)
                 thread.start()
 
                 self.send_response(202)
@@ -91,7 +90,7 @@ class ControlHandler(BaseHTTPRequestHandler):
             use_depth = depth if depth is not None else config.DEFAULT_DEPTH
             from infracrawl.domain.config import CrawlerConfig
             adhoc_cfg = CrawlerConfig(config_id=None, name="adhoc", config_path="<adhoc>", root_urls=[url], max_depth=use_depth)
-            thread = threading.Thread(target=_start_crawl, args=(None, use_depth, adhoc_cfg), daemon=True)
+            thread = threading.Thread(target=_start_crawl, args=(adhoc_cfg,), daemon=True)
             thread.start()
 
             self.send_response(202)
@@ -103,23 +102,17 @@ class ControlHandler(BaseHTTPRequestHandler):
         self.end_headers()
 
 
-def _start_crawl(url: str | None, depth: int, config: object | None = None):
-    print(f"Starting crawl: {url or '<config roots>'} depth={depth} config={getattr(config, 'name', config)}")
+def _start_crawl(config):
+    cfg_name = getattr(config, 'name', '<config>')
+    print(f"Starting crawl: {cfg_name}")
     # Pass repositories explicitly for dependency injection
     crawler = Crawler(
         pages_repo=pages_repo,
         links_repo=links_repo,
         configs_repo=configs_repo
     )
-    # If a config object is supplied, let crawler iterate its roots; otherwise use adhoc config
-    if config is not None:
-        crawler.crawl(config)
-    else:
-        # adhoc: single URL passed in url param; build a small config with that root
-        from infracrawl.domain.config import CrawlerConfig
-        adhoc_cfg = CrawlerConfig(config_id=None, name="adhoc", config_path="<adhoc>", root_urls=[url], max_depth=depth)
-        crawler.crawl(adhoc_cfg)
-    print(f"Crawl finished: {url or '<config roots>'}")
+    crawler.crawl(config)
+    print(f"Crawl finished: {cfg_name}")
 
 
 def main():
@@ -135,7 +128,8 @@ def main():
 
     # Start control HTTP server
     server_port = 8000
-    server = HTTPServer(("0.0.0.0", server_port), ControlHandler)
+    # Create the control server using the ConfigService rather than the raw repo
+    server = create_server(pages_repo, links_repo, config_service, _start_crawl, host='0.0.0.0', port=server_port)
 
     def serve():
         print(f"Control server listening on 0.0.0.0:{server_port}")

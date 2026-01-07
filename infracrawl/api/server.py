@@ -3,11 +3,14 @@ import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import urlparse, parse_qs
 
+from infracrawl.domain.config import CrawlerConfig
+from infracrawl.services.config_service import ConfigService
 
-def create_server(pages_repo, links_repo, configs_repo, start_crawl_callback, host='0.0.0.0', port=8000):
+
+def create_server(pages_repo, links_repo, config_service: ConfigService, start_crawl_callback, host='0.0.0.0', port=8000):
     """Return an HTTPServer instance with control endpoints.
 
-    - `start_crawl_callback(url, depth, config)` will be called when a crawl is requested.
+    - `start_crawl_callback(config)` will be called when a crawl is requested.
     """
 
     class ControlHandler(BaseHTTPRequestHandler):
@@ -59,28 +62,28 @@ def create_server(pages_repo, links_repo, configs_repo, start_crawl_callback, ho
                     self.wfile.write(str(e).encode())
                     return
 
-                # If a config name was supplied, load config and let caller handle iteration
+                # Require a config name and use the ConfigService to load the full CrawlerConfig
                 if config_name:
-                    cfg = configs_repo.get_config(config_name)
+                    cfg = config_service.get_config(config_name)
                     if not cfg:
                         self.send_response(404)
                         self.end_headers()
                         self.wfile.write(b"config not found")
                         return
                     use_depth = depth if depth is not None else cfg.max_depth
-                    # let the caller decide how to schedule roots
-                    threading.Thread(target=start_crawl_callback, args=(None, use_depth, cfg), daemon=True).start()
+                    # if depth override provided, clone the config with the override
+                    if depth is not None and cfg is not None:
+                        cfg = CrawlerConfig(cfg.config_id, cfg.name, cfg.config_path, root_urls=cfg.root_urls, max_depth=use_depth, robots=cfg.robots, refresh_days=cfg.refresh_days)
+                    threading.Thread(target=start_crawl_callback, args=(cfg,), daemon=True).start()
                     self.send_response(202)
                     self.end_headers()
                     self.wfile.write(b"Crawl(s) started for config")
                     return
 
-                # fallback: direct URL crawl
-                use_depth = depth if depth is not None else 0
-                threading.Thread(target=start_crawl_callback, args=(url, use_depth, None), daemon=True).start()
-                self.send_response(202)
+                # Do not accept direct URLs here — only config names are supported
+                self.send_response(400)
                 self.end_headers()
-                self.wfile.write(b"Crawl started")
+                self.wfile.write(b"/crawl only accepts a config name")
                 return
 
             self.send_response(404)
