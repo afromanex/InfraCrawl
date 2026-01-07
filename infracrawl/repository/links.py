@@ -1,5 +1,5 @@
 from typing import Optional, List
-from sqlalchemy import select
+from sqlalchemy import select, or_
 from sqlalchemy.orm import Session
 
 from infracrawl.db.models import Link as DBLink
@@ -36,3 +36,13 @@ class LinksRepository:
                 link_to_id=l.link_to_id,
                 anchor_text=l.anchor_text
             ) for l in rows]
+
+    def delete_links_for_page_ids(self, page_ids: List[int]) -> int:
+        """Delete any links referencing any of the provided page IDs. Returns number deleted."""
+        if not page_ids:
+            return 0
+        with self.get_session() as session:
+            q = session.query(DBLink).filter(or_(DBLink.link_from_id.in_(page_ids), DBLink.link_to_id.in_(page_ids)))
+            deleted = q.delete(synchronize_session=False)
+            session.commit()
+            return deleted

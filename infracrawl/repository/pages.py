@@ -88,3 +88,18 @@ class PagesRepository:
                 fetched_at=p.fetched_at,
                 config_id=p.config_id
             ) for p in rows]
+
+    def get_page_ids_by_config(self, config_id: int) -> List[int]:
+        with self.get_session() as session:
+            q = select(DBPage.page_id).where(DBPage.config_id == config_id)
+            rows = session.execute(q).scalars().all()
+            return rows
+
+    def delete_pages_by_ids(self, ids: List[int]) -> int:
+        if not ids:
+            return 0
+        with self.get_session() as session:
+            q = session.query(DBPage).filter(DBPage.page_id.in_(ids))
+            deleted = q.delete(synchronize_session=False)
+            session.commit()
+            return deleted
