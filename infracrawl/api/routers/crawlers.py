@@ -71,7 +71,7 @@ def create_crawlers_router(pages_repo, links_repo, config_service: ConfigService
             return {"active": []}
         return {"active": crawl_registry.list_active()}
 
-    @router.get("/{crawl_id}")
+    @router.get("/active/{crawl_id}")
     def get_crawl(crawl_id: str):
         if crawl_registry is None:
             raise HTTPException(status_code=404, detail="no registry configured")
