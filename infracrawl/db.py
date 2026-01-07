@@ -114,7 +114,7 @@ def insert_link(link_from_id: int, link_to_id: int, anchor_text: str | None):
         conn.close()
 
 
-def upsert_config(name: str, root_urls: list, max_depth: int):
+def upsert_config(name: str, root_urls: list, max_depth: int, robots: bool = True):
     """Insert or update a crawler configuration."""
     conn = get_conn()
     try:
@@ -122,15 +122,16 @@ def upsert_config(name: str, root_urls: list, max_depth: int):
             with conn.cursor() as cur:
                 cur.execute(
                     """
-                    INSERT INTO crawler_configs (name, root_urls, max_depth, updated_at)
-                    VALUES (%s, %s::jsonb, %s, now())
+                    INSERT INTO crawler_configs (name, root_urls, max_depth, robots, updated_at)
+                    VALUES (%s, %s::jsonb, %s, %s, now())
                     ON CONFLICT (name) DO UPDATE
                       SET root_urls = EXCLUDED.root_urls,
                           max_depth = EXCLUDED.max_depth,
+                          robots = EXCLUDED.robots,
                           updated_at = now()
                     RETURNING config_id
                     """,
-                    (name, json.dumps(root_urls), max_depth),
+                    (name, json.dumps(root_urls), max_depth, robots),
                 )
                 row = cur.fetchone()
                 return row[0]
@@ -142,7 +143,20 @@ def get_config(name: str):
     conn = get_conn()
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
-            cur.execute("SELECT config_id, name, root_urls, max_depth FROM crawler_configs WHERE name = %s", (name,))
+            cur.execute("SELECT config_id, name, root_urls, max_depth, robots FROM crawler_configs WHERE name = %s", (name,))
+            row = cur.fetchone()
+            if row:
+                return dict(row)
+            return None
+    finally:
+        conn.close()
+
+
+def get_config_by_id(config_id: int):
+    conn = get_conn()
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("SELECT config_id, name, root_urls, max_depth, robots FROM crawler_configs WHERE config_id = %s", (config_id,))
             row = cur.fetchone()
             if row:
                 return dict(row)

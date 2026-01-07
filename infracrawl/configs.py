@@ -29,10 +29,11 @@ def load_configs_from_dir(path: str | None = None):
         name = data.get("name")
         root_urls = data.get("root_urls")
         max_depth = data.get("max_depth")
+        robots = data.get("robots", True)
         if not name or not root_urls or max_depth is None:
             continue
         if isinstance(root_urls, str):
             root_urls = [root_urls]
-        configs.append({"name": name, "root_urls": root_urls, "max_depth": int(max_depth)})
+        configs.append({"name": name, "root_urls": root_urls, "max_depth": int(max_depth), "robots": bool(robots)})
 
     return configs

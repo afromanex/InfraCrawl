@@ -112,7 +112,7 @@ def main():
         cfgs = config_loader.load_configs_from_dir()
         loaded_names = set()
         for c in cfgs:
-            cid = db.upsert_config(c["name"], c["root_urls"], c["max_depth"])
+            cid = db.upsert_config(c["name"], c["root_urls"], c["max_depth"], robots=c.get("robots", True))
             loaded_names.add(c["name"])
             print(f"Loaded config {c['name']} -> id={cid}")
 
