@@ -3,9 +3,9 @@ import time
 from datetime import datetime, timezone
 from urllib.parse import urljoin, urlparse
 
-import requests
-from bs4 import BeautifulSoup
 from urllib.robotparser import RobotFileParser
+from infracrawl.services.http_service import HttpService
+from infracrawl.services.content_review_service import ContentReviewService
 
 from infracrawl import config
 from infracrawl.repository.pages import PagesRepository
@@ -16,19 +16,20 @@ from infracrawl.domain import Link
 logger = logging.getLogger(__name__)
 
 
+
 class Crawler:
-    def __init__(self, pages_repo=None, links_repo=None, configs_repo=None, delay=None, user_agent=None):
+    def __init__(self, pages_repo=None, links_repo=None, configs_repo=None, delay=None, user_agent=None, http_service=None, content_review_service=None):
         self.pages_repo = pages_repo or PagesRepository()
         self.links_repo = links_repo or LinksRepository()
         self.configs_repo = configs_repo or ConfigsRepository()
         self.delay = delay if delay is not None else config.CRAWL_DELAY
         self.user_agent = user_agent or config.USER_AGENT
+        self.http_service = http_service or HttpService(self.user_agent)
+        self.content_review_service = content_review_service or ContentReviewService()
         self._rp_cache: dict[str, RobotFileParser] = {}
 
     def fetch(self, url: str):
-        headers = {"User-Agent": self.user_agent}
-        resp = requests.get(url, headers=headers, timeout=10)
-        return resp.status_code, resp.text
+        return self.http_service.fetch(url)
 
     def _allowed_by_robots(self, url: str, robots_enabled: bool) -> bool:
         if not robots_enabled:
@@ -41,9 +42,9 @@ class Crawler:
                 rp = RobotFileParser()
                 robots_url = urljoin(base, "/robots.txt")
                 try:
-                    r = requests.get(robots_url, headers={"User-Agent": self.user_agent}, timeout=5)
-                    if r.status_code == 200:
-                        rp.parse(r.text.splitlines())
+                    status, robots_txt = self.http_service.fetch_robots(robots_url)
+                    if status == 200:
+                        rp.parse(robots_txt.splitlines())
                     else:
                         rp = None
                 except Exception:
@@ -57,13 +58,7 @@ class Crawler:
             return True
 
     def extract_links(self, base_url: str, html: str):
-        soup = BeautifulSoup(html, "html.parser")
-        urls = []
-        for a in soup.find_all("a", href=True):
-            href = a.get("href")
-            abs_url = urljoin(base_url, href)
-            urls.append((abs_url, a.get_text(strip=True)))
-        return urls
+        return self.content_review_service.extract_links(base_url, html)
 
     def _same_host(self, base: str, other: str) -> bool:
         try:
