@@ -1,5 +1,6 @@
 from typing import Any, Dict, Optional
 import logging
+import os
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -50,6 +51,11 @@ class SchedulerService:
         # lazy-instantiate crawls repo so scheduler can record runs
         from infracrawl.repository.crawls import CrawlsRepository
         self.crawls_repo = CrawlsRepository()
+        # config watcher interval (seconds). Can be overridden via env var
+        try:
+            self._config_watch_interval = int(os.getenv("INFRACRAWL_CONFIG_WATCH_INTERVAL", "60"))
+        except Exception:
+            self._config_watch_interval = 60
 
     def start(self):
         if self._sched is not None:
@@ -58,6 +64,20 @@ class SchedulerService:
         self._sched.start()
         logger.info("Scheduler started")
         self.load_and_schedule_all()
+        # schedule periodic config watcher to keep DB in sync with disk
+        try:
+            # use an interval trigger to periodically scan configs
+            from apscheduler.triggers.interval import IntervalTrigger
+
+            self._sched.add_job(
+                self._run_config_watcher,
+                trigger=IntervalTrigger(seconds=self._config_watch_interval),
+                id="config_watcher",
+                replace_existing=True,
+            )
+            logger.info("Scheduled config watcher every %s seconds", self._config_watch_interval)
+        except Exception:
+            logger.exception("Could not schedule config watcher")
 
     def shutdown(self, wait: bool = True):
         if not self._sched:
@@ -138,3 +158,19 @@ class SchedulerService:
                 logger.info("Scheduled job %s -> %s", job_id, full.schedule)
             except Exception:
                 logger.exception("Could not schedule job for %s", full.config_path)
+
+    def _run_config_watcher(self):
+        """Periodic job: sync configs on disk with DB and reload scheduled crawl jobs."""
+        try:
+            logger.info("Config watcher: syncing configs with disk")
+            try:
+                self.config_service.sync_configs_with_disk()
+            except Exception:
+                logger.exception("Error syncing configs with disk")
+            # reload scheduled crawl jobs after sync
+            try:
+                self.load_and_schedule_all()
+            except Exception:
+                logger.exception("Error reloading scheduled crawl jobs after config sync")
+        except Exception:
+            logger.exception("Unhandled error in config watcher")
