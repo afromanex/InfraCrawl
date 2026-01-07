@@ -6,3 +6,4 @@ PyYAML==6.0
 SQLAlchemy==2.0.19
 fastapi
 uvicorn[standard]
+apscheduler==3.10.1

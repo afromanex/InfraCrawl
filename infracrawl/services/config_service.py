@@ -27,7 +27,8 @@ class ConfigService:
                     root_urls=data.get("root_urls", []),
                     max_depth=data.get("max_depth"),
                     robots=data.get("robots", True),
-                    refresh_days=data.get("refresh_days")
+                    refresh_days=data.get("refresh_days"),
+                    schedule=data.get("schedule")
                 )
                 cid = self.configs_repo.upsert_config(config_obj)
                 loaded_paths.add(fname)
@@ -70,6 +71,7 @@ class ConfigService:
             max_depth=data.get("max_depth"),
             robots=data.get("robots", True),
             refresh_days=data.get("refresh_days"),
+            schedule=data.get("schedule"),
             created_at=db_cfg.created_at,
-            updated_at=db_cfg.updated_at
+            updated_at=db_cfg.updated_at,
         )
