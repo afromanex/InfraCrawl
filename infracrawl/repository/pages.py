@@ -2,7 +2,8 @@ from typing import Optional, List
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from infracrawl.db.models import Page
+from infracrawl.db.models import Page as DBPage
+from infracrawl.domain import Page
 from infracrawl.db.engine import make_engine
 
 
@@ -25,13 +26,20 @@ class PagesRepository:
             session.refresh(p)
             return p.page_id
 
-    def get_page_by_url(self, page_url: str) -> Optional[dict]:
+    def get_page_by_url(self, page_url: str) -> Optional[Page]:
         with self.get_session() as session:
-            q = select(Page).where(Page.page_url == page_url)
+            q = select(DBPage).where(DBPage.page_url == page_url)
             p = session.execute(q).scalars().first()
             if not p:
                 return None
-            return {"page_id": p.page_id, "page_url": p.page_url, "fetched_at": p.fetched_at}
+            return Page(
+                page_id=p.page_id,
+                page_url=p.page_url,
+                page_content=p.page_content,
+                http_status=p.http_status,
+                fetched_at=p.fetched_at,
+                config_id=p.config_id
+            )
 
     def upsert_page(self, page_url: str, page_content: Optional[str], http_status: Optional[int], fetched_at: Optional[str], config_id: Optional[int] = None) -> int:
         with self.get_session() as session:
@@ -52,16 +60,17 @@ class PagesRepository:
             session.refresh(p)
             return p.page_id
 
-    def fetch_pages(self, full: bool = False, limit: Optional[int] = None) -> List[dict]:
+    def fetch_pages(self, full: bool = False, limit: Optional[int] = None) -> List[Page]:
         with self.get_session() as session:
-            q = select(Page).order_by(Page.page_id)
+            q = select(DBPage).order_by(DBPage.page_id)
             if limit:
                 q = q.limit(limit)
             rows = session.execute(q).scalars().all()
-            out = []
-            for p in rows:
-                d = {"page_id": p.page_id, "page_url": p.page_url, "http_status": p.http_status, "fetched_at": (p.fetched_at.isoformat() if p.fetched_at else None)}
-                if full:
-                    d["page_content"] = p.page_content
-                out.append(d)
-            return out
+            return [Page(
+                page_id=p.page_id,
+                page_url=p.page_url,
+                page_content=p.page_content if full else None,
+                http_status=p.http_status,
+                fetched_at=p.fetched_at,
+                config_id=p.config_id
+            ) for p in rows]

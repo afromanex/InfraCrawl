@@ -2,7 +2,8 @@ from typing import Optional, List
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from infracrawl.db.models import Link
+from infracrawl.db.models import Link as DBLink
+from infracrawl.domain import Link
 from infracrawl.db.engine import make_engine
 
 
@@ -19,10 +20,15 @@ class LinksRepository:
             session.add(link)
             session.commit()
 
-    def fetch_links(self, limit: Optional[int] = None) -> List[dict]:
+    def fetch_links(self, limit: Optional[int] = None) -> List[Link]:
         with self.get_session() as session:
-            q = select(Link).order_by(Link.link_id)
+            q = select(DBLink).order_by(DBLink.link_id)
             if limit:
                 q = q.limit(limit)
             rows = session.execute(q).scalars().all()
-            return [{"link_id": l.link_id, "link_from_id": l.link_from_id, "link_to_id": l.link_to_id, "anchor_text": l.anchor_text} for l in rows]
+            return [Link(
+                link_id=l.link_id,
+                link_from_id=l.link_from_id,
+                link_to_id=l.link_to_id,
+                anchor_text=l.anchor_text
+            ) for l in rows]

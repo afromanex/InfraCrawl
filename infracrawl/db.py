@@ -205,14 +205,28 @@ def get_config_by_id(config_id: int):
         conn.close()
 
 
-def list_config_names():
+def list_configs():
+    if USE_SQLALCHEMY and _configs_repo is not None:
+        return _configs_repo.list_configs()
     conn = get_conn()
     try:
         with conn:
             with conn.cursor() as cur:
-                cur.execute("SELECT name FROM crawler_configs")
+                cur.execute("SELECT config_id, name, root_urls, max_depth, robots, refresh_days, created_at, updated_at FROM crawler_configs")
                 rows = cur.fetchall()
-                return [r[0] for r in rows]
+                from infracrawl.domain import CrawlerConfig
+                return [CrawlerConfig(
+                    config_id=r[0],
+                    name=r[1],
+                    root_urls=r[2],
+                    max_depth=r[3],
+                    robots=r[4],
+                    refresh_days=r[5],
+                    created_at=r[6],
+                    updated_at=r[7]
+                ) for r in rows]
+    finally:
+        conn.close()
     finally:
         conn.close()
 
@@ -228,6 +242,8 @@ def delete_config(name: str):
 
 
 def fetch_pages(full: bool = False, limit: int | None = None):
+    if USE_SQLALCHEMY and _pages_repo is not None:
+        return _pages_repo.fetch_pages(full=full, limit=limit)
     conn = get_conn()
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -239,19 +255,29 @@ def fetch_pages(full: bool = False, limit: int | None = None):
                 sql += f" LIMIT {int(limit)}"
             cur.execute(sql)
             rows = cur.fetchall()
+            from infracrawl.domain import Page
             out = []
             for r in rows:
                 d = dict(r)
                 fa = d.get("fetched_at")
                 if fa is not None:
                     d["fetched_at"] = fa.isoformat()
-                out.append(d)
+                out.append(Page(
+                    page_id=d["page_id"],
+                    page_url=d["page_url"],
+                    page_content=d.get("page_content"),
+                    http_status=d.get("http_status"),
+                    fetched_at=d.get("fetched_at"),
+                    config_id=d.get("config_id")
+                ))
             return out
     finally:
         conn.close()
 
 
 def fetch_links(limit: int | None = None):
+    if USE_SQLALCHEMY and _links_repo is not None:
+        return _links_repo.fetch_links(limit=limit)
     conn = get_conn()
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -260,7 +286,13 @@ def fetch_links(limit: int | None = None):
                 sql += f" LIMIT {int(limit)}"
             cur.execute(sql)
             rows = cur.fetchall()
-            return [dict(r) for r in rows]
+            from infracrawl.domain import Link
+            return [Link(
+                link_id=r["link_id"],
+                link_from_id=r["link_from_id"],
+                link_to_id=r["link_to_id"],
+                anchor_text=r["anchor_text"]
+            ) for r in rows]
     finally:
         conn.close()
 
@@ -289,8 +321,8 @@ if USE_SQLALCHEMY and _repo is not None:
     def get_config_by_id(config_id: int):
         return _configs_repo.get_config_by_id(config_id)
 
-    def list_config_names():
-        return _configs_repo.list_config_names()
+    def list_configs():
+        return _configs_repo.list_configs()
 
     def delete_config(name: str):
         return _configs_repo.delete_config(name)

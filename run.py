@@ -29,7 +29,10 @@ class ControlHandler(BaseHTTPRequestHandler):
                 limit_val = None
             pages = db.fetch_pages(full=full, limit=limit_val)
             links = db.fetch_links(limit=limit_val)
-            payload = {"pages": pages, "links": links}
+            payload = {
+                "pages": [p.__dict__ for p in pages],
+                "links": [l.__dict__ for l in links]
+            }
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.end_headers()
@@ -119,8 +122,9 @@ def main():
             print(f"Loaded config {c['name']} -> id={cid}")
 
         # Remove any configs in DB that are not present in the configs directory
-        existing = set(db.list_config_names())
-        to_remove = existing - loaded_names
+        existing_configs = db.list_configs()
+        existing_names = set(c.name for c in existing_configs)
+        to_remove = existing_names - loaded_names
         for name in to_remove:
             db.delete_config(name)
             print(f"Removed DB config not present on disk: {name}")
