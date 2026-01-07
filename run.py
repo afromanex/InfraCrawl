@@ -17,102 +17,11 @@ pages_repo = PagesRepository()
 links_repo = LinksRepository()
 configs_repo = ConfigsRepository()
 
-class ControlHandler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        p = urlparse(self.path)
-        if p.path == "/health":
-            self.send_response(200)
-            self.send_header("Content-Type", "application/json")
-            self.end_headers()
-            self.wfile.write(b"{\"status\": \"ok\"}")
-            return
-        if p.path == "/export":
-            qs = parse_qs(p.query)
-            full = qs.get("full", ["0"])[0] in ("1", "true", "True")
-            limit = qs.get("limit", [None])[0]
-            try:
-                limit_val = int(limit) if limit else None
-            except Exception:
-                limit_val = None
-            pages = pages_repo.fetch_pages(full=full, limit=limit_val)
-            links = links_repo.fetch_links(limit=limit_val)
-            payload = {
-                "pages": [p.__dict__ for p in pages],
-                "links": [l.__dict__ for l in links]
-            }
-            self.send_response(200)
-            self.send_header("Content-Type", "application/json")
-            self.end_headers()
-            self.wfile.write(json.dumps(payload).encode("utf-8"))
-            return
-        self.send_response(404)
-        self.end_headers()
 
-    def do_POST(self):
-        if self.path == "/crawl":
-            length = int(self.headers.get("Content-Length", 0))
-            body = self.rfile.read(length)
-            try:
-                data = json.loads(body.decode("utf-8"))
-                # support either a direct URL or a config name
-                url = data.get("url")
-                config_name = data.get("config")
-                depth = data.get("depth", None)
-                if not (url or config_name):
-                    raise ValueError("missing url or config")
-            except Exception as e:
-                self.send_response(400)
-                self.end_headers()
-                self.wfile.write(str(e).encode())
-                return
+# Create a single Crawler instance and expose its `crawl` method as the server callback.
+# This keeps dependency injection explicit and allows the server to pass a `CrawlerConfig`
+# directly into `crawler.crawl(config)`.
 
-            if config_name:
-                cfg = configs_repo.get_config(config_name)
-                if not cfg:
-                    self.send_response(404)
-                    self.end_headers()
-                    self.wfile.write(b"config not found")
-                    return
-                use_depth = depth if depth is not None else cfg.max_depth
-                if depth is not None:
-                    cfg = type(cfg)(cfg.config_id, cfg.name, cfg.config_path, root_urls=cfg.root_urls, max_depth=use_depth, robots=cfg.robots, refresh_days=cfg.refresh_days)
-
-                # spawn a single crawl thread which will iterate the config's root URLs
-                thread = threading.Thread(target=_start_crawl, args=(cfg,), daemon=True)
-                thread.start()
-
-                self.send_response(202)
-                self.end_headers()
-                self.wfile.write(b"Crawl(s) started for config")
-                return
-
-            # fallback: direct URL crawl -> create an ad-hoc config with the URL as root
-            use_depth = depth if depth is not None else config.DEFAULT_DEPTH
-            from infracrawl.domain.config import CrawlerConfig
-            adhoc_cfg = CrawlerConfig(config_id=None, name="adhoc", config_path="<adhoc>", root_urls=[url], max_depth=use_depth)
-            thread = threading.Thread(target=_start_crawl, args=(adhoc_cfg,), daemon=True)
-            thread.start()
-
-            self.send_response(202)
-            self.end_headers()
-            self.wfile.write(b"Crawl started")
-            return
-
-        self.send_response(404)
-        self.end_headers()
-
-
-def _start_crawl(config):
-    cfg_name = getattr(config, 'name', '<config>')
-    print(f"Starting crawl: {cfg_name}")
-    # Pass repositories explicitly for dependency injection
-    crawler = Crawler(
-        pages_repo=pages_repo,
-        links_repo=links_repo,
-        configs_repo=configs_repo
-    )
-    crawler.crawl(config)
-    print(f"Crawl finished: {cfg_name}")
 
 
 def main():
@@ -128,8 +37,13 @@ def main():
 
     # Start control HTTP server
     server_port = 8000
-    # Create the control server using the ConfigService rather than the raw repo
-    server = create_server(pages_repo, links_repo, config_service, _start_crawl, host='0.0.0.0', port=server_port)
+    # Instantiate the crawler once and pass its `crawl` method as the callback
+    crawler = Crawler(
+        pages_repo=pages_repo,
+        links_repo=links_repo,
+        configs_repo=configs_repo
+    )
+    server = create_server(pages_repo, links_repo, config_service, crawler.crawl, host='0.0.0.0', port=server_port)
 
     def serve():
         print(f"Control server listening on 0.0.0.0:{server_port}")
