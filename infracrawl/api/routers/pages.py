@@ -8,16 +8,14 @@ def create_pages_router(pages_repo, config_service: ConfigService):
     router = APIRouter(prefix="/pages", tags=["Pages"])
 
     @router.get("/")
-    def list_pages(config: Optional[str] = None, include_page_content: Optional[bool] = None, full: Optional[bool] = None, limit: Optional[int] = 100, offset: Optional[int] = 0):
-        # include_page_content is preferred; fall back to full for compatibility
-        include = include_page_content if include_page_content is not None else (full if full is not None else False)
+    def list_pages(config: Optional[str] = None, include_page_content: Optional[bool] = None, limit: Optional[int] = 100, offset: Optional[int] = 0):
         config_id = None
         if config:
             cfg = config_service.configs_repo.get_config(config)
             if not cfg:
                 raise HTTPException(status_code=404, detail="config not found")
             config_id = cfg.config_id
-        pages = pages_repo.fetch_pages(full=include, limit=limit, offset=offset, config_id=config_id)
+        pages = pages_repo.fetch_pages(full=include_page_content, limit=limit, offset=offset, config_id=config_id)
         return {"pages": [p.__dict__ for p in pages], "limit": limit, "offset": offset}
 
     @router.get("/{page_id}")

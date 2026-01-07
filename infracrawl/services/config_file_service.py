@@ -26,5 +26,6 @@ class ConfigFileService:
 
     def validate_config(self, data: Dict[str, Any]) -> bool:
         """Basic validation: check for required fields."""
-        required = ["name", "root_urls", "max_depth"]
+        # `name` removed from config file schema; identify configs by filename/config_path
+        required = ["root_urls", "max_depth"]
         return all(field in data for field in required)

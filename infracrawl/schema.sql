@@ -19,14 +19,14 @@ CREATE INDEX IF NOT EXISTS idx_links_from ON links (link_from_id);
 -- Table for crawler configurations loaded from YAML files
 CREATE TABLE IF NOT EXISTS crawler_configs (
   config_id SERIAL PRIMARY KEY,
-  name TEXT UNIQUE NOT NULL,
+  config_path TEXT UNIQUE NOT NULL,
   root_urls JSONB NOT NULL,
   max_depth INTEGER NOT NULL,
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_crawler_configs_name ON crawler_configs (name);
+CREATE INDEX IF NOT EXISTS idx_crawler_configs_config_path ON crawler_configs (config_path);
 
 -- Migrations tracking table (records applied SQL migration filenames)
 CREATE TABLE IF NOT EXISTS migrations (

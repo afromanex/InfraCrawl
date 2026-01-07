@@ -10,10 +10,13 @@ from infracrawl.services.crawl_registry import InMemoryCrawlRegistry
 
 class CrawlRequest(BaseModel):
     config: str
-    depth: Optional[int] = None
 
 
 class ReloadRequest(BaseModel):
+    config: str
+
+
+class RemoveRequest(BaseModel):
     config: str
 
 
@@ -21,16 +24,15 @@ def create_crawlers_router(pages_repo, links_repo, config_service: ConfigService
     router = APIRouter(prefix="/crawlers", tags=["Crawlers"])
 
     @router.get("/export")
-    def export(config: Optional[str] = None, include_page_content: Optional[bool] = None, full: Optional[bool] = None, limit: Optional[int] = None):
+    def export(config: Optional[str] = None, include_page_content: Optional[bool] = None, limit: Optional[int] = None):
         # include_page_content is the preferred param; full is accepted as a fallback for compatibility
-        include = include_page_content if include_page_content is not None else (full if full is not None else False)
         config_id = None
         if config:
             cfg = config_service.get_config(config)
             if not cfg:
                 raise HTTPException(status_code=404, detail="config not found")
             config_id = cfg.config_id
-        pages = pages_repo.fetch_pages(full=include, limit=limit, config_id=config_id)
+        pages = pages_repo.fetch_pages(full=include_page_content, limit=limit, config_id=config_id)
         links = links_repo.fetch_links(limit=limit, config_id=config_id)
         return {"pages": [p.__dict__ for p in pages], "links": [l.__dict__ for l in links]}
 
@@ -41,13 +43,11 @@ def create_crawlers_router(pages_repo, links_repo, config_service: ConfigService
         cfg = config_service.get_config(req.config)
         if not cfg:
             raise HTTPException(status_code=404, detail="config not found")
-        use_depth = req.depth if req.depth is not None else cfg.max_depth
-        if req.depth is not None and cfg is not None:
-            cfg = CrawlerConfig(cfg.config_id, cfg.name, cfg.config_path, root_urls=cfg.root_urls, max_depth=use_depth, robots=cfg.robots, refresh_days=cfg.refresh_days)
+        # depth is taken from the stored config file; do not accept depth from request
         # register crawl in registry (if provided)
         crawl_id = None
         if crawl_registry is not None:
-            crawl_id = crawl_registry.start(config_name=cfg.name, config_id=cfg.config_id)
+            crawl_id = crawl_registry.start(config_name=cfg.config_path, config_id=cfg.config_id)
 
         stop_event = crawl_registry.get_stop_event(crawl_id) if crawl_registry is not None else None
 
@@ -112,7 +112,7 @@ def create_crawlers_router(pages_repo, links_repo, config_service: ConfigService
         # register reload crawl in registry (if provided)
         crawl_id = None
         if crawl_registry is not None:
-            crawl_id = crawl_registry.start(config_name=cfg.name, config_id=cfg.config_id)
+            crawl_id = crawl_registry.start(config_name=cfg.config_path, config_id=cfg.config_id)
 
         def _run_and_track(cfg, cid=None):
             try:
@@ -126,5 +126,27 @@ def create_crawlers_router(pages_repo, links_repo, config_service: ConfigService
 
         background_tasks.add_task(_run_and_track, cfg, crawl_id)
         return {"status": "reloading", "deleted_pages": deleted_pages, "deleted_links": deleted_links, "crawl_id": crawl_id}
+
+    @router.delete("/remove")
+    def remove(req: RemoveRequest):
+        config_name = req.config
+        if not config_name:
+            raise HTTPException(status_code=400, detail="missing config")
+
+        cfg = config_service.get_config(config_name)
+        if not cfg:
+            raise HTTPException(status_code=404, detail="config not found")
+
+        try:
+            page_ids = pages_repo.get_page_ids_by_config(cfg.config_id)
+            deleted_links = 0
+            deleted_pages = 0
+            if page_ids:
+                deleted_links = links_repo.delete_links_for_page_ids(page_ids)
+                deleted_pages = pages_repo.delete_pages_by_ids(page_ids)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"error removing data: {e}")
+
+        return {"status": "removed", "deleted_pages": deleted_pages, "deleted_links": deleted_links}
 
     return router

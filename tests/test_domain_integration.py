@@ -6,7 +6,6 @@ def test_config_domain_roundtrip():
     repo = ConfigsRepository()
     config = CrawlerConfig(
         config_id=None,
-        name="pytest-config",
         config_path="pytest-config.yml",
         root_urls=["https://example.com/"],
         max_depth=1,
@@ -16,10 +15,10 @@ def test_config_domain_roundtrip():
     # Insert
     config_id = repo.upsert_config(config)
     assert isinstance(config_id, int)
-    # Fetch by name
-    loaded = repo.get_config("pytest-config")
+    # Fetch by config_path
+    loaded = repo.get_config("pytest-config.yml")
     assert loaded is not None
-    assert loaded.name == config.name
+    assert loaded.config_path == config.config_path
     # Simulate loading full config from YAML using config_path
     import os, yaml
     config_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "configs")
@@ -33,7 +32,7 @@ def test_config_domain_roundtrip():
         assert loaded.config_path == config.config_path
     # List
     configs = repo.list_configs()
-    assert any(c.name == "pytest-config" for c in configs)
-    # Delete
-    repo.delete_config("pytest-config")
-    assert repo.get_config("pytest-config") is None
+    assert any(c.config_path == "pytest-config.yml" for c in configs)
+    # Delete (by config_path)
+    repo.delete_config("pytest-config.yml")
+    assert repo.get_config("pytest-config.yml") is None

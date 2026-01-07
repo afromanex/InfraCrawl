@@ -37,7 +37,6 @@ class CrawlerConfig(Base):
     __tablename__ = "crawler_configs"
 
     config_id = Column(Integer, primary_key=True)
-    name = Column(Text, unique=True, nullable=False)
-    config_path = Column(Text, nullable=False)  # Path or filename of the YAML config
+    config_path = Column(Text, unique=True, nullable=False)  # Path or filename of the YAML config
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

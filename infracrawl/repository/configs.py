@@ -16,7 +16,8 @@ class ConfigsRepository:
 
     def upsert_config(self, config: CrawlerConfig) -> int:
         with self.get_session() as session:
-            q = select(DBCrawlerConfig).where(DBCrawlerConfig.name == config.name)
+            # Upsert by config_path only. Backwards compatibility by name removed.
+            q = select(DBCrawlerConfig).where(DBCrawlerConfig.config_path == config.config_path)
             c = session.execute(q).scalars().first()
             if c:
                 c.config_path = config.config_path
@@ -24,7 +25,6 @@ class ConfigsRepository:
                 session.commit()
                 return c.config_id
             c = DBCrawlerConfig(
-                name=config.name,
                 config_path=config.config_path
             )
             session.add(c)
@@ -34,13 +34,13 @@ class ConfigsRepository:
 
     def get_config(self, name: str) -> Optional[CrawlerConfig]:
         with self.get_session() as session:
-            q = select(DBCrawlerConfig).where(DBCrawlerConfig.name == name)
+            # Find by config_path only. The `name` fallback has been removed.
+            q = select(DBCrawlerConfig).where(DBCrawlerConfig.config_path == name)
             c = session.execute(q).scalars().first()
             if not c:
                 return None
             return CrawlerConfig(
                 config_id=c.config_id,
-                name=c.name,
                 config_path=c.config_path,
                 created_at=c.created_at,
                 updated_at=c.updated_at
@@ -54,7 +54,6 @@ class ConfigsRepository:
                 return None
             return CrawlerConfig(
                 config_id=c.config_id,
-                name=c.name,
                 config_path=c.config_path,
                 created_at=c.created_at,
                 updated_at=c.updated_at
@@ -66,7 +65,6 @@ class ConfigsRepository:
             rows = session.execute(q).scalars().all()
             return [CrawlerConfig(
                 config_id=c.config_id,
-                name=c.name,
                 config_path=c.config_path,
                 created_at=c.created_at,
                 updated_at=c.updated_at
@@ -74,7 +72,8 @@ class ConfigsRepository:
 
     def delete_config(self, name: str):
         with self.get_session() as session:
-            q = select(DBCrawlerConfig).where(DBCrawlerConfig.name == name)
+            # Delete by config_path only. No legacy name-based lookup.
+            q = select(DBCrawlerConfig).where(DBCrawlerConfig.config_path == name)
             c = session.execute(q).scalars().first()
             if c:
                 session.delete(c)

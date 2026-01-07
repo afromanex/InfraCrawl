@@ -10,7 +10,7 @@ class ConfigService:
         Scan the configs directory for YAML files, upsert configs into the DB by name and config_path,
         and remove DB configs not present on disk.
         """
-        loaded_names = set()
+        loaded_paths = set()
         for fname in os.listdir(self.configs_dir):
             if not (fname.endswith(".yml") or fname.endswith(".yaml")):
                 continue
@@ -18,27 +18,30 @@ class ConfigService:
             try:
                 with open(full_path, "r", encoding="utf-8") as f:
                     data = yaml.safe_load(f)
-                name = data.get("name")
-                if not name:
+                # Identify configs by filename (config_path). If YAML is malformed, skip.
+                if not isinstance(data, dict):
                     continue
                 config_obj = CrawlerConfig(
                     config_id=None,
-                    name=name,
-                    config_path=fname
+                    config_path=fname,
+                    root_urls=data.get("root_urls", []),
+                    max_depth=data.get("max_depth"),
+                    robots=data.get("robots", True),
+                    refresh_days=data.get("refresh_days")
                 )
                 cid = self.configs_repo.upsert_config(config_obj)
-                loaded_names.add(name)
-                print(f"Loaded config {name} -> id={cid}")
+                loaded_paths.add(fname)
+                print(f"Loaded config {fname} -> id={cid}")
             except Exception as e:
                 print(f"Warning: could not load config {fname}: {e}")
 
         # Remove any configs in DB that are not present on disk
         existing_configs = self.configs_repo.list_configs()
-        existing_names = set(c.name for c in existing_configs)
-        to_remove = existing_names - loaded_names
-        for name in to_remove:
-            self.configs_repo.delete_config(name)
-            print(f"Removed DB config not present on disk: {name}")
+        existing_paths = set(c.config_path for c in existing_configs)
+        to_remove = existing_paths - loaded_paths
+        for path in to_remove:
+            self.configs_repo.delete_config(path)
+            print(f"Removed DB config not present on disk: {path}")
 
     def __init__(self, configs_repo: Optional[ConfigsRepository] = None, configs_dir: Optional[str] = None):
         self.configs_repo = configs_repo or ConfigsRepository()
@@ -62,7 +65,6 @@ class ConfigService:
         # Populate all config fields from YAML
         return CrawlerConfig(
             config_id=db_cfg.config_id,
-            name=db_cfg.name,
             config_path=db_cfg.config_path,
             root_urls=data.get("root_urls", []),
             max_depth=data.get("max_depth"),
