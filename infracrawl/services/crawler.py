@@ -55,13 +55,17 @@ class Crawler:
                         pass
         return False
 
-    def _fetch_and_store(self, url: str, context: CrawlContext):
+    def _fetch_and_store(self, url: str, context: CrawlContext, stop_event=None):
         """Fetch a URL and persist the result using `FetchPersistService`.
 
         Returns the response body on success, or `None` on failure.
         """
         # Use the overridable `fetch` method so tests and subclasses can intercept network I/O
         try:
+            # check for cooperative cancellation before network I/O
+            if stop_event is not None and getattr(stop_event, 'is_set', lambda: False)():
+                logger.info("Fetch cancelled for %s", url)
+                return None
             status, body = self.fetch(url)
         except Exception as e:
             logger.error("Fetch error for %s: %s", url, e, exc_info=True)
@@ -84,15 +88,14 @@ class Crawler:
 
         return body
 
-    def _process_links(self, url: str, body: str, from_id: int, context: CrawlContext, depth: int, _crawl_from=None):
+    def _process_links(self, url: str, body: str, from_id: int, context: CrawlContext, depth: int, _crawl_from=None, stop_event=None):
         # Delegate link extraction, persistence and scheduling to LinkProcessor
         # Crawl callback prefers direct method but falls back to supplied callback
         def cb(link_url, next_depth):
             if _crawl_from is not None:
-                _crawl_from(link_url, next_depth)
+                _crawl_from(link_url, next_depth, stop_event)
             else:
-                self._crawl_from(link_url, next_depth, context)
-
+                self._crawl_from(link_url, next_depth, context, stop_event)
         self.link_processor.process_links(context.current_root, url, body, from_id, context, depth, crawl_callback=cb, extract_links_fn=self.extract_links)
     def __init__(self, pages_repo=None, links_repo=None, configs_repo=None, delay=None, user_agent=None, http_service=None, content_review_service=None, robots_service=None, link_processor=None, fetch_persist_service=None):
         self.pages_repo = pages_repo or PagesRepository()
@@ -123,7 +126,7 @@ class Crawler:
         except Exception:
             return False
 
-    def crawl(self, config: CrawlerConfig):
+    def crawl(self, config: CrawlerConfig, stop_event=None):
         """Crawl using the provided `CrawlerConfig` object.
 
         Iterates `config.root_urls` and performs depth-limited crawling from
@@ -139,16 +142,24 @@ class Crawler:
 
         roots = getattr(context.config, 'root_urls', []) or []
         for ru in roots:
+            # cooperative cancellation: check stop_event before starting each root
+            if stop_event is not None and getattr(stop_event, 'is_set', lambda: False)():
+                logger.info("Crawl cancelled before starting root %s", ru)
+                return
             context.set_root(ru)
-            self._crawl_from(ru, context.max_depth, context)
+            self._crawl_from(ru, context.max_depth, context, stop_event)
 
-    def _crawl_from(self, url: str, depth: int, context: CrawlContext):
+    def _crawl_from(self, url: str, depth: int, context: CrawlContext, stop_event=None):
         if context.is_visited(url):
             logger.debug("Skipping (visited) %s", url)
             return
         context.mark_visited(url)
 
         from_id = self.pages_repo.ensure_page(url)
+
+        if stop_event is not None and getattr(stop_event, 'is_set', lambda: False)():
+            logger.info("Crawl cancelled during traversal of %s", url)
+            return
 
         if self._should_skip_due_to_depth(context, depth):
             return
@@ -157,11 +168,11 @@ class Crawler:
         if self._should_skip_due_to_refresh(url, context):
             return
 
-        body = self._fetch_and_store(url, context)
+        body = self._fetch_and_store(url, context, stop_event)
         if body is None:
             return
 
         time.sleep(self.delay)
-        self._process_links(url, body, from_id, context, depth, None)
+        self._process_links(url, body, from_id, context, depth, None, stop_event)
 
         

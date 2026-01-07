@@ -49,9 +49,12 @@ def create_crawlers_router(pages_repo, links_repo, config_service: ConfigService
         if crawl_registry is not None:
             crawl_id = crawl_registry.start(config_name=cfg.name, config_id=cfg.config_id)
 
-        def _run_and_track(cfg, cid=None):
+        stop_event = crawl_registry.get_stop_event(crawl_id) if crawl_registry is not None else None
+
+        def _run_and_track(cfg, cid=None, stop_event=None):
             try:
-                start_crawl_callback(cfg)
+                # pass stop_event into the crawl callback so the worker can exit cooperatively
+                start_crawl_callback(cfg, stop_event) if stop_event is not None else start_crawl_callback(cfg)
                 if cid and crawl_registry is not None:
                     crawl_registry.finish(cid, status="finished")
             except Exception as e:
@@ -59,7 +62,7 @@ def create_crawlers_router(pages_repo, links_repo, config_service: ConfigService
                     crawl_registry.finish(cid, status="failed", error=str(e))
                 raise
 
-        background_tasks.add_task(_run_and_track, cfg, crawl_id)
+        background_tasks.add_task(_run_and_track, cfg, crawl_id, stop_event)
         return {"status": "started", "crawl_id": crawl_id}
 
     @router.get("/active")
@@ -76,6 +79,15 @@ def create_crawlers_router(pages_repo, links_repo, config_service: ConfigService
         if not rec:
             raise HTTPException(status_code=404, detail="crawl not found")
         return rec
+
+    @router.post("/cancel/{crawl_id}")
+    def cancel_crawl(crawl_id: str):
+        if crawl_registry is None:
+            raise HTTPException(status_code=404, detail="no registry configured")
+        ok = crawl_registry.cancel(crawl_id)
+        if not ok:
+            raise HTTPException(status_code=404, detail="crawl not found or cannot cancel")
+        return {"status": "cancelling", "crawl_id": crawl_id}
 
     @router.post("/reload")
     def reload(req: ReloadRequest, background_tasks: BackgroundTasks):

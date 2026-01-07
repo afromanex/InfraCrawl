@@ -33,6 +33,7 @@ class InMemoryCrawlRegistry:
     def __init__(self):
         self._lock = threading.Lock()
         self._records: Dict[str, CrawlRecord] = {}
+        self._cancel_events: Dict[str, threading.Event] = {}
 
     def start(self, config_name: str, config_id: Optional[int] = None) -> str:
         with self._lock:
@@ -47,6 +48,8 @@ class InMemoryCrawlRegistry:
                 last_seen=now,
             )
             self._records[cid] = rec
+            # create cancellation event for cooperative cancellation
+            self._cancel_events[cid] = threading.Event()
             return cid
 
     def update(self, crawl_id: str, *, pages_fetched: Optional[int] = None, links_found: Optional[int] = None, current_url: Optional[str] = None):
@@ -73,12 +76,35 @@ class InMemoryCrawlRegistry:
             rec.last_seen = rec.finished_at
             if error:
                 rec.error = error
+            # cleanup cancel event
+            ev = self._cancel_events.pop(crawl_id, None)
+            if ev:
+                ev.set()
             return True
 
     def get(self, crawl_id: str) -> Optional[Dict]:
         with self._lock:
             rec = self._records.get(crawl_id)
             return asdict(rec) if rec else None
+
+    def get_stop_event(self, crawl_id: str) -> Optional[threading.Event]:
+        with self._lock:
+            return self._cancel_events.get(crawl_id)
+
+    def cancel(self, crawl_id: str) -> bool:
+        """Request cancellation for a running crawl. This sets the cancel event
+        and marks the crawl as cancelled (finish time set).
+        """
+        with self._lock:
+            ev = self._cancel_events.get(crawl_id)
+            rec = self._records.get(crawl_id)
+            if not ev or not rec:
+                return False
+            ev.set()
+            rec.status = "cancelled"
+            rec.finished_at = datetime.utcnow()
+            rec.last_seen = rec.finished_at
+            return True
 
     def list_active(self) -> List[Dict]:
         with self._lock:
