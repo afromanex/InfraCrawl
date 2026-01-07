@@ -10,6 +10,7 @@ from infracrawl.repository.configs import ConfigsRepository
 from infracrawl import config
 from infracrawl.services.crawler import Crawler
 from infracrawl.services.config_service import ConfigService
+from infracrawl.api.server import create_server
 
 
 pages_repo = PagesRepository()
@@ -102,16 +103,23 @@ class ControlHandler(BaseHTTPRequestHandler):
         self.end_headers()
 
 
-def _start_crawl(url: str, depth: int, config: object | None = None):
-    print(f"Starting crawl: {url} depth={depth} config={getattr(config, 'name', config)}")
+def _start_crawl(url: str | None, depth: int, config: object | None = None):
+    print(f"Starting crawl: {url or '<config roots>'} depth={depth} config={getattr(config, 'name', config)}")
     # Pass repositories explicitly for dependency injection
     crawler = Crawler(
         pages_repo=pages_repo,
         links_repo=links_repo,
         configs_repo=configs_repo
     )
-    crawler.crawl(url, max_depth=depth, config=config)
-    print(f"Crawl finished: {url}")
+    # If a config object is supplied, let crawler iterate its roots; otherwise use adhoc config
+    if config is not None:
+        crawler.crawl(config)
+    else:
+        # adhoc: single URL passed in url param; build a small config with that root
+        from infracrawl.domain.config import CrawlerConfig
+        adhoc_cfg = CrawlerConfig(config_id=None, name="adhoc", config_path="<adhoc>", root_urls=[url], max_depth=depth)
+        crawler.crawl(adhoc_cfg)
+    print(f"Crawl finished: {url or '<config roots>'}")
 
 
 def main():
