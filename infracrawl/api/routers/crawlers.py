@@ -24,7 +24,19 @@ class RemoveRequest(BaseModel):
 def create_crawlers_router(pages_repo, links_repo, config_service: ConfigService, start_crawl_callback, crawl_registry: InMemoryCrawlRegistry = None):
     router = APIRouter(prefix="/crawlers", tags=["Crawlers"])
 
-    @router.get("/export")
+    @router.get(
+        "/export",
+        responses={
+            200: {
+                "content": {
+                    "application/x-ndjson": {
+                        "schema": {"type": "string", "format": "binary"}
+                    }
+                },
+                "description": "NDJSON stream (one JSON object per line)"
+            }
+        },
+    )
     def export(config: Optional[str] = None, include_html: Optional[bool] = None, include_plain_text: Optional[bool] = None, limit: Optional[int] = None):
         # `include_html` and `include_plain_text` control which fields are returned.
         include_html = bool(include_html)
@@ -53,12 +65,11 @@ def create_crawlers_router(pages_repo, links_repo, config_service: ConfigService
                 d["plain_text"] = p.plain_text
             return d
 
-        def gen():
+        def gen_ndjson():
             for p in pages:
                 yield (json.dumps(page_to_dict(p), default=str) + "\n").encode("utf-8")
 
-        headers = {"Content-Type": "application/x-ndjson"}
-        return StreamingResponse(gen(), media_type="application/x-ndjson", headers=headers)
+        return StreamingResponse(gen_ndjson(), media_type="application/x-ndjson")
 
     @router.post("/crawl", status_code=202)
     def crawl(req: CrawlRequest, background_tasks: BackgroundTasks):
