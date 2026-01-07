@@ -9,7 +9,7 @@ from infracrawl.repository.links import LinksRepository
 from infracrawl.repository.configs import ConfigsRepository
 from infracrawl import config
 from infracrawl.services.crawler import Crawler
-from infracrawl import configs as config_loader
+from infracrawl.services.config_service import ConfigService
 
 
 pages_repo = PagesRepository()
@@ -119,21 +119,34 @@ def main():
 
     # Load YAML configs and upsert into DB. Remove DB configs not present on disk.
     try:
-        cfgs = config_loader.load_configs_from_dir()
+        config_service = ConfigService(configs_repo=configs_repo)
+        config_files = config_service.list_configs()
         loaded_names = set()
-        for c in cfgs:
-            from infracrawl.domain import CrawlerConfig
-            config_obj = CrawlerConfig(
-                config_id=None,
-                name=c["name"],
-                root_urls=c["root_urls"],
-                max_depth=c["max_depth"],
-                robots=c.get("robots", True),
-                refresh_days=c.get("refresh_days")
-            )
-            cid = configs_repo.upsert_config(config_obj)
-            loaded_names.add(c["name"])
-            print(f"Loaded config {c['name']} -> id={cid}")
+        # Upsert configs from files (by name and config_path)
+        import os
+        configs_dir = os.path.join(os.getcwd(), "configs")
+        for fname in os.listdir(configs_dir):
+            if not (fname.endswith(".yml") or fname.endswith(".yaml")):
+                continue
+            full_path = os.path.join(configs_dir, fname)
+            try:
+                import yaml
+                with open(full_path, "r", encoding="utf-8") as f:
+                    data = yaml.safe_load(f)
+                name = data.get("name")
+                if not name:
+                    continue
+                from infracrawl.domain import CrawlerConfig
+                config_obj = CrawlerConfig(
+                    config_id=None,
+                    name=name,
+                    config_path=fname
+                )
+                cid = configs_repo.upsert_config(config_obj)
+                loaded_names.add(name)
+                print(f"Loaded config {name} -> id={cid}")
+            except Exception as e:
+                print(f"Warning: could not load config {fname}: {e}")
 
         # Remove any configs in DB that are not present on disk
         existing_configs = configs_repo.list_configs()
