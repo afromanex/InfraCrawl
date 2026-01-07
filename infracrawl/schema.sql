@@ -2,6 +2,7 @@ CREATE TABLE IF NOT EXISTS pages (
   page_id SERIAL PRIMARY KEY,
   page_url TEXT UNIQUE NOT NULL,
   page_content TEXT,
+  plain_text TEXT,
   http_status INTEGER,
   fetched_at TIMESTAMPTZ
 );

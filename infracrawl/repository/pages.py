@@ -36,17 +36,19 @@ class PagesRepository:
                 page_id=p.page_id,
                 page_url=p.page_url,
                 page_content=p.page_content,
+                plain_text=p.plain_text,
                 http_status=p.http_status,
                 fetched_at=p.fetched_at,
                 config_id=p.config_id
             )
 
-    def upsert_page(self, page_url: str, page_content: Optional[str], http_status: Optional[int], fetched_at: Optional[str], config_id: Optional[int] = None) -> Page:
+    def upsert_page(self, page_url: str, page_content: Optional[str], http_status: Optional[int], fetched_at: Optional[str], config_id: Optional[int] = None, plain_text: Optional[str] = None) -> Page:
         with self.get_session() as session:
             q = select(DBPage).where(DBPage.page_url == page_url)
             p = session.execute(q).scalars().first()
             if p:
                 p.page_content = page_content
+                p.plain_text = plain_text
                 p.http_status = http_status
                 p.fetched_at = fetched_at
                 if config_id is not None:
@@ -57,11 +59,12 @@ class PagesRepository:
                     page_id=p.page_id,
                     page_url=p.page_url,
                     page_content=p.page_content,
+                    plain_text=p.plain_text,
                     http_status=p.http_status,
                     fetched_at=p.fetched_at,
                     config_id=p.config_id,
                 )
-            p = DBPage(page_url=page_url, page_content=page_content, http_status=http_status, fetched_at=fetched_at, config_id=config_id)
+            p = DBPage(page_url=page_url, page_content=page_content, plain_text=plain_text, http_status=http_status, fetched_at=fetched_at, config_id=config_id)
             session.add(p)
             session.commit()
             session.refresh(p)
@@ -69,6 +72,7 @@ class PagesRepository:
                 page_id=p.page_id,
                 page_url=p.page_url,
                 page_content=p.page_content,
+                plain_text=p.plain_text,
                 http_status=p.http_status,
                 fetched_at=p.fetched_at,
                 config_id=p.config_id,
@@ -89,6 +93,7 @@ class PagesRepository:
                 page_id=p.page_id,
                 page_url=p.page_url,
                 page_content=p.page_content if full else None,
+                plain_text=p.plain_text if full else None,
                 http_status=p.http_status,
                 fetched_at=p.fetched_at,
                 config_id=p.config_id
@@ -104,6 +109,7 @@ class PagesRepository:
                 page_id=p.page_id,
                 page_url=p.page_url,
                 page_content=p.page_content,
+                plain_text=p.plain_text,
                 http_status=p.http_status,
                 fetched_at=p.fetched_at,
                 config_id=p.config_id

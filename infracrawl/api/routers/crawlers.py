@@ -24,17 +24,36 @@ def create_crawlers_router(pages_repo, links_repo, config_service: ConfigService
     router = APIRouter(prefix="/crawlers", tags=["Crawlers"])
 
     @router.get("/export")
-    def export(config: Optional[str] = None, include_page_content: Optional[bool] = None, limit: Optional[int] = None):
-        # include_page_content is the preferred param; full is accepted as a fallback for compatibility
+    def export(config: Optional[str] = None, include_html: Optional[bool] = None, include_plain_text: Optional[bool] = None, limit: Optional[int] = None):
+        # `include_html` and `include_plain_text` control which fields are returned.
+        include_html = bool(include_html)
+        include_plain_text = bool(include_plain_text)
         config_id = None
         if config:
             cfg = config_service.get_config(config)
             if not cfg:
                 raise HTTPException(status_code=404, detail="config not found")
             config_id = cfg.config_id
-        pages = pages_repo.fetch_pages(full=include_page_content, limit=limit, config_id=config_id)
+        # fetch full rows if either HTML or plain text is requested
+        fetch_full = include_html or include_plain_text
+        pages = pages_repo.fetch_pages(full=fetch_full, limit=limit, config_id=config_id)
         links = links_repo.fetch_links(limit=limit, config_id=config_id)
-        return {"pages": [p.__dict__ for p in pages], "links": [l.__dict__ for l in links]}
+
+        def page_to_dict(p):
+            d = {
+                "page_id": p.page_id,
+                "page_url": p.page_url,
+                "http_status": p.http_status,
+                "fetched_at": p.fetched_at,
+                "config_id": p.config_id,
+            }
+            if include_html:
+                d["page_content"] = p.page_content
+            if include_plain_text:
+                d["plain_text"] = p.plain_text
+            return d
+
+        return {"pages": [page_to_dict(p) for p in pages], "links": [l.__dict__ for l in links]}
 
     @router.post("/crawl", status_code=202)
     def crawl(req: CrawlRequest, background_tasks: BackgroundTasks):

@@ -6,6 +6,7 @@ from infracrawl.services.http_service import HttpService
 from infracrawl.repository.pages import PagesRepository
 from infracrawl.domain.crawl_context import CrawlContext
 from infracrawl.domain.page import Page as DomainPage
+from bs4 import BeautifulSoup
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +37,15 @@ class PageFetchPersistService:
             except Exception:
                 config_id = None
 
-        page = self.pages_repo.upsert_page(url, body, status, fetched_at, config_id=config_id)
+        plain = None
+        try:
+            if body:
+                soup = BeautifulSoup(body, "html.parser")
+                plain = soup.get_text(separator="\n", strip=True)
+        except Exception:
+            plain = None
+
+        page = self.pages_repo.upsert_page(url, body, status, fetched_at, config_id=config_id, plain_text=plain)
         return page
 
     def persist(self, url: str, status: str, body: Optional[str], fetched_at: str, context: Optional[CrawlContext] = None) -> DomainPage:
@@ -48,5 +57,13 @@ class PageFetchPersistService:
             except Exception:
                 config_id = None
 
-        page = self.pages_repo.upsert_page(url, body, status, fetched_at, config_id=config_id)
+        plain = None
+        try:
+            if body:
+                soup = BeautifulSoup(body, "html.parser")
+                plain = soup.get_text(separator="\n", strip=True)
+        except Exception:
+            plain = None
+
+        page = self.pages_repo.upsert_page(url, body, status, fetched_at, config_id=config_id, plain_text=plain)
         return page
