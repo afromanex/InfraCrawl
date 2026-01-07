@@ -34,3 +34,5 @@ CREATE INDEX IF NOT EXISTS idx_pages_config ON pages (config_id);
 
 -- Add robots flag to crawler configs (default true)
 ALTER TABLE crawler_configs ADD COLUMN IF NOT EXISTS robots BOOLEAN DEFAULT true;
+-- Optional: refresh_days specifies that pages fetched within this many days should be skipped
+ALTER TABLE crawler_configs ADD COLUMN IF NOT EXISTS refresh_days INTEGER;

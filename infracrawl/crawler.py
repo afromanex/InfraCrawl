@@ -2,7 +2,7 @@ from bs4 import BeautifulSoup
 import requests
 import time
 from urllib.parse import urljoin, urlparse
-from datetime import datetime
+from datetime import datetime, timezone
 from infracrawl import config
 from infracrawl import db
 from urllib.parse import urlunparse
@@ -85,6 +85,7 @@ class Crawler:
 
         def _crawl_from(url: str, depth: int):
             if url in visited:
+                print(f"Skipping (visited) {url}")
                 return
             visited.add(url)
 
@@ -94,18 +95,51 @@ class Crawler:
             # if ensure_page created without config_id, we'll set config_id when upserting after fetch
 
             if depth < 0:
+                print(f"Skipping (max depth reached) {url} at depth {depth}")
                 return
 
-            # Check robots
+            # Check robots and refresh_days
             cfg_robots = True
+            cfg_refresh_days = None
             if config_id is not None:
                 cfg = db.get_config_by_id(config_id) if hasattr(db, 'get_config_by_id') else None
                 if isinstance(cfg, dict):
                     cfg_robots = cfg.get('robots', True)
+                    cfg_refresh_days = cfg.get('refresh_days')
 
             if not self._allowed_by_robots(url, cfg_robots):
-                print(f"Disallowed by robots.txt: {url}")
+                print(f"Skipping (robots) {url}")
                 return
+
+            # Check refresh_days: skip fetching if recently fetched
+            if cfg_refresh_days is not None:
+                page = db.get_page_by_url(url)
+                if page and page.get('fetched_at'):
+                    try:
+                        last = page.get('fetched_at')
+                        if isinstance(last, str):
+                            try:
+                                last_dt = datetime.fromisoformat(last)
+                            except Exception:
+                                last_dt = None
+                        else:
+                            last_dt = last
+                        if last_dt is not None:
+                            try:
+                                # Normalize last_dt to UTC naive datetime for safe subtraction
+                                if last_dt.tzinfo is not None:
+                                    last_dt_utc = last_dt.astimezone(timezone.utc).replace(tzinfo=None)
+                                else:
+                                    last_dt_utc = last_dt
+                                delta_days = (datetime.utcnow() - last_dt_utc).days
+                                if delta_days < int(cfg_refresh_days):
+                                    print(f"Skipping {url}; fetched {delta_days} days ago (< {cfg_refresh_days})")
+                                    return
+                            except Exception:
+                                # If any error occurs comparing datetimes, fall through and fetch
+                                pass
+                    except Exception:
+                        pass
 
             try:
                 status, body = self.fetch(url)
@@ -121,6 +155,7 @@ class Crawler:
             links = self.extract_links(url, body)
             for link_url, anchor in links:
                 if not self._same_host(start_url, link_url):
+                    print(f"Skipping (external) {link_url} -> not same host as {start_url}")
                     continue
                 to_id = db.ensure_page(link_url)
                 db.insert_link(from_id, to_id, anchor)
