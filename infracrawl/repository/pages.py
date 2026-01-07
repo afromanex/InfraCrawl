@@ -41,7 +41,7 @@ class PagesRepository:
                 config_id=p.config_id
             )
 
-    def upsert_page(self, page_url: str, page_content: Optional[str], http_status: Optional[int], fetched_at: Optional[str], config_id: Optional[int] = None) -> int:
+    def upsert_page(self, page_url: str, page_content: Optional[str], http_status: Optional[int], fetched_at: Optional[str], config_id: Optional[int] = None) -> Page:
         with self.get_session() as session:
             q = select(DBPage).where(DBPage.page_url == page_url)
             p = session.execute(q).scalars().first()
@@ -53,12 +53,26 @@ class PagesRepository:
                     p.config_id = config_id
                 session.add(p)
                 session.commit()
-                return p.page_id
+                return Page(
+                    page_id=p.page_id,
+                    page_url=p.page_url,
+                    page_content=p.page_content,
+                    http_status=p.http_status,
+                    fetched_at=p.fetched_at,
+                    config_id=p.config_id,
+                )
             p = DBPage(page_url=page_url, page_content=page_content, http_status=http_status, fetched_at=fetched_at, config_id=config_id)
             session.add(p)
             session.commit()
             session.refresh(p)
-            return p.page_id
+            return Page(
+                page_id=p.page_id,
+                page_url=p.page_url,
+                page_content=p.page_content,
+                http_status=p.http_status,
+                fetched_at=p.fetched_at,
+                config_id=p.config_id,
+            )
 
     def fetch_pages(self, full: bool = False, limit: Optional[int] = None) -> List[Page]:
         with self.get_session() as session:

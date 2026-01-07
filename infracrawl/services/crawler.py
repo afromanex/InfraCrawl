@@ -8,7 +8,7 @@ from infracrawl.services.http_service import HttpService
 from infracrawl.services.content_review_service import ContentReviewService
 from infracrawl.services.robots_service import RobotsService
 from infracrawl.services.link_processor import LinkProcessor
-from infracrawl.services.page_fetch_persist_service import PageFetchPersistService, PageFetchResult
+from infracrawl.services.page_fetch_persist_service import PageFetchPersistService
 
 from infracrawl import config
 from infracrawl.repository.pages import PagesRepository
@@ -69,8 +69,8 @@ class Crawler:
 
         fetched_at = datetime.utcnow().isoformat()
         try:
-            page_id = self.fetch_persist_service.persist(url, status, body, fetched_at, context=context)
-            logger.info("Fetched %s -> status %s, page_id=%s", url, status, page_id)
+            page = self.fetch_persist_service.persist(url, status, body, fetched_at, context=context)
+            logger.info("Fetched %s -> status %s, page_id=%s", url, status, getattr(page, 'page_id', None))
         except Exception as e:
             logger.error("Storage error while saving %s: %s", url, e, exc_info=True)
             return None
