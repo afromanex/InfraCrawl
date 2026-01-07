@@ -19,19 +19,13 @@ class ConfigsRepository:
             q = select(DBCrawlerConfig).where(DBCrawlerConfig.name == config.name)
             c = session.execute(q).scalars().first()
             if c:
-                c.root_urls = config.root_urls
-                c.max_depth = config.max_depth
-                c.robots = config.robots
-                c.refresh_days = config.refresh_days
+                c.config_path = config.config_path
                 session.add(c)
                 session.commit()
                 return c.config_id
             c = DBCrawlerConfig(
                 name=config.name,
-                root_urls=config.root_urls,
-                max_depth=config.max_depth,
-                robots=config.robots,
-                refresh_days=config.refresh_days
+                config_path=config.config_path
             )
             session.add(c)
             session.commit()
@@ -47,10 +41,7 @@ class ConfigsRepository:
             return CrawlerConfig(
                 config_id=c.config_id,
                 name=c.name,
-                root_urls=c.root_urls,
-                max_depth=c.max_depth,
-                robots=c.robots,
-                refresh_days=c.refresh_days,
+                config_path=c.config_path,
                 created_at=c.created_at,
                 updated_at=c.updated_at
             )
@@ -64,10 +55,7 @@ class ConfigsRepository:
             return CrawlerConfig(
                 config_id=c.config_id,
                 name=c.name,
-                root_urls=c.root_urls,
-                max_depth=c.max_depth,
-                robots=c.robots,
-                refresh_days=c.refresh_days,
+                config_path=c.config_path,
                 created_at=c.created_at,
                 updated_at=c.updated_at
             )
@@ -79,10 +67,7 @@ class ConfigsRepository:
             return [CrawlerConfig(
                 config_id=c.config_id,
                 name=c.name,
-                root_urls=c.root_urls,
-                max_depth=c.max_depth,
-                robots=c.robots,
-                refresh_days=c.refresh_days,
+                config_path=c.config_path,
                 created_at=c.created_at,
                 updated_at=c.updated_at
             ) for c in rows]

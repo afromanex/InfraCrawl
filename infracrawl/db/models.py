@@ -38,9 +38,6 @@ class CrawlerConfig(Base):
 
     config_id = Column(Integer, primary_key=True)
     name = Column(Text, unique=True, nullable=False)
-    root_urls = Column(JSON, nullable=False)
-    max_depth = Column(Integer, nullable=False)
-    robots = Column(Boolean, nullable=False, server_default="true")
-    refresh_days = Column(Integer, nullable=True)
+    config_path = Column(Text, nullable=False)  # Path or filename of the YAML config
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
