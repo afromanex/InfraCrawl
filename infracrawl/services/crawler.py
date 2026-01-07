@@ -3,9 +3,9 @@ import time
 from datetime import datetime, timezone
 from urllib.parse import urljoin, urlparse
 
-from urllib.robotparser import RobotFileParser
 from infracrawl.services.http_service import HttpService
 from infracrawl.services.content_review_service import ContentReviewService
+from infracrawl.services.robots_service import RobotsService
 
 from infracrawl import config
 from infracrawl.repository.pages import PagesRepository
@@ -16,9 +16,8 @@ from infracrawl.domain import Link
 logger = logging.getLogger(__name__)
 
 
-
 class Crawler:
-    def __init__(self, pages_repo=None, links_repo=None, configs_repo=None, delay=None, user_agent=None, http_service=None, content_review_service=None):
+    def __init__(self, pages_repo=None, links_repo=None, configs_repo=None, delay=None, user_agent=None, http_service=None, content_review_service=None, robots_service=None):
         self.pages_repo = pages_repo or PagesRepository()
         self.links_repo = links_repo or LinksRepository()
         self.configs_repo = configs_repo or ConfigsRepository()
@@ -26,36 +25,13 @@ class Crawler:
         self.user_agent = user_agent or config.USER_AGENT
         self.http_service = http_service or HttpService(self.user_agent)
         self.content_review_service = content_review_service or ContentReviewService()
-        self._rp_cache: dict[str, RobotFileParser] = {}
+        self.robots_service = robots_service or RobotsService(self.http_service, self.user_agent)
 
     def fetch(self, url: str):
         return self.http_service.fetch(url)
 
     def _allowed_by_robots(self, url: str, robots_enabled: bool) -> bool:
-        if not robots_enabled:
-            return True
-        try:
-            parsed = urlparse(url)
-            base = f"{parsed.scheme}://{parsed.netloc}"
-            rp = self._rp_cache.get(base)
-            if rp is None:
-                rp = RobotFileParser()
-                robots_url = urljoin(base, "/robots.txt")
-                try:
-                    status, robots_txt = self.http_service.fetch_robots(robots_url)
-                    if status == 200:
-                        rp.parse(robots_txt.splitlines())
-                    else:
-                        rp = None
-                except Exception:
-                    rp = None
-                self._rp_cache[base] = rp
-
-            if rp is None:
-                return True
-            return rp.can_fetch(self.user_agent, url)
-        except Exception:
-            return True
+        return self.robots_service.allowed_by_robots(url, robots_enabled)
 
     def extract_links(self, base_url: str, html: str):
         return self.content_review_service.extract_links(base_url, html)
