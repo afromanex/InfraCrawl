@@ -136,6 +136,28 @@ def upsert_config(name: str, root_urls: list, max_depth: int):
         conn.close()
 
 
+def list_config_names():
+    conn = get_conn()
+    try:
+        with conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT name FROM crawler_configs")
+                rows = cur.fetchall()
+                return [r[0] for r in rows]
+    finally:
+        conn.close()
+
+
+def delete_config(name: str):
+    conn = get_conn()
+    try:
+        with conn:
+            with conn.cursor() as cur:
+                cur.execute("DELETE FROM crawler_configs WHERE name = %s", (name,))
+    finally:
+        conn.close()
+
+
 def fetch_pages(full: bool = False, limit: int | None = None):
     conn = get_conn()
     try:

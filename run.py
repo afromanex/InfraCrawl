@@ -82,12 +82,21 @@ def main():
     except Exception as e:
         print(f"Warning: could not initialize DB: {e}")
 
-    # Load YAML configs and upsert into DB
+    # Load YAML configs and upsert into DB. Remove DB configs not present on disk.
     try:
         cfgs = config_loader.load_configs_from_dir()
+        loaded_names = set()
         for c in cfgs:
             cid = db.upsert_config(c["name"], c["root_urls"], c["max_depth"])
+            loaded_names.add(c["name"])
             print(f"Loaded config {c['name']} -> id={cid}")
+
+        # Remove any configs in DB that are not present in the configs directory
+        existing = set(db.list_config_names())
+        to_remove = existing - loaded_names
+        for name in to_remove:
+            db.delete_config(name)
+            print(f"Removed DB config not present on disk: {name}")
     except Exception as e:
         print(f"Warning: could not load configs: {e}")
 
