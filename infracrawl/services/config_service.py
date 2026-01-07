@@ -5,6 +5,41 @@ from infracrawl.domain.config import CrawlerConfig
 from typing import Optional
 
 class ConfigService:
+
+        def sync_configs_with_disk(self):
+            """
+            Scan the configs directory for YAML files, upsert configs into the DB by name and config_path,
+            and remove DB configs not present on disk.
+            """
+            loaded_names = set()
+            for fname in os.listdir(self.configs_dir):
+                if not (fname.endswith(".yml") or fname.endswith(".yaml")):
+                    continue
+                full_path = os.path.join(self.configs_dir, fname)
+                try:
+                    with open(full_path, "r", encoding="utf-8") as f:
+                        data = yaml.safe_load(f)
+                    name = data.get("name")
+                    if not name:
+                        continue
+                    config_obj = CrawlerConfig(
+                        config_id=None,
+                        name=name,
+                        config_path=fname
+                    )
+                    cid = self.configs_repo.upsert_config(config_obj)
+                    loaded_names.add(name)
+                    print(f"Loaded config {name} -> id={cid}")
+                except Exception as e:
+                    print(f"Warning: could not load config {fname}: {e}")
+
+            # Remove any configs in DB that are not present on disk
+            existing_configs = self.configs_repo.list_configs()
+            existing_names = set(c.name for c in existing_configs)
+            to_remove = existing_names - loaded_names
+            for name in to_remove:
+                self.configs_repo.delete_config(name)
+                print(f"Removed DB config not present on disk: {name}")
     def __init__(self, configs_repo: Optional[ConfigsRepository] = None, configs_dir: Optional[str] = None):
         self.configs_repo = configs_repo or ConfigsRepository()
         self.configs_dir = configs_dir or os.path.join(os.getcwd(), "configs")
