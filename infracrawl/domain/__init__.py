@@ -2,5 +2,6 @@
 from .page import Page as Page
 from .link import Link as Link
 from .config import CrawlerConfig as CrawlerConfig
+from .crawl_run import CrawlRun as CrawlRun
 
-__all__ = ["Page", "Link", "CrawlerConfig"]
+__all__ = ["Page", "Link", "CrawlerConfig", "CrawlRun"]

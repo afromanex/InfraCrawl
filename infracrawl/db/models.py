@@ -39,3 +39,13 @@ class CrawlerConfig(Base):
     config_path = Column(Text, unique=True, nullable=False)  # Path or filename of the YAML config
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class CrawlRun(Base):
+    __tablename__ = "crawls"
+
+    run_id = Column(Integer, primary_key=True)
+    config_id = Column(Integer, nullable=True)
+    start_timestamp = Column(DateTime(timezone=True), nullable=False)
+    end_timestamp = Column(DateTime(timezone=True), nullable=True)
+    exception = Column(Text, nullable=True)

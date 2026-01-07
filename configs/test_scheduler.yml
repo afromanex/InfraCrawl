@@ -6,4 +6,4 @@ robots: true
 # Run every 30 seconds for testing
 schedule:
   type: "interval"
-  seconds: 30
+  seconds: 86400 # change to like 30 seconds for quicker tests
