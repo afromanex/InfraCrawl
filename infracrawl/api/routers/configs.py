@@ -3,7 +3,7 @@ from infracrawl.services.config_service import ConfigService
 
 
 def create_configs_router(config_service: ConfigService):
-    router = APIRouter(prefix="/configs")
+    router = APIRouter(prefix="/configs", tags=["Configs"])
 
     @router.get("/")
     def list_configs():

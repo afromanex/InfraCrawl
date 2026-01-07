@@ -24,9 +24,19 @@ class LinksRepository:
             session.add(db_link)
             session.commit()
 
-    def fetch_links(self, limit: Optional[int] = None) -> List[Link]:
+    def fetch_links(self, limit: Optional[int] = None, config_id: Optional[int] = None) -> List[Link]:
         with self.get_session() as session:
-            q = select(DBLink).order_by(DBLink.link_id)
+            # If config_id is provided, select links where either end references a page in that config
+            if config_id is not None:
+                # fetch page ids belonging to the config
+                from infracrawl.db.models import Page as DBPage
+                pid_q = select(DBPage.page_id).where(DBPage.config_id == config_id)
+                page_ids = session.execute(pid_q).scalars().all()
+                if not page_ids:
+                    return []
+                q = select(DBLink).where(or_(DBLink.link_from_id.in_(page_ids), DBLink.link_to_id.in_(page_ids))).order_by(DBLink.link_id)
+            else:
+                q = select(DBLink).order_by(DBLink.link_id)
             if limit:
                 q = q.limit(limit)
             rows = session.execute(q).scalars().all()

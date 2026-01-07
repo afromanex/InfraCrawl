@@ -17,12 +17,20 @@ class ReloadRequest(BaseModel):
 
 
 def create_crawlers_router(pages_repo, links_repo, config_service: ConfigService, start_crawl_callback):
-    router = APIRouter(prefix="/crawlers")
+    router = APIRouter(prefix="/crawlers", tags=["Crawlers"])
 
     @router.get("/export")
-    def export(full: bool = False, limit: Optional[int] = None):
-        pages = pages_repo.fetch_pages(full=full, limit=limit)
-        links = links_repo.fetch_links(limit=limit)
+    def export(config: Optional[str] = None, include_page_content: Optional[bool] = None, full: Optional[bool] = None, limit: Optional[int] = None):
+        # include_page_content is the preferred param; full is accepted as a fallback for compatibility
+        include = include_page_content if include_page_content is not None else (full if full is not None else False)
+        config_id = None
+        if config:
+            cfg = config_service.get_config(config)
+            if not cfg:
+                raise HTTPException(status_code=404, detail="config not found")
+            config_id = cfg.config_id
+        pages = pages_repo.fetch_pages(full=include, limit=limit, config_id=config_id)
+        links = links_repo.fetch_links(limit=limit, config_id=config_id)
         return {"pages": [p.__dict__ for p in pages], "links": [l.__dict__ for l in links]}
 
     @router.post("/crawl", status_code=202)

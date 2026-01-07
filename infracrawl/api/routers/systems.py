@@ -2,7 +2,7 @@ from fastapi import APIRouter
 
 
 def create_systems_router():
-    router = APIRouter(prefix="/systems")
+    router = APIRouter(prefix="/systems", tags=["System"])
 
     @router.get("/health")
     def health():
