@@ -125,6 +125,9 @@ def ensure_page(page_url: str):
 
 
 def insert_link(link_from_id: int, link_to_id: int, anchor_text: str | None):
+    from infracrawl.domain import Link
+    if USE_SQLALCHEMY and _links_repo is not None:
+        return _links_repo.insert_link(Link(link_id=None, link_from_id=link_from_id, link_to_id=link_to_id, anchor_text=anchor_text))
     conn = get_conn()
     try:
         with conn:
@@ -310,7 +313,8 @@ if USE_SQLALCHEMY and _repo is not None:
         return _pages_repo.upsert_page(page_url, page_content, http_status, fetched_at, config_id=config_id)
 
     def insert_link(link_from_id: int, link_to_id: int, anchor_text: str | None):
-        return _links_repo.insert_link(link_from_id, link_to_id, anchor_text)
+        from infracrawl.domain import Link
+        return _links_repo.insert_link(Link(link_id=None, link_from_id=link_from_id, link_to_id=link_to_id, anchor_text=anchor_text))
 
     def upsert_config(name: str, root_urls: list, max_depth: int, robots: bool = True, refresh_days: int | None = None):
         return _configs_repo.upsert_config(name, root_urls, max_depth, robots=robots, refresh_days=refresh_days)

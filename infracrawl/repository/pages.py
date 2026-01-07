@@ -16,11 +16,11 @@ class PagesRepository:
 
     def ensure_page(self, page_url: str) -> int:
         with self.get_session() as session:
-            q = select(Page).where(Page.page_url == page_url)
+            q = select(DBPage).where(DBPage.page_url == page_url)
             row = session.execute(q).scalars().first()
             if row:
                 return row.page_id
-            p = Page(page_url=page_url)
+            p = DBPage(page_url=page_url)
             session.add(p)
             session.commit()
             session.refresh(p)
@@ -43,7 +43,7 @@ class PagesRepository:
 
     def upsert_page(self, page_url: str, page_content: Optional[str], http_status: Optional[int], fetched_at: Optional[str], config_id: Optional[int] = None) -> int:
         with self.get_session() as session:
-            q = select(Page).where(Page.page_url == page_url)
+            q = select(DBPage).where(DBPage.page_url == page_url)
             p = session.execute(q).scalars().first()
             if p:
                 p.page_content = page_content
@@ -54,7 +54,7 @@ class PagesRepository:
                 session.add(p)
                 session.commit()
                 return p.page_id
-            p = Page(page_url=page_url, page_content=page_content, http_status=http_status, fetched_at=fetched_at, config_id=config_id)
+            p = DBPage(page_url=page_url, page_content=page_content, http_status=http_status, fetched_at=fetched_at, config_id=config_id)
             session.add(p)
             session.commit()
             session.refresh(p)

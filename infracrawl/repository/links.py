@@ -14,10 +14,14 @@ class LinksRepository:
     def get_session(self) -> Session:
         return Session(self.engine)
 
-    def insert_link(self, link_from_id: int, link_to_id: int, anchor_text: Optional[str]):
+    def insert_link(self, link: Link):
         with self.get_session() as session:
-            link = Link(link_from_id=link_from_id, link_to_id=link_to_id, anchor_text=anchor_text)
-            session.add(link)
+            db_link = DBLink(
+                link_from_id=link.link_from_id,
+                link_to_id=link.link_to_id,
+                anchor_text=link.anchor_text
+            )
+            session.add(db_link)
             session.commit()
 
     def fetch_links(self, limit: Optional[int] = None) -> List[Link]:
