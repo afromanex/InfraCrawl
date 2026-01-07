@@ -26,4 +26,12 @@ def create_configs_router(config_service: ConfigService):
             "updated_at": cfg.updated_at,
         }
 
+    @router.post('/sync')
+    def sync_configs():
+        try:
+            config_service.sync_configs_with_disk()
+            return {"status": "synced"}
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"sync failed: {e}")
+
     return router

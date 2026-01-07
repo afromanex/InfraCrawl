@@ -9,6 +9,7 @@ from infracrawl.services.crawl_registry import InMemoryCrawlRegistry
 from infracrawl.services.scheduler_service import SchedulerService
 from fastapi import Depends
 from infracrawl.api.auth import require_admin
+from fastapi.staticfiles import StaticFiles
 
 
 def create_app(pages_repo, links_repo, config_service: ConfigService, start_crawl_callback):
@@ -29,6 +30,9 @@ def create_app(pages_repo, links_repo, config_service: ConfigService, start_craw
     # create an in-memory crawl registry and pass into the crawlers router
     crawl_registry = InMemoryCrawlRegistry()
     app.include_router(create_crawlers_router(pages_repo, links_repo, config_service, start_crawl_callback, crawl_registry), dependencies=[Depends(require_admin)])
+
+    # Serve minimal UI
+    app.mount("/ui", StaticFiles(directory="static", html=True), name="ui")
 
     # Scheduler: schedule jobs declared inside YAML configs via `schedule` key.
     scheduler = SchedulerService(config_service, start_crawl_callback, crawl_registry)

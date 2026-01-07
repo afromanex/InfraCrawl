@@ -1,0 +1,160 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>InfraCrawl Control UI</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <style>
+      body { font-family: system-ui, Arial; max-width: 900px; margin: 24px auto; padding: 0 12px; }
+      h1 { font-size: 20px }
+      .card { border: 1px solid #ddd; padding: 12px; margin-bottom: 12px; border-radius: 6px }
+      button { margin-right: 6px }
+      table { width: 100%; border-collapse: collapse }
+      th,td { text-align: left; padding: 6px; border-bottom: 1px solid #eee }
+      pre { white-space: pre-wrap; word-break: break-word }
+    </style>
+  </head>
+  <body>
+    <h1>InfraCrawl Control UI</h1>
+
+    <div class="card">
+      <strong>Config Management</strong>
+      <div style="margin-top:8px">
+        <button id="btn-sync">Sync configs</button>
+        <span id="sync-result"></span>
+      </div>
+      <div style="margin-top:8px">
+        <label for="admin-token">Admin token:</label>
+        <input id="admin-token" placeholder="Paste admin token" style="width:60%" />
+        <button id="login-token">Login</button>
+        <button id="logout-token">Logout</button>
+        <span id="token-status" style="margin-left:8px;color:#666">Not authenticated on the static page</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <strong>Configs</strong>
+      <div id="configs-container">Loading…</div>
+    </div>
+
+    <div class="card">
+      <strong>Recent Runs</strong>
+      <div id="runs-container">Loading…</div>
+    </div>
+
+    <script>
+      function getAuthHeader() {
+        const t = localStorage.getItem('admin_token');
+        return t ? {'Authorization': 'Bearer ' + t} : {};
+      }
+
+      async function fetchJson(path, opts={}) {
+        opts.headers = Object.assign({}, opts.headers || {}, getAuthHeader());
+        const r = await fetch(path, opts);
+        if (!r.ok) throw new Error(await r.text());
+        return r.json();
+      }
+
+      async function loadConfigs() {
+        try {
+          const data = await fetchJson('/configs/');
+          const el = document.getElementById('configs-container');
+          if (!data.length) { el.innerText = 'No configs found'; return }
+          let html = '<table><tr><th>config_path</th><th>created_at</th><th>updated_at</th><th>actions</th></tr>';
+          for (const c of data) {
+            html += `<tr><td>${c.config_path}</td><td>${c.created_at ?? ''}</td><td>${c.updated_at ?? ''}</td><td><button data-config="${c.config_path}" class="start">Start Crawl</button></td></tr>`
+          }
+          html += '</table>';
+          el.innerHTML = html;
+          for (const b of el.querySelectorAll('button.start')) {
+            b.onclick = async (ev) => {
+              const cfg = ev.target.getAttribute('data-config');
+              ev.target.disabled = true;
+              try {
+                const res = await fetchJson('/crawlers/crawl', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({config: cfg}) });
+                alert('Started: ' + JSON.stringify(res));
+              } catch (e) { alert('Error: ' + e.message) }
+              ev.target.disabled = false;
+            }
+          }
+        } catch (e) {
+          document.getElementById('configs-container').innerText = 'Error loading configs: ' + e.message;
+        }
+      }
+
+      async function loadRuns() {
+        try {
+          const data = await fetchJson('/crawlers/runs?limit=20');
+          const el = document.getElementById('runs-container');
+          if (!data.length) { el.innerText = 'No runs'; return }
+          let html = '<table><tr><th>run_id</th><th>config</th><th>start</th><th>end</th><th>exception</th><th>actions</th></tr>';
+          for (const r of data) {
+            html += `<tr><td>${r.run_id}</td><td>${r.config_path ?? r.config_id}</td><td>${r.start_timestamp ?? ''}</td><td>${r.end_timestamp ?? ''}</td><td><pre>${r.exception ?? ''}</pre></td><td></td></tr>`
+          }
+          html += '</table>';
+          el.innerHTML = html;
+        } catch (e) {
+          document.getElementById('runs-container').innerText = 'Error loading runs: ' + e.message;
+        }
+      }
+
+      document.getElementById('btn-sync').onclick = async () => {
+        const out = document.getElementById('sync-result');
+        out.innerText = 'Syncing...';
+        try {
+          await fetchJson('/configs/sync', { method: 'POST' });
+          out.innerText = ' OK';
+          loadConfigs();
+        } catch (e) { out.innerText = ' Error: ' + e.message }
+      }
+
+      async function testToken() {
+        try {
+          const r = await fetch('/crawlers/runs?limit=1', { headers: getAuthHeader() });
+          return r.ok;
+        } catch (e) { return false }
+      }
+
+      document.getElementById('login-token').onclick = async () => {
+        let v = document.getElementById('admin-token').value.trim();
+        if (!v) v = prompt('Paste admin token:');
+        if (!v) return;
+        localStorage.setItem('admin_token', v);
+        document.getElementById('token-status').innerText = 'Checking token…';
+        const ok = await testToken();
+        if (ok) {
+          document.getElementById('admin-token').value = v;
+          document.getElementById('token-status').innerText = 'Authenticated (token saved in localStorage)';
+        } else {
+          localStorage.removeItem('admin_token');
+          document.getElementById('token-status').innerText = 'Auth failed — token not saved';
+          alert('Authentication failed — token invalid or server not configured with ADMIN_TOKEN');
+        }
+      }
+
+      document.getElementById('logout-token').onclick = () => {
+        localStorage.removeItem('admin_token');
+        document.getElementById('admin-token').value = '';
+        document.getElementById('token-status').innerText = 'Not authenticated on the static page';
+      }
+
+      // initialize token input/status from localStorage
+      (function initTokenUI(){
+        const t = localStorage.getItem('admin_token');
+        if (t) {
+          document.getElementById('admin-token').value = t;
+          // verify token quickly
+          testToken().then(ok => {
+            document.getElementById('token-status').innerText = ok ? 'Authenticated (token saved in localStorage)' : 'Not authenticated on the static page';
+          });
+        } else {
+          document.getElementById('token-status').innerText = 'Not authenticated on the static page';
+        }
+      })();
+
+      loadConfigs();
+      loadRuns();
+      setInterval(loadRuns, 15000);
+    </script>
+  </body>
+</html>
