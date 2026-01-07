@@ -87,9 +87,9 @@
           const data = await fetchJson('/crawlers/runs?limit=20');
           const el = document.getElementById('runs-container');
           if (!data.length) { el.innerText = 'No runs'; return }
-          let html = '<table><tr><th>run_id</th><th>config</th><th>start</th><th>end</th><th>exception</th><th>actions</th></tr>';
+          let html = '<table><tr><th>run_id</th><th>config</th><th>start</th><th>end</th><th>exception</th></tr>';
           for (const r of data) {
-            html += `<tr><td>${r.run_id}</td><td>${r.config_path ?? r.config_id}</td><td>${r.start_timestamp ?? ''}</td><td>${r.end_timestamp ?? ''}</td><td><pre>${r.exception ?? ''}</pre></td><td></td></tr>`
+            html += `<tr><td>${r.run_id}</td><td>${r.config_path ?? r.config_id}</td><td>${r.start_timestamp ?? ''}</td><td>${r.end_timestamp ?? ''}</td><td><pre>${r.exception ?? ''}</pre></td></tr>`
           }
           html += '</table>';
           el.innerHTML = html;
