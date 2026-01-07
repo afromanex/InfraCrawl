@@ -34,7 +34,7 @@ class Crawler:
         except Exception:
             return False
 
-    def crawl(self, start_url: str, max_depth: int | None = None):
+    def crawl(self, start_url: str, max_depth: int | None = None, config_id: int | None = None):
         """Depth-limited recursive crawl starting at `start_url`.
 
         Stores pages and links in the database. Pages discovered but not yet
@@ -51,13 +51,15 @@ class Crawler:
             # ensure page row exists
             from_id = db.ensure_page(url)
 
+            # if ensure_page created without config_id, we'll set config_id when upserting after fetch
+
             if depth < 0:
                 return
 
             try:
                 status, body = self.fetch(url)
                 fetched_at = datetime.utcnow().isoformat()
-                page_id = db.upsert_page(url, body, status, fetched_at)
+                page_id = db.upsert_page(url, body, status, fetched_at, config_id=config_id)
                 print(f"Fetched {url} -> status {status}, page_id={page_id}")
             except Exception as e:
                 print(f"Failed to fetch {url}: {e}")

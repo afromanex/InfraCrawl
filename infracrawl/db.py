@@ -43,28 +43,30 @@ def init_db(retries: int = 10, delay: float = 1.0):
         conn.close()
 
 
-def upsert_page(page_url: str, page_content: str | None, http_status: int | None, fetched_at: str | None):
-    """Insert or update a page row and return the page_id."""
+def upsert_page(page_url: str, page_content: str | None, http_status: int | None, fetched_at: str | None, config_id: int | None = None):
+    """Insert or update a page row and return the page_id. Associates page with `config_id` if provided."""
     conn = get_conn()
     try:
         with conn:
             with conn.cursor() as cur:
                 cur.execute(
                     """
-                    INSERT INTO pages (page_url, page_content, http_status, fetched_at)
-                    VALUES (%s, %s, %s, %s)
+                    INSERT INTO pages (page_url, page_content, http_status, fetched_at, config_id)
+                    VALUES (%s, %s, %s, %s, %s)
                     ON CONFLICT (page_url) DO UPDATE
                       SET page_content = EXCLUDED.page_content,
                           http_status = EXCLUDED.http_status,
-                          fetched_at = EXCLUDED.fetched_at
+                          fetched_at = EXCLUDED.fetched_at,
+                          config_id = COALESCE(EXCLUDED.config_id, pages.config_id)
                     RETURNING page_id
                     """,
-                    (page_url, page_content, http_status, fetched_at),
+                    (page_url, page_content, http_status, fetched_at, config_id),
                 )
                 row = cur.fetchone()
                 return row[0]
     finally:
         conn.close()
+
 
 
 def ensure_page(page_url: str):
@@ -132,6 +134,19 @@ def upsert_config(name: str, root_urls: list, max_depth: int):
                 )
                 row = cur.fetchone()
                 return row[0]
+    finally:
+        conn.close()
+
+
+def get_config(name: str):
+    conn = get_conn()
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("SELECT config_id, name, root_urls, max_depth FROM crawler_configs WHERE name = %s", (name,))
+            row = cur.fetchone()
+            if row:
+                return dict(row)
+            return None
     finally:
         conn.close()
 

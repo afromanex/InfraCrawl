@@ -44,18 +44,43 @@ class ControlHandler(BaseHTTPRequestHandler):
             body = self.rfile.read(length)
             try:
                 data = json.loads(body.decode("utf-8"))
+                # support either a direct URL or a config name
                 url = data.get("url")
-                depth = data.get("depth", config.DEFAULT_DEPTH)
-                if not url:
-                    raise ValueError("missing url")
+                config_name = data.get("config")
+                depth = data.get("depth", None)
+                if not (url or config_name):
+                    raise ValueError("missing url or config")
             except Exception as e:
                 self.send_response(400)
                 self.end_headers()
                 self.wfile.write(str(e).encode())
                 return
 
-            # spawn crawl in separate thread
-            thread = threading.Thread(target=_start_crawl, args=(url, depth), daemon=True)
+            if config_name:
+                cfg = db.get_config(config_name)
+                if not cfg:
+                    self.send_response(404)
+                    self.end_headers()
+                    self.wfile.write(b"config not found")
+                    return
+                cfg_id = cfg["config_id"]
+                root_urls = cfg["root_urls"]
+                cfg_max_depth = cfg["max_depth"]
+                use_depth = depth if depth is not None else cfg_max_depth
+
+                # spawn crawl threads for each root URL
+                for ru in root_urls:
+                    thread = threading.Thread(target=_start_crawl, args=(ru, use_depth, cfg_id), daemon=True)
+                    thread.start()
+
+                self.send_response(202)
+                self.end_headers()
+                self.wfile.write(b"Crawl(s) started for config")
+                return
+
+            # fallback: direct URL crawl
+            use_depth = depth if depth is not None else config.DEFAULT_DEPTH
+            thread = threading.Thread(target=_start_crawl, args=(url, use_depth, None), daemon=True)
             thread.start()
 
             self.send_response(202)
@@ -67,10 +92,10 @@ class ControlHandler(BaseHTTPRequestHandler):
         self.end_headers()
 
 
-def _start_crawl(url: str, depth: int):
-    print(f"Starting crawl: {url} depth={depth}")
+def _start_crawl(url: str, depth: int, config_id: int | None = None):
+    print(f"Starting crawl: {url} depth={depth} config_id={config_id}")
     crawler = Crawler()
-    crawler.crawl(url, max_depth=depth)
+    crawler.crawl(url, max_depth=depth, config_id=config_id)
     print(f"Crawl finished: {url}")
 
 

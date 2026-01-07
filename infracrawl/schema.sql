@@ -27,3 +27,7 @@ CREATE TABLE IF NOT EXISTS crawler_configs (
 );
 
 CREATE INDEX IF NOT EXISTS idx_crawler_configs_name ON crawler_configs (name);
+
+-- Ensure pages table has config_id column for association
+ALTER TABLE pages ADD COLUMN IF NOT EXISTS config_id INTEGER;
+CREATE INDEX IF NOT EXISTS idx_pages_config ON pages (config_id);
