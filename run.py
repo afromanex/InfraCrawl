@@ -77,19 +77,20 @@ class ControlHandler(BaseHTTPRequestHandler):
                 cfg_max_depth = cfg.max_depth
                 use_depth = depth if depth is not None else cfg_max_depth
 
-                # spawn crawl threads for each root URL
-                for ru in root_urls:
-                    thread = threading.Thread(target=_start_crawl, args=(ru, use_depth, cfg_id), daemon=True)
-                    thread.start()
+                # spawn a single crawl thread which will iterate the config's root URLs
+                thread = threading.Thread(target=_start_crawl, args=(None, use_depth, cfg), daemon=True)
+                thread.start()
 
                 self.send_response(202)
                 self.end_headers()
                 self.wfile.write(b"Crawl(s) started for config")
                 return
 
-            # fallback: direct URL crawl
+            # fallback: direct URL crawl -> create an ad-hoc config with the URL as root
             use_depth = depth if depth is not None else config.DEFAULT_DEPTH
-            thread = threading.Thread(target=_start_crawl, args=(url, use_depth, None), daemon=True)
+            from infracrawl.domain.config import CrawlerConfig
+            adhoc_cfg = CrawlerConfig(config_id=None, name="adhoc", config_path="<adhoc>", root_urls=[url], max_depth=use_depth)
+            thread = threading.Thread(target=_start_crawl, args=(None, use_depth, adhoc_cfg), daemon=True)
             thread.start()
 
             self.send_response(202)
@@ -101,15 +102,15 @@ class ControlHandler(BaseHTTPRequestHandler):
         self.end_headers()
 
 
-def _start_crawl(url: str, depth: int, config_id: int | None = None):
-    print(f"Starting crawl: {url} depth={depth} config_id={config_id}")
+def _start_crawl(url: str, depth: int, config: object | None = None):
+    print(f"Starting crawl: {url} depth={depth} config={getattr(config, 'name', config)}")
     # Pass repositories explicitly for dependency injection
     crawler = Crawler(
         pages_repo=pages_repo,
         links_repo=links_repo,
         configs_repo=configs_repo
     )
-    crawler.crawl(url, max_depth=depth, config_id=config_id)
+    crawler.crawl(url, max_depth=depth, config=config)
     print(f"Crawl finished: {url}")
 
 
