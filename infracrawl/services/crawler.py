@@ -8,6 +8,7 @@ from infracrawl.services.http_service import HttpService
 from infracrawl.services.content_review_service import ContentReviewService
 from infracrawl.services.robots_service import RobotsService
 from infracrawl.services.link_processor import LinkProcessor
+from infracrawl.services.page_fetch_persist_service import PageFetchPersistService, PageFetchResult
 
 from infracrawl import config
 from infracrawl.repository.pages import PagesRepository
@@ -55,30 +56,30 @@ class Crawler:
         return False
 
     def _fetch_and_store(self, url: str, context: CrawlContext):
-        # First, attempt to fetch the URL. Network/fetch errors are surfaced separately.
+        """Fetch a URL and persist the result using `FetchPersistService`.
+
+        Returns the response body on success, or `None` on failure.
+        """
+        # Use the overridable `fetch` method so tests and subclasses can intercept network I/O
         try:
             status, body = self.fetch(url)
         except Exception as e:
             logger.error("Fetch error for %s: %s", url, e, exc_info=True)
             return None
 
-        # Record fetch time and attempt to persist the page. Storage failures are separate.
         fetched_at = datetime.utcnow().isoformat()
-        config_id = context.config.config_id if (context and context.config) else None
         try:
-            page_id = self.pages_repo.upsert_page(url, body, status, fetched_at, config_id=config_id)
+            page_id = self.fetch_persist_service.persist(url, status, body, fetched_at, context=context)
             logger.info("Fetched %s -> status %s, page_id=%s", url, status, page_id)
         except Exception as e:
             logger.error("Storage error while saving %s: %s", url, e, exc_info=True)
             return None
 
-        # Non-2xx status codes are still recorded but logged for visibility.
         try:
             sc = int(status)
             if sc < 200 or sc >= 300:
                 logger.warning("Non-success status for %s: %s", url, status)
         except Exception:
-            # If status isn't parseable, just ignore this check.
             pass
 
         return body
@@ -93,7 +94,7 @@ class Crawler:
                 self._crawl_from(link_url, next_depth, context)
 
         self.link_processor.process_links(context.current_root, url, body, from_id, context, depth, crawl_callback=cb, extract_links_fn=self.extract_links)
-    def __init__(self, pages_repo=None, links_repo=None, configs_repo=None, delay=None, user_agent=None, http_service=None, content_review_service=None, robots_service=None, link_processor=None):
+    def __init__(self, pages_repo=None, links_repo=None, configs_repo=None, delay=None, user_agent=None, http_service=None, content_review_service=None, robots_service=None, link_processor=None, fetch_persist_service=None):
         self.pages_repo = pages_repo or PagesRepository()
         self.links_repo = links_repo or LinksRepository()
         self.configs_repo = configs_repo or ConfigsRepository()
@@ -103,6 +104,7 @@ class Crawler:
         self.content_review_service = content_review_service or ContentReviewService()
         self.robots_service = robots_service or RobotsService(self.http_service, self.user_agent)
         self.link_processor = link_processor or LinkProcessor(self.content_review_service, self.pages_repo, self.links_repo)
+        self.fetch_persist_service = fetch_persist_service or PageFetchPersistService(self.http_service, self.pages_repo)
 
     def fetch(self, url: str):
         return self.http_service.fetch(url)
