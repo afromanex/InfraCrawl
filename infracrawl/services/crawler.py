@@ -1,6 +1,7 @@
 import logging
 import time
 from datetime import datetime, timezone
+from infracrawl.utils.datetime_utils import parse_to_utc_naive
 from urllib.parse import urljoin, urlparse
 
 from infracrawl.services.http_service import HttpService
@@ -42,29 +43,15 @@ class Crawler:
         if cfg_refresh_days is not None:
             page = self.pages_repo.get_page_by_url(url)
             if page and page.fetched_at:
-                try:
-                    last = page.fetched_at
-                    if isinstance(last, str):
-                        try:
-                            last_dt = datetime.fromisoformat(last)
-                        except Exception:
-                            last_dt = None
-                    else:
-                        last_dt = last
-                    if last_dt is not None:
-                        try:
-                            if last_dt.tzinfo is not None:
-                                last_dt_utc = last_dt.astimezone(timezone.utc).replace(tzinfo=None)
-                            else:
-                                last_dt_utc = last_dt
-                            delta_days = (datetime.utcnow() - last_dt_utc).days
-                            if delta_days < int(cfg_refresh_days):
-                                logger.info("Skipping %s; fetched %s days ago (< %s)", url, delta_days, cfg_refresh_days)
-                                return True
-                        except Exception:
-                            pass
-                except Exception:
-                    pass
+                last_dt_utc = parse_to_utc_naive(page.fetched_at)
+                if last_dt_utc is not None:
+                    try:
+                        delta_days = (datetime.utcnow() - last_dt_utc).days
+                        if delta_days < int(cfg_refresh_days):
+                            logger.info("Skipping %s; fetched %s days ago (< %s)", url, delta_days, cfg_refresh_days)
+                            return True
+                    except Exception:
+                        pass
         return False
 
     def _fetch_and_store(self, url: str, context: CrawlContext):
