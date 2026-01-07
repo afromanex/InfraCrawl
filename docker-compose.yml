@@ -23,7 +23,7 @@ services:
       - .:/app
     command: python run.py
     ports:
-      - "8002:8000"
+      - "8002:8002"
     restart: unless-stopped
 
   test:

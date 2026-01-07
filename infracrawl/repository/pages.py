@@ -74,9 +74,14 @@ class PagesRepository:
                 config_id=p.config_id,
             )
 
-    def fetch_pages(self, full: bool = False, limit: Optional[int] = None) -> List[Page]:
+    def fetch_pages(self, full: bool = False, limit: Optional[int] = None, offset: Optional[int] = None, config_id: Optional[int] = None) -> List[Page]:
         with self.get_session() as session:
-            q = select(DBPage).order_by(DBPage.page_id)
+            q = select(DBPage)
+            if config_id is not None:
+                q = q.where(DBPage.config_id == config_id)
+            q = q.order_by(DBPage.page_id)
+            if offset:
+                q = q.offset(offset)
             if limit:
                 q = q.limit(limit)
             rows = session.execute(q).scalars().all()
@@ -88,6 +93,21 @@ class PagesRepository:
                 fetched_at=p.fetched_at,
                 config_id=p.config_id
             ) for p in rows]
+
+    def get_page_by_id(self, page_id: int) -> Optional[Page]:
+        with self.get_session() as session:
+            q = select(DBPage).where(DBPage.page_id == page_id)
+            p = session.execute(q).scalars().first()
+            if not p:
+                return None
+            return Page(
+                page_id=p.page_id,
+                page_url=p.page_url,
+                page_content=p.page_content,
+                http_status=p.http_status,
+                fetched_at=p.fetched_at,
+                config_id=p.config_id
+            )
 
     def get_page_ids_by_config(self, config_id: int) -> List[int]:
         with self.get_session() as session:
