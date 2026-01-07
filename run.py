@@ -2,6 +2,7 @@ import json
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from urllib.parse import urlparse, parse_qs
 
 from infracrawl import db
 from infracrawl import config
@@ -10,11 +11,28 @@ from infracrawl.crawler import Crawler
 
 class ControlHandler(BaseHTTPRequestHandler):
     def do_GET(self):
-        if self.path == "/health":
+        p = urlparse(self.path)
+        if p.path == "/health":
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.end_headers()
             self.wfile.write(b"{\"status\": \"ok\"}")
+            return
+        if p.path == "/export":
+            qs = parse_qs(p.query)
+            full = qs.get("full", ["0"])[0] in ("1", "true", "True")
+            limit = qs.get("limit", [None])[0]
+            try:
+                limit_val = int(limit) if limit else None
+            except Exception:
+                limit_val = None
+            pages = db.fetch_pages(full=full, limit=limit_val)
+            links = db.fetch_links(limit=limit_val)
+            payload = {"pages": pages, "links": links}
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps(payload).encode("utf-8"))
             return
         self.send_response(404)
         self.end_headers()

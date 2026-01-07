@@ -109,3 +109,41 @@ def insert_link(link_from_id: int, link_to_id: int, anchor_text: str | None):
                 )
     finally:
         conn.close()
+
+
+def fetch_pages(full: bool = False, limit: int | None = None):
+    conn = get_conn()
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cols = ["page_id", "page_url", "http_status", "fetched_at"]
+            if full:
+                cols.append("page_content")
+            sql = f"SELECT {', '.join(cols)} FROM pages ORDER BY page_id"
+            if limit:
+                sql += f" LIMIT {int(limit)}"
+            cur.execute(sql)
+            rows = cur.fetchall()
+            out = []
+            for r in rows:
+                d = dict(r)
+                fa = d.get("fetched_at")
+                if fa is not None:
+                    d["fetched_at"] = fa.isoformat()
+                out.append(d)
+            return out
+    finally:
+        conn.close()
+
+
+def fetch_links(limit: int | None = None):
+    conn = get_conn()
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            sql = "SELECT link_id, link_from_id, link_to_id, anchor_text FROM links ORDER BY link_id"
+            if limit:
+                sql += f" LIMIT {int(limit)}"
+            cur.execute(sql)
+            rows = cur.fetchall()
+            return [dict(r) for r in rows]
+    finally:
+        conn.close()
