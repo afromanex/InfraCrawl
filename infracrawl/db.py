@@ -4,6 +4,7 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 from psycopg2 import OperationalError
 from infracrawl import config
+import json
 
 
 def get_conn():
@@ -107,6 +108,30 @@ def insert_link(link_from_id: int, link_to_id: int, anchor_text: str | None):
                     """,
                     (link_from_id, link_to_id, anchor_text),
                 )
+    finally:
+        conn.close()
+
+
+def upsert_config(name: str, root_urls: list, max_depth: int):
+    """Insert or update a crawler configuration."""
+    conn = get_conn()
+    try:
+        with conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO crawler_configs (name, root_urls, max_depth, updated_at)
+                    VALUES (%s, %s::jsonb, %s, now())
+                    ON CONFLICT (name) DO UPDATE
+                      SET root_urls = EXCLUDED.root_urls,
+                          max_depth = EXCLUDED.max_depth,
+                          updated_at = now()
+                    RETURNING config_id
+                    """,
+                    (name, json.dumps(root_urls), max_depth),
+                )
+                row = cur.fetchone()
+                return row[0]
     finally:
         conn.close()
 

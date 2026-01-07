@@ -1,0 +1,4 @@
+name: starkparks
+root_urls:
+  - https://starkparks.com/
+max_depth: 2

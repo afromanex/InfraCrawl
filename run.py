@@ -7,6 +7,7 @@ from urllib.parse import urlparse, parse_qs
 from infracrawl import db
 from infracrawl import config
 from infracrawl.crawler import Crawler
+from infracrawl import configs as config_loader
 
 
 class ControlHandler(BaseHTTPRequestHandler):
@@ -80,6 +81,15 @@ def main():
         print("Schema initialized or already present.")
     except Exception as e:
         print(f"Warning: could not initialize DB: {e}")
+
+    # Load YAML configs and upsert into DB
+    try:
+        cfgs = config_loader.load_configs_from_dir()
+        for c in cfgs:
+            cid = db.upsert_config(c["name"], c["root_urls"], c["max_depth"])
+            print(f"Loaded config {c['name']} -> id={cid}")
+    except Exception as e:
+        print(f"Warning: could not load configs: {e}")
 
     # Start control HTTP server
     server_port = 8000
