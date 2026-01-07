@@ -4,11 +4,17 @@ import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import urlparse, parse_qs
 
-from infracrawl import db
+from infracrawl.repository.pages import PagesRepository
+from infracrawl.repository.links import LinksRepository
+from infracrawl.repository.configs import ConfigsRepository
 from infracrawl import config
 from infracrawl.crawler import Crawler
 from infracrawl import configs as config_loader
 
+
+pages_repo = PagesRepository()
+links_repo = LinksRepository()
+configs_repo = ConfigsRepository()
 
 class ControlHandler(BaseHTTPRequestHandler):
     def do_GET(self):
@@ -27,8 +33,8 @@ class ControlHandler(BaseHTTPRequestHandler):
                 limit_val = int(limit) if limit else None
             except Exception:
                 limit_val = None
-            pages = db.fetch_pages(full=full, limit=limit_val)
-            links = db.fetch_links(limit=limit_val)
+            pages = pages_repo.fetch_pages(full=full, limit=limit_val)
+            links = links_repo.fetch_links(limit=limit_val)
             payload = {
                 "pages": [p.__dict__ for p in pages],
                 "links": [l.__dict__ for l in links]
@@ -60,15 +66,15 @@ class ControlHandler(BaseHTTPRequestHandler):
                 return
 
             if config_name:
-                cfg = db.get_config(config_name)
+                cfg = configs_repo.get_config(config_name)
                 if not cfg:
                     self.send_response(404)
                     self.end_headers()
                     self.wfile.write(b"config not found")
                     return
-                cfg_id = cfg["config_id"]
-                root_urls = cfg["root_urls"]
-                cfg_max_depth = cfg["max_depth"]
+                cfg_id = cfg.config_id
+                root_urls = cfg.root_urls
+                cfg_max_depth = cfg.max_depth
                 use_depth = depth if depth is not None else cfg_max_depth
 
                 # spawn crawl threads for each root URL
@@ -103,30 +109,33 @@ def _start_crawl(url: str, depth: int, config_id: int | None = None):
 
 
 def main():
-    print("Initializing database (if available)...")
-    try:
-        db.init_db()
-        print("Schema initialized or already present.")
-    except Exception as e:
-        print(f"Warning: could not initialize DB: {e}")
+
+    # Database schema should be initialized elsewhere if needed
 
     # Load YAML configs and upsert into DB. Remove DB configs not present on disk.
     try:
         cfgs = config_loader.load_configs_from_dir()
         loaded_names = set()
         for c in cfgs:
-            cid = db.upsert_config(
-                c["name"], c["root_urls"], c["max_depth"], robots=c.get("robots", True), refresh_days=c.get("refresh_days")
+            from infracrawl.domain import CrawlerConfig
+            config_obj = CrawlerConfig(
+                config_id=None,
+                name=c["name"],
+                root_urls=c["root_urls"],
+                max_depth=c["max_depth"],
+                robots=c.get("robots", True),
+                refresh_days=c.get("refresh_days")
             )
+            cid = configs_repo.upsert_config(config_obj)
             loaded_names.add(c["name"])
             print(f"Loaded config {c['name']} -> id={cid}")
 
-        # Remove any configs in DB that are not present in the configs directory
-        existing_configs = db.list_configs()
+        # Remove any configs in DB that are not present on disk
+        existing_configs = configs_repo.list_configs()
         existing_names = set(c.name for c in existing_configs)
         to_remove = existing_names - loaded_names
         for name in to_remove:
-            db.delete_config(name)
+            configs_repo.delete_config(name)
             print(f"Removed DB config not present on disk: {name}")
     except Exception as e:
         print(f"Warning: could not load configs: {e}")

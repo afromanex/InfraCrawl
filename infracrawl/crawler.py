@@ -8,10 +8,17 @@ from bs4 import BeautifulSoup
 from urllib.robotparser import RobotFileParser
 
 from infracrawl import config
-from infracrawl import db
+from infracrawl.repository.pages import PagesRepository
+from infracrawl.repository.links import LinksRepository
+from infracrawl.repository.configs import ConfigsRepository
+from infracrawl.domain import Link
 
 logger = logging.getLogger(__name__)
 
+
+pages_repo = PagesRepository()
+links_repo = LinksRepository()
+configs_repo = ConfigsRepository()
 
 class Crawler:
     def __init__(self, delay=None, user_agent=None):
@@ -80,10 +87,10 @@ class Crawler:
         cfg_robots = True
         cfg_refresh_days = None
         if config_id is not None:
-            cfg = db.get_config_by_id(config_id)
-            if isinstance(cfg, dict):
-                cfg_robots = cfg.get('robots', True)
-                cfg_refresh_days = cfg.get('refresh_days')
+            cfg = configs_repo.get_config_by_id(config_id)
+            if cfg:
+                cfg_robots = cfg.robots
+                cfg_refresh_days = cfg.refresh_days
 
         def _crawl_from(url: str, depth: int):
             if url in visited:
@@ -92,7 +99,7 @@ class Crawler:
             visited.add(url)
 
             # ensure page row exists
-            from_id = db.ensure_page(url)
+            from_id = pages_repo.ensure_page(url)
 
             # if ensure_page created without config_id, we'll set config_id when upserting after fetch
 
@@ -104,10 +111,10 @@ class Crawler:
             cfg_robots = True
             cfg_refresh_days = None
             if config_id is not None:
-                cfg = db.get_config_by_id(config_id) if hasattr(db, 'get_config_by_id') else None
-                if isinstance(cfg, dict):
-                    cfg_robots = cfg.get('robots', True)
-                    cfg_refresh_days = cfg.get('refresh_days')
+                cfg = configs_repo.get_config_by_id(config_id)
+                if cfg:
+                    cfg_robots = cfg.robots
+                    cfg_refresh_days = cfg.refresh_days
 
             if not self._allowed_by_robots(url, cfg_robots):
                 logger.info("Skipping (robots) %s", url)
@@ -115,10 +122,10 @@ class Crawler:
 
             # Check refresh_days: skip fetching if recently fetched
             if cfg_refresh_days is not None:
-                page = db.get_page_by_url(url)
-                if page and page.get('fetched_at'):
+                page = pages_repo.get_page_by_url(url)
+                if page and page.fetched_at:
                     try:
-                        last = page.get('fetched_at')
+                        last = page.fetched_at
                         if isinstance(last, str):
                             try:
                                 last_dt = datetime.fromisoformat(last)
@@ -144,7 +151,7 @@ class Crawler:
             try:
                 status, body = self.fetch(url)
                 fetched_at = datetime.utcnow().isoformat()
-                page_id = db.upsert_page(url, body, status, fetched_at, config_id=config_id)
+                page_id = pages_repo.upsert_page(url, body, status, fetched_at, config_id=config_id)
                 logger.info("Fetched %s -> status %s, page_id=%s", url, status, page_id)
             except Exception as e:
                 logger.warning("Failed to fetch %s: %s", url, e)
@@ -157,8 +164,9 @@ class Crawler:
                 if not self._same_host(start_url, link_url):
                     logger.debug("Skipping (external) %s -> not same host as %s", link_url, start_url)
                     continue
-                to_id = db.ensure_page(link_url)
-                db.insert_link(from_id, to_id, anchor)
+                to_id = pages_repo.ensure_page(link_url)
+                link_obj = Link(link_id=None, link_from_id=from_id, link_to_id=to_id, anchor_text=anchor)
+                links_repo.insert_link(link_obj)
                 if depth - 1 >= 0:
                     _crawl_from(link_url, depth - 1)
 
