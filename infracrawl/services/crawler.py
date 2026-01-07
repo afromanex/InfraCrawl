@@ -1,8 +1,8 @@
 import logging
 import time
-from datetime import datetime, timezone
+from datetime import datetime
 from infracrawl.utils.datetime_utils import parse_to_utc_naive
-from urllib.parse import urljoin, urlparse
+from urllib.parse import urlparse
 
 from infracrawl.services.http_service import HttpService
 from infracrawl.services.content_review_service import ContentReviewService
@@ -14,7 +14,6 @@ from infracrawl import config
 from infracrawl.repository.pages import PagesRepository
 from infracrawl.repository.links import LinksRepository
 from infracrawl.repository.configs import ConfigsRepository
-from infracrawl.domain import Link
 from infracrawl.domain.config import CrawlerConfig
 from infracrawl.domain.crawl_context import CrawlContext
 

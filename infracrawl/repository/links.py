@@ -41,11 +41,11 @@ class LinksRepository:
                 q = q.limit(limit)
             rows = session.execute(q).scalars().all()
             return [Link(
-                link_id=l.link_id,
-                link_from_id=l.link_from_id,
-                link_to_id=l.link_to_id,
-                anchor_text=l.anchor_text
-            ) for l in rows]
+                link_id=row.link_id,
+                link_from_id=row.link_from_id,
+                link_to_id=row.link_to_id,
+                anchor_text=row.anchor_text
+            ) for row in rows]
 
     def delete_links_for_page_ids(self, page_ids: List[int]) -> int:
         """Delete any links referencing any of the provided page IDs. Returns number deleted."""

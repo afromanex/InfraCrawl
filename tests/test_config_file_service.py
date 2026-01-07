@@ -1,5 +1,4 @@
 import os
-import pytest
 from infracrawl.services.config_file_service import ConfigFileService
 
 CONFIGS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "configs")

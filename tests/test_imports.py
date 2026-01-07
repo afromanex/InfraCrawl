@@ -1,5 +1,4 @@
 import importlib
-import pytest
 
 MODULES = [
     'infracrawl.db.engine',

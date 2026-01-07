@@ -1,6 +1,5 @@
-from typing import Optional
 
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi import FastAPI
 
 from infracrawl.services.config_service import ConfigService
 from infracrawl.api.routers.configs import create_configs_router

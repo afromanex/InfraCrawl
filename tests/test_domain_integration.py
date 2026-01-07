@@ -1,4 +1,3 @@
-import pytest
 from infracrawl.repository.configs import ConfigsRepository
 from infracrawl.domain import CrawlerConfig
 
@@ -20,7 +19,8 @@ def test_config_domain_roundtrip():
     assert loaded is not None
     assert loaded.config_path == config.config_path
     # Simulate loading full config from YAML using config_path
-    import os, yaml
+    import os
+    import yaml
     config_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "configs")
     yaml_path = os.path.join(config_dir, loaded.config_path)
     if os.path.isfile(yaml_path):

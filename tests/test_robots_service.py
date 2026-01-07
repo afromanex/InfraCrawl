@@ -1,6 +1,4 @@
 from infracrawl.services.robots_service import RobotsService
-import pytest
-from unittest.mock import MagicMock
 
 class DummyHttp:
     def __init__(self, status, text):

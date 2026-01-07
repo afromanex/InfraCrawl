@@ -1,4 +1,3 @@
-import pytest
 from infracrawl.services.http_service import HttpService
 from unittest.mock import patch
 

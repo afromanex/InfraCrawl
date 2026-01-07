@@ -1,7 +1,5 @@
-import pytest
 from infracrawl.services.page_fetch_persist_service import PageFetchPersistService
 from infracrawl.repository.pages import PagesRepository
-from infracrawl.services.http_service import HttpService
 
 class DummyHttp:
     def fetch(self, url):

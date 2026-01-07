@@ -3,7 +3,6 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException, BackgroundTasks
 from pydantic import BaseModel
 
-from infracrawl.domain.config import CrawlerConfig
 from infracrawl.services.config_service import ConfigService
 from infracrawl.services.crawl_registry import InMemoryCrawlRegistry
 
@@ -53,7 +52,7 @@ def create_crawlers_router(pages_repo, links_repo, config_service: ConfigService
                 d["plain_text"] = p.plain_text
             return d
 
-        return {"pages": [page_to_dict(p) for p in pages], "links": [l.__dict__ for l in links]}
+        return {"pages": [page_to_dict(p) for p in pages], "links": [link.__dict__ for link in links]}
 
     @router.post("/crawl", status_code=202)
     def crawl(req: CrawlRequest, background_tasks: BackgroundTasks):
@@ -108,43 +107,7 @@ def create_crawlers_router(pages_repo, links_repo, config_service: ConfigService
             raise HTTPException(status_code=404, detail="crawl not found or cannot cancel")
         return {"status": "cancelling", "crawl_id": crawl_id}
 
-    @router.post("/reload")
-    def reload(req: ReloadRequest, background_tasks: BackgroundTasks):
-        config_name = req.config
-        if not config_name:
-            raise HTTPException(status_code=400, detail="missing config")
-
-        cfg = config_service.get_config(config_name)
-        if not cfg:
-            raise HTTPException(status_code=404, detail="config not found")
-
-        try:
-            page_ids = pages_repo.get_page_ids_by_config(cfg.config_id)
-            deleted_links = 0
-            deleted_pages = 0
-            if page_ids:
-                deleted_links = links_repo.delete_links_for_page_ids(page_ids)
-                deleted_pages = pages_repo.delete_pages_by_ids(page_ids)
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"error clearing data: {e}")
-
-        # register reload crawl in registry (if provided)
-        crawl_id = None
-        if crawl_registry is not None:
-            crawl_id = crawl_registry.start(config_name=cfg.config_path, config_id=cfg.config_id)
-
-        def _run_and_track(cfg, cid=None):
-            try:
-                start_crawl_callback(cfg)
-                if cid and crawl_registry is not None:
-                    crawl_registry.finish(cid, status="finished")
-            except Exception as e:
-                if cid and crawl_registry is not None:
-                    crawl_registry.finish(cid, status="failed", error=str(e))
-                raise
-
-        background_tasks.add_task(_run_and_track, cfg, crawl_id)
-        return {"status": "reloading", "deleted_pages": deleted_pages, "deleted_links": deleted_links, "crawl_id": crawl_id}
+    # `/reload` endpoint removed — use `/crawlers/remove` followed by `/crawlers/crawl` instead.
 
     @router.delete("/remove")
     def remove(req: RemoveRequest):
