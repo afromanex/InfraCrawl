@@ -8,7 +8,7 @@ from infracrawl.repository.pages import PagesRepository
 from infracrawl.repository.links import LinksRepository
 from infracrawl.repository.configs import ConfigsRepository
 from infracrawl import config
-from infracrawl.crawler import Crawler
+from infracrawl.services.crawler import Crawler
 from infracrawl import configs as config_loader
 
 
@@ -103,7 +103,12 @@ class ControlHandler(BaseHTTPRequestHandler):
 
 def _start_crawl(url: str, depth: int, config_id: int | None = None):
     print(f"Starting crawl: {url} depth={depth} config_id={config_id}")
-    crawler = Crawler()
+    # Pass repositories explicitly for dependency injection
+    crawler = Crawler(
+        pages_repo=pages_repo,
+        links_repo=links_repo,
+        configs_repo=configs_repo
+    )
     crawler.crawl(url, max_depth=depth, config_id=config_id)
     print(f"Crawl finished: {url}")
 
