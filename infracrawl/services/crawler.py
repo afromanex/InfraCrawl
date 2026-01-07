@@ -6,6 +6,7 @@ from urllib.parse import urljoin, urlparse
 from infracrawl.services.http_service import HttpService
 from infracrawl.services.content_review_service import ContentReviewService
 from infracrawl.services.robots_service import RobotsService
+from infracrawl.services.link_processor import LinkProcessor
 
 from infracrawl import config
 from infracrawl.repository.pages import PagesRepository
@@ -79,21 +80,16 @@ class Crawler:
             return None
 
     def _process_links(self, url: str, body: str, from_id: int, context: CrawlContext, depth: int, _crawl_from=None):
-        links = self.extract_links(url, body)
-        for link_url, anchor in links:
-            if not self._same_host(context.current_root, link_url):
-                logger.debug("Skipping (external) %s -> not same host as %s", link_url, context.current_root)
-                continue
-            to_id = self.pages_repo.ensure_page(link_url)
-            link_obj = Link(link_id=None, link_from_id=from_id, link_to_id=to_id, anchor_text=anchor)
-            self.links_repo.insert_link(link_obj)
-            if depth - 1 >= 0:
-                # prefer direct method recursion; fall back to passed callback if present
-                if _crawl_from is not None:
-                    _crawl_from(link_url, depth - 1)
-                else:
-                    self._crawl_from(link_url, depth - 1, context)
-    def __init__(self, pages_repo=None, links_repo=None, configs_repo=None, delay=None, user_agent=None, http_service=None, content_review_service=None, robots_service=None):
+        # Delegate link extraction, persistence and scheduling to LinkProcessor
+        # Crawl callback prefers direct method but falls back to supplied callback
+        def cb(link_url, next_depth):
+            if _crawl_from is not None:
+                _crawl_from(link_url, next_depth)
+            else:
+                self._crawl_from(link_url, next_depth, context)
+
+        self.link_processor.process_links(context.current_root, url, body, from_id, context, depth, crawl_callback=cb, extract_links_fn=self.extract_links)
+    def __init__(self, pages_repo=None, links_repo=None, configs_repo=None, delay=None, user_agent=None, http_service=None, content_review_service=None, robots_service=None, link_processor=None):
         self.pages_repo = pages_repo or PagesRepository()
         self.links_repo = links_repo or LinksRepository()
         self.configs_repo = configs_repo or ConfigsRepository()
@@ -102,6 +98,7 @@ class Crawler:
         self.http_service = http_service or HttpService(self.user_agent)
         self.content_review_service = content_review_service or ContentReviewService()
         self.robots_service = robots_service or RobotsService(self.http_service, self.user_agent)
+        self.link_processor = link_processor or LinkProcessor(self.content_review_service, self.pages_repo, self.links_repo)
 
     def fetch(self, url: str):
         return self.http_service.fetch(url)
