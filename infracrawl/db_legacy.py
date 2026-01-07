@@ -1,3 +1,9 @@
+"""Legacy DB module moved to `infracrawl.db` package.
+
+This file preserves the original `infracrawl/db.py` implementation so code
+can be migrated incrementally. Prefer using `infracrawl.db.engine` and the
+repository classes under `infracrawl.repository` going forward.
+"""
 import os
 import time
 try:
@@ -92,6 +98,7 @@ def upsert_page(page_url: str, page_content: str | None, http_status: int | None
                 return row[0]
     finally:
         conn.close()
+
 
 
 
@@ -266,7 +273,7 @@ def fetch_links(limit: int | None = None):
 
 
 # If requested, override the above functions with SQLAlchemy-backed implementations
-if USE_SQLALCHEMY and _repo is not None:
+if USE_SQLALCHEMY and _pages_repo is not None:
     # simple delegations to the Repository methods
     def ensure_page(page_url: str):
         return _pages_repo.ensure_page(page_url)

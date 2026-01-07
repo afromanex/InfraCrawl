@@ -1,20 +1,16 @@
-from bs4 import BeautifulSoup
-import requests
+import logging
 import time
-from urllib.parse import urljoin, urlparse
 from datetime import datetime, timezone
+from urllib.parse import urljoin, urlparse
+
+import requests
+from bs4 import BeautifulSoup
+from urllib.robotparser import RobotFileParser
+
 from infracrawl import config
 from infracrawl import db
-from urllib.parse import urlunparse
-import requests
-from urllib.parse import urljoin
-from urllib.parse import urlparse as _urlparse
-from urllib.parse import urlsplit
-from urllib.parse import urlunsplit
-from urllib.parse import SplitResult
-from urllib.parse import urlsplit as _urlsplit
-import urllib
-from urllib.robotparser import RobotFileParser
+
+logger = logging.getLogger(__name__)
 
 
 class Crawler:
@@ -32,20 +28,17 @@ class Crawler:
         if not robots_enabled:
             return True
         try:
-            parsed = _urlparse(url)
+            parsed = urlparse(url)
             base = f"{parsed.scheme}://{parsed.netloc}"
-            if base in self._rp_cache:
-                rp = self._rp_cache[base]
-            else:
+            rp = self._rp_cache.get(base)
+            if rp is None:
                 rp = RobotFileParser()
                 robots_url = urljoin(base, "/robots.txt")
                 try:
                     r = requests.get(robots_url, headers={"User-Agent": self.user_agent}, timeout=5)
                     if r.status_code == 200:
-                        lines = r.text.splitlines()
-                        rp.parse(lines)
+                        rp.parse(r.text.splitlines())
                     else:
-                        # missing or inaccessible robots -> allow
                         rp = None
                 except Exception:
                     rp = None
@@ -83,9 +76,18 @@ class Crawler:
         max_depth = max_depth if max_depth is not None else config.DEFAULT_DEPTH
         visited = set()
 
+        # Load config once for the whole crawl to avoid repeated DB calls
+        cfg_robots = True
+        cfg_refresh_days = None
+        if config_id is not None:
+            cfg = db.get_config_by_id(config_id)
+            if isinstance(cfg, dict):
+                cfg_robots = cfg.get('robots', True)
+                cfg_refresh_days = cfg.get('refresh_days')
+
         def _crawl_from(url: str, depth: int):
             if url in visited:
-                print(f"Skipping (visited) {url}")
+                logger.debug("Skipping (visited) %s", url)
                 return
             visited.add(url)
 
@@ -95,7 +97,7 @@ class Crawler:
             # if ensure_page created without config_id, we'll set config_id when upserting after fetch
 
             if depth < 0:
-                print(f"Skipping (max depth reached) {url} at depth {depth}")
+                logger.debug("Skipping (max depth reached) %s at depth %s", url, depth)
                 return
 
             # Check robots and refresh_days
@@ -108,7 +110,7 @@ class Crawler:
                     cfg_refresh_days = cfg.get('refresh_days')
 
             if not self._allowed_by_robots(url, cfg_robots):
-                print(f"Skipping (robots) {url}")
+                logger.info("Skipping (robots) %s", url)
                 return
 
             # Check refresh_days: skip fetching if recently fetched
@@ -126,17 +128,15 @@ class Crawler:
                             last_dt = last
                         if last_dt is not None:
                             try:
-                                # Normalize last_dt to UTC naive datetime for safe subtraction
                                 if last_dt.tzinfo is not None:
                                     last_dt_utc = last_dt.astimezone(timezone.utc).replace(tzinfo=None)
                                 else:
                                     last_dt_utc = last_dt
                                 delta_days = (datetime.utcnow() - last_dt_utc).days
                                 if delta_days < int(cfg_refresh_days):
-                                    print(f"Skipping {url}; fetched {delta_days} days ago (< {cfg_refresh_days})")
+                                    logger.info("Skipping %s; fetched %s days ago (< %s)", url, delta_days, cfg_refresh_days)
                                     return
                             except Exception:
-                                # If any error occurs comparing datetimes, fall through and fetch
                                 pass
                     except Exception:
                         pass
@@ -145,9 +145,9 @@ class Crawler:
                 status, body = self.fetch(url)
                 fetched_at = datetime.utcnow().isoformat()
                 page_id = db.upsert_page(url, body, status, fetched_at, config_id=config_id)
-                print(f"Fetched {url} -> status {status}, page_id={page_id}")
+                logger.info("Fetched %s -> status %s, page_id=%s", url, status, page_id)
             except Exception as e:
-                print(f"Failed to fetch {url}: {e}")
+                logger.warning("Failed to fetch %s: %s", url, e)
                 return
 
             time.sleep(self.delay)
@@ -155,7 +155,7 @@ class Crawler:
             links = self.extract_links(url, body)
             for link_url, anchor in links:
                 if not self._same_host(start_url, link_url):
-                    print(f"Skipping (external) {link_url} -> not same host as {start_url}")
+                    logger.debug("Skipping (external) %s -> not same host as %s", link_url, start_url)
                     continue
                 to_id = db.ensure_page(link_url)
                 db.insert_link(from_id, to_id, anchor)

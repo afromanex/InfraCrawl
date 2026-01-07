@@ -1,7 +1,10 @@
-from dotenv import load_dotenv
 import os
-
-load_dotenv()
+try:
+	from dotenv import load_dotenv
+	load_dotenv()
+except Exception:
+	# python-dotenv not installed in this environment; rely on environment variables
+	pass
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 USER_AGENT = os.getenv("USER_AGENT", "InfraCrawl/0.1")

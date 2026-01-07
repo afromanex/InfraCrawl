@@ -15,6 +15,7 @@ services:
     environment:
       - DATABASE_URL=postgresql://infracrawl:infracrawl_pass@db:5432/infracrawl_db
       - PYTHONUNBUFFERED=1
+      - PYTHONPATH=/app
     depends_on:
       - db
     volumes:
@@ -23,6 +24,18 @@ services:
     ports:
       - "8000:8000"
     restart: unless-stopped
+
+  test:
+    build: .
+    environment:
+      - DATABASE_URL=postgresql://infracrawl:infracrawl_pass@db:5432/infracrawl_db
+      - PYTHONUNBUFFERED=1
+    depends_on:
+      - db
+    volumes:
+      - .:/app
+    command: pytest tests/
+    restart: "no"
 
 volumes:
   db_data:
