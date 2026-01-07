@@ -5,6 +5,7 @@ from pydantic import BaseModel
 
 from infracrawl.domain.config import CrawlerConfig
 from infracrawl.services.config_service import ConfigService
+from infracrawl.services.crawl_registry import InMemoryCrawlRegistry
 
 
 class CrawlRequest(BaseModel):
@@ -16,7 +17,7 @@ class ReloadRequest(BaseModel):
     config: str
 
 
-def create_crawlers_router(pages_repo, links_repo, config_service: ConfigService, start_crawl_callback):
+def create_crawlers_router(pages_repo, links_repo, config_service: ConfigService, start_crawl_callback, crawl_registry: InMemoryCrawlRegistry = None):
     router = APIRouter(prefix="/crawlers", tags=["Crawlers"])
 
     @router.get("/export")
@@ -43,8 +44,38 @@ def create_crawlers_router(pages_repo, links_repo, config_service: ConfigService
         use_depth = req.depth if req.depth is not None else cfg.max_depth
         if req.depth is not None and cfg is not None:
             cfg = CrawlerConfig(cfg.config_id, cfg.name, cfg.config_path, root_urls=cfg.root_urls, max_depth=use_depth, robots=cfg.robots, refresh_days=cfg.refresh_days)
-        background_tasks.add_task(start_crawl_callback, cfg)
-        return {"status": "started"}
+        # register crawl in registry (if provided)
+        crawl_id = None
+        if crawl_registry is not None:
+            crawl_id = crawl_registry.start(config_name=cfg.name, config_id=cfg.config_id)
+
+        def _run_and_track(cfg, cid=None):
+            try:
+                start_crawl_callback(cfg)
+                if cid and crawl_registry is not None:
+                    crawl_registry.finish(cid, status="finished")
+            except Exception as e:
+                if cid and crawl_registry is not None:
+                    crawl_registry.finish(cid, status="failed", error=str(e))
+                raise
+
+        background_tasks.add_task(_run_and_track, cfg, crawl_id)
+        return {"status": "started", "crawl_id": crawl_id}
+
+    @router.get("/active")
+    def list_active_crawls():
+        if crawl_registry is None:
+            return {"active": []}
+        return {"active": crawl_registry.list_active()}
+
+    @router.get("/{crawl_id}")
+    def get_crawl(crawl_id: str):
+        if crawl_registry is None:
+            raise HTTPException(status_code=404, detail="no registry configured")
+        rec = crawl_registry.get(crawl_id)
+        if not rec:
+            raise HTTPException(status_code=404, detail="crawl not found")
+        return rec
 
     @router.post("/reload")
     def reload(req: ReloadRequest, background_tasks: BackgroundTasks):
@@ -66,7 +97,22 @@ def create_crawlers_router(pages_repo, links_repo, config_service: ConfigService
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"error clearing data: {e}")
 
-        background_tasks.add_task(start_crawl_callback, cfg)
-        return {"status": "reloading", "deleted_pages": deleted_pages, "deleted_links": deleted_links}
+        # register reload crawl in registry (if provided)
+        crawl_id = None
+        if crawl_registry is not None:
+            crawl_id = crawl_registry.start(config_name=cfg.name, config_id=cfg.config_id)
+
+        def _run_and_track(cfg, cid=None):
+            try:
+                start_crawl_callback(cfg)
+                if cid and crawl_registry is not None:
+                    crawl_registry.finish(cid, status="finished")
+            except Exception as e:
+                if cid and crawl_registry is not None:
+                    crawl_registry.finish(cid, status="failed", error=str(e))
+                raise
+
+        background_tasks.add_task(_run_and_track, cfg, crawl_id)
+        return {"status": "reloading", "deleted_pages": deleted_pages, "deleted_links": deleted_links, "crawl_id": crawl_id}
 
     return router

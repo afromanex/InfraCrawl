@@ -1,6 +1,4 @@
 import json
-import threading
-import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import urlparse, parse_qs
 
@@ -52,21 +50,11 @@ def main():
 
     app = create_app(pages_repo, links_repo, config_service, crawler.crawl)
 
-    def serve():
-        print(f"Control server (FastAPI/uvicorn) listening on 0.0.0.0:{server_port}")
-        uvicorn.run(app, host='0.0.0.0', port=server_port)
-
-    t = threading.Thread(target=serve, daemon=True)
-    t.start()
-
-    # Heartbeat loop
+    print(f"Control server (FastAPI/uvicorn) listening on 0.0.0.0:{server_port}")
     try:
-        while True:
-            print("InfraCrawl daemon heartbeat")
-            time.sleep(30)
+        uvicorn.run(app, host='0.0.0.0', port=server_port)
     except KeyboardInterrupt:
         print("Shutting down")
-        server.shutdown()
 
 
 if __name__ == '__main__':
