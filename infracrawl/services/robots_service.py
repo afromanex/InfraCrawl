@@ -1,11 +1,15 @@
 from urllib.parse import urljoin, urlparse
-from urllib.robotparser import RobotFileParser
+
+from infracrawl.services.robots_fetcher import RobotsFetcher
+
 
 class RobotsService:
-    def __init__(self, http_service, user_agent):
+    def __init__(self, http_service, user_agent, robots_fetcher: RobotsFetcher = None):
+        # Backwards-compatible: callers may still pass an http_service with fetch_robots
         self.http_service = http_service
         self.user_agent = user_agent
         self._rp_cache = {}
+        self.robots_fetcher = robots_fetcher or RobotsFetcher(http_service)
 
     def allowed_by_robots(self, url: str, robots_enabled: bool) -> bool:
         if not robots_enabled:
@@ -13,21 +17,16 @@ class RobotsService:
         try:
             parsed = urlparse(url)
             base = f"{parsed.scheme}://{parsed.netloc}"
-            rp = self._rp_cache.get(base)
-            if rp is None:
-                rp = RobotFileParser()
+            robots_parser = self._rp_cache.get(base)
+            if robots_parser is None:
                 robots_url = urljoin(base, "/robots.txt")
                 try:
-                    status, robots_txt = self.http_service.fetch_robots(robots_url)
-                    if status == 200:
-                        rp.parse(robots_txt.splitlines())
-                    else:
-                        rp = None
+                    robots_parser = self.robots_fetcher.fetch(robots_url)
                 except Exception:
-                    rp = None
-                self._rp_cache[base] = rp
-            if rp is None:
+                    robots_parser = None
+                self._rp_cache[base] = robots_parser
+            if robots_parser is None:
                 return True
-            return rp.can_fetch(self.user_agent, url)
+            return robots_parser.can_fetch(self.user_agent, url)
         except Exception:
             return True
