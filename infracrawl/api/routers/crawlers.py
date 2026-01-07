@@ -1,6 +1,8 @@
 from typing import Optional
+import json
 
 from fastapi import APIRouter, HTTPException, BackgroundTasks
+from starlette.responses import StreamingResponse
 from pydantic import BaseModel
 
 from infracrawl.services.config_service import ConfigService
@@ -36,7 +38,6 @@ def create_crawlers_router(pages_repo, links_repo, config_service: ConfigService
         # fetch full rows if either HTML or plain text is requested
         fetch_full = include_html or include_plain_text
         pages = pages_repo.fetch_pages(full=fetch_full, limit=limit, config_id=config_id)
-        links = links_repo.fetch_links(limit=limit, config_id=config_id)
 
         def page_to_dict(p):
             d = {
@@ -52,7 +53,12 @@ def create_crawlers_router(pages_repo, links_repo, config_service: ConfigService
                 d["plain_text"] = p.plain_text
             return d
 
-        return {"pages": [page_to_dict(p) for p in pages], "links": [link.__dict__ for link in links]}
+        def gen():
+            for p in pages:
+                yield (json.dumps(page_to_dict(p), default=str) + "\n").encode("utf-8")
+
+        headers = {"Content-Type": "application/x-ndjson"}
+        return StreamingResponse(gen(), media_type="application/x-ndjson", headers=headers)
 
     @router.post("/crawl", status_code=202)
     def crawl(req: CrawlRequest, background_tasks: BackgroundTasks):
@@ -106,8 +112,6 @@ def create_crawlers_router(pages_repo, links_repo, config_service: ConfigService
         if not ok:
             raise HTTPException(status_code=404, detail="crawl not found or cannot cancel")
         return {"status": "cancelling", "crawl_id": crawl_id}
-
-    # `/reload` endpoint removed — use `/crawlers/remove` followed by `/crawlers/crawl` instead.
 
     @router.delete("/remove")
     def remove(req: RemoveRequest):
