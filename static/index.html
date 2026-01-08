@@ -18,14 +18,10 @@
     <h1>InfraCrawl Control UI</h1>
 
     <div class="card">
-      <strong>Config Management</strong>
-      <div style="margin-top:8px">
-        <button id="btn-sync">Sync configs</button>
-        <span id="sync-result"></span>
-      </div>
+      <strong>Auth</strong>
       <div style="margin-top:8px">
         <label for="admin-token">Admin token:</label>
-        <input id="admin-token" placeholder="Paste admin token" style="width:60%" />
+        <input type="password" id="admin-token" placeholder="Paste admin token" style="width:60%" />
         <button id="login-token">Login</button>
         <button id="logout-token">Logout</button>
         <span id="token-status" style="margin-left:8px;color:#666">Not authenticated on the static page</span>
@@ -34,7 +30,16 @@
 
     <div class="card">
       <strong>Configs</strong>
+      <div style="margin-top:8px">
+        <button id="btn-sync">Sync configs</button>
+        <span id="sync-result"></span>
+      </div>
       <div id="configs-container">Loading…</div>
+    </div>
+
+    <div class="card">
+      <strong>Active Crawlers</strong>
+      <div id="active-container">Loading…</div>
     </div>
 
     <div class="card">
@@ -98,6 +103,37 @@
         }
       }
 
+      async function loadActiveCrawls() {
+        try {
+          const resp = await fetchJson('/crawlers/active');
+          const data = resp && resp.active ? resp.active : [];
+          const el = document.getElementById('active-container');
+          if (!data || !data.length) { el.innerText = 'No active crawls'; return }
+          let html = '<table><tr><th>crawl_id</th><th>config</th><th>started_at</th><th>status</th><th>action</th></tr>';
+          for (const c of data) {
+            const id = c.id || c.crawl_id || '';
+            const cfg = c.config_name ?? c.config_path ?? c.config_id ?? '';
+            const started = c.started_at ?? c.start_timestamp ?? '';
+            html += `<tr><td>${id}</td><td>${cfg}</td><td>${started}</td><td>${c.status ?? ''}</td><td><button data-id="${id}" class="cancel">Cancel</button></td></tr>`;
+          }
+          html += '</table>';
+          el.innerHTML = html;
+          for (const b of el.querySelectorAll('button.cancel')) {
+            b.onclick = async (ev) => {
+              const id = ev.target.getAttribute('data-id');
+              ev.target.disabled = true;
+              try {
+                await fetchJson('/crawlers/cancel/' + encodeURIComponent(id), { method: 'POST' });
+                setTimeout(loadActiveCrawls, 500);
+              } catch (e) { alert('Cancel failed: ' + e.message) }
+              ev.target.disabled = false;
+            }
+          }
+        } catch (e) {
+          document.getElementById('active-container').innerText = 'Error loading active crawls: ' + e.message;
+        }
+      }
+
       document.getElementById('btn-sync').onclick = async () => {
         const out = document.getElementById('sync-result');
         out.innerText = 'Syncing...';
@@ -154,7 +190,9 @@
 
       loadConfigs();
       loadRuns();
+      loadActiveCrawls();
       setInterval(loadRuns, 15000);
+      setInterval(loadActiveCrawls, 5000);
     </script>
   </body>
 </html>
