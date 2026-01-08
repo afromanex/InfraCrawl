@@ -22,6 +22,12 @@ class RemoveRequest(BaseModel):
     config: str
 
 
+class ClearRunsRequest(BaseModel):
+    config: str
+    within_seconds: Optional[int] = None
+    message: Optional[str] = None
+
+
 def create_crawlers_router(pages_repo, links_repo, config_service: ConfigService, start_crawl_callback, crawl_registry: InMemoryCrawlRegistry = None):
     router = APIRouter(prefix="/crawlers", tags=["Crawlers"])
     crawls_repo = CrawlsRepository()
@@ -191,5 +197,25 @@ def create_crawlers_router(pages_repo, links_repo, config_service: ConfigService
             }
 
         return [r_to_dict(r) for r in runs]
+
+    @router.post("/runs/clear")
+    def clear_runs(req: ClearRunsRequest):
+        """Mark recent incomplete runs for a config as finished.
+
+        Useful to clear stale incomplete runs before attempting resume logic.
+        """
+        config_name = req.config
+        if not config_name:
+            raise HTTPException(status_code=400, detail="missing config")
+        cfg = config_service.get_config(config_name)
+        if not cfg:
+            raise HTTPException(status_code=404, detail="config not found")
+
+        try:
+            cnt = crawls_repo.clear_incomplete_runs(cfg.config_id, within_seconds=req.within_seconds, message=req.message)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"could not clear runs: {e}")
+
+        return {"status": "cleared", "count": cnt}
 
     return router

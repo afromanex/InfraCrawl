@@ -43,10 +43,13 @@ def _parse_schedule(schedule: Any):
 
 
 class SchedulerService:
-    def __init__(self, config_service, start_crawl_callback, crawl_registry):
+    def __init__(self, config_service, start_crawl_callback, crawl_registry, pages_repo=None, links_repo=None):
         self.config_service = config_service
         self.start_crawl_callback = start_crawl_callback
         self.crawl_registry = crawl_registry
+        # optional repositories (backwards-compatible): some callers pass these
+        self.pages_repo = pages_repo
+        self.links_repo = links_repo
         self._sched: Optional[BackgroundScheduler] = None
         # lazy-instantiate crawls repo so scheduler can record runs
         from infracrawl.repository.crawls import CrawlsRepository

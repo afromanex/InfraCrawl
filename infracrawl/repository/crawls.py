@@ -59,3 +59,51 @@ class CrawlsRepository:
                     cfg_path = cfg.config_path
             out.append(DomainCrawlRun(r.run_id, r.config_id, cfg_path, r.start_timestamp, r.end_timestamp, r.exception))
         return out
+
+    def clear_incomplete_runs(self, config_id: int, within_seconds: Optional[int] = None, message: Optional[str] = None) -> int:
+        """Mark recent incomplete runs for a config as finished and delete their pages/links.
+
+        Returns the number of runs marked finished.
+        """
+        from datetime import timedelta
+
+        # lazy imports to avoid cycles
+        from infracrawl.repository.pages import PagesRepository
+        from infracrawl.repository.links import LinksRepository
+
+        now = datetime.utcnow()
+        cutoff = None
+        if within_seconds is not None:
+            cutoff = now - timedelta(seconds=within_seconds)
+
+        with self.get_session() as session:
+            q = select(DBCrawlRun).where(DBCrawlRun.config_id == config_id, DBCrawlRun.end_timestamp == None)
+            if cutoff is not None:
+                q = q.where(DBCrawlRun.start_timestamp >= cutoff)
+            rows = session.execute(q).scalars().all()
+            count = 0
+            for r in rows:
+                r.end_timestamp = now
+                r.exception = message or "job found incomplete on startup"
+                session.add(r)
+                count += 1
+            if count:
+                session.commit()
+            else:
+                session.rollback()
+
+        if count:
+            # best-effort cleanup of pages/links for this config
+            pages_repo = PagesRepository(self.engine)
+            links_repo = LinksRepository(self.engine)
+            try:
+                page_ids = pages_repo.get_page_ids_by_config(config_id)
+                if page_ids:
+                    links_repo.delete_links_for_page_ids(page_ids)
+                    pages_repo.delete_pages_by_ids(page_ids)
+            except Exception:
+                import logging
+
+                logging.exception("Failed cleaning pages/links for config %s", config_id)
+
+        return count

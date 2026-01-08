@@ -15,7 +15,7 @@
     </style>
   </head>
   <body>
-    <h1>InfraCrawl Control UI</h1>
+    <h1>InfraCrawl</h1>
 
     <div class="card">
       <strong>Auth</strong>
@@ -44,6 +44,10 @@
 
     <div class="card">
       <strong>Recent Runs</strong>
+      <div style="margin-top:8px">
+        <button id="btn-clear-runs">Clear incomplete runs</button>
+        <small style="color:#666;margin-left:8px">Mark recent incomplete runs finished and remove their data</small>
+      </div>
       <div id="runs-container">Loading…</div>
     </div>
 
@@ -132,6 +136,19 @@
         } catch (e) {
           document.getElementById('active-container').innerText = 'Error loading active crawls: ' + e.message;
         }
+      }
+
+      document.getElementById('btn-clear-runs').onclick = async () => {
+        try {
+          const cfg = prompt('Config path to clear (e.g. starkparks.yml):');
+          if (!cfg) return;
+          const within = prompt('Within seconds (optional, leave blank for no limit):', '3600');
+          const body = { config: cfg };
+          if (within && within.trim()) body.within_seconds = parseInt(within, 10);
+          const res = await fetchJson('/crawlers/runs/clear', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
+          alert('Cleared: ' + JSON.stringify(res));
+          loadRuns();
+        } catch (e) { alert('Clear failed: ' + e.message) }
       }
 
       document.getElementById('btn-sync').onclick = async () => {

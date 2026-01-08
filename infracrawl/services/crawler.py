@@ -125,7 +125,7 @@ class Crawler:
         except Exception:
             return False
 
-    def crawl(self, config: CrawlerConfig, stop_event=None):
+    def crawl(self, config: CrawlerConfig, stop_event=None, initial_visited=None, start_url: str = None):
         """Crawl using the provided `CrawlerConfig` object.
 
         Iterates `config.root_urls` and performs depth-limited crawling from
@@ -135,11 +135,39 @@ class Crawler:
             raise ValueError("config is required for crawl")
         # Build context from the provided config
         context = CrawlContext(config)
+        # If an initial visited list is provided (used for resume), seed the
+        # in-memory visited set so the crawler won't revisit already-processed URLs.
+        if initial_visited:
+            try:
+                for u in initial_visited:
+                    context.mark_visited(u)
+            except Exception:
+                logger.exception("Error seeding initial visited URLs for resume")
+            # Ensure root URLs are not marked visited so the crawler will
+            # still start traversal from the configured roots. If we leave
+            # roots marked visited the crawl may immediately exit.
+            try:
+                roots = getattr(context.config, 'root_urls', []) or []
+                for ru in roots:
+                    if ru in context.visited:
+                        context.visited.discard(ru)
+            except Exception:
+                logger.exception("Error unmarking root URLs after seeding resume state")
         # Ensure max_depth is set
         if context.max_depth is None:
             context.max_depth = config.DEFAULT_DEPTH
 
         roots = getattr(context.config, 'root_urls', []) or []
+        # If a `start_url` is provided (resume from a specific link), start
+        # traversal from that URL first so the crawler continues from the
+        # previously-seen area.
+        if start_url:
+            if stop_event is not None and getattr(stop_event, 'is_set', lambda: False)():
+                logger.info("Crawl cancelled before starting start_url %s", start_url)
+                return
+            context.set_root(start_url)
+            self._crawl_from(start_url, context.max_depth, context, stop_event)
+
         for ru in roots:
             # cooperative cancellation: check stop_event before starting each root
             if stop_event is not None and getattr(stop_event, 'is_set', lambda: False)():

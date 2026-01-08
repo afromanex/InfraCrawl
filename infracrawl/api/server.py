@@ -35,7 +35,9 @@ def create_app(pages_repo, links_repo, config_service: ConfigService, start_craw
     app.mount("/ui", StaticFiles(directory="static", html=True), name="ui")
 
     # Scheduler: schedule jobs declared inside YAML configs via `schedule` key.
-    scheduler = SchedulerService(config_service, start_crawl_callback, crawl_registry)
+    scheduler = SchedulerService(config_service, start_crawl_callback, crawl_registry, pages_repo=pages_repo)
+    # provide links_repo to the scheduler so it can compute link-based resume
+    scheduler.links_repo = links_repo
 
     @app.on_event("startup")
     def _start_scheduler():
