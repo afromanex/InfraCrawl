@@ -22,12 +22,6 @@ class RemoveRequest(BaseModel):
     config: str
 
 
-class ClearRunsRequest(BaseModel):
-    config: str
-    within_seconds: Optional[int] = None
-    message: Optional[str] = None
-
-
 def create_crawlers_router(pages_repo, links_repo, config_service: ConfigService, start_crawl_callback, crawl_registry: InMemoryCrawlRegistry = None):
     router = APIRouter(prefix="/crawlers", tags=["Crawlers"])
     crawls_repo = CrawlsRepository()
@@ -45,18 +39,19 @@ def create_crawlers_router(pages_repo, links_repo, config_service: ConfigService
             }
         },
     )
-    def export(config: Optional[str] = None, include_html: Optional[bool] = None, include_plain_text: Optional[bool] = None, limit: Optional[int] = None):
-        # `include_html` and `include_plain_text` control which fields are returned.
+    def export(config: Optional[str] = None, include_html: Optional[bool] = None, include_plain_text: Optional[bool] = None, include_filtered_plain_text: Optional[bool] = None, limit: Optional[int] = None):
+        # `include_html`, `include_plain_text`, and `include_filtered_plain_text` control which fields are returned.
         include_html = bool(include_html)
         include_plain_text = bool(include_plain_text)
+        include_filtered_plain_text = bool(include_filtered_plain_text)
         config_id = None
         if config:
             cfg = config_service.get_config(config)
             if not cfg:
                 raise HTTPException(status_code=404, detail="config not found")
             config_id = cfg.config_id
-        # fetch full rows if either HTML or plain text is requested
-        fetch_full = include_html or include_plain_text
+        # fetch full rows if any content field is requested
+        fetch_full = include_html or include_plain_text or include_filtered_plain_text
         pages = pages_repo.fetch_pages(full=fetch_full, limit=limit, config_id=config_id)
 
         def page_to_dict(p):
@@ -71,6 +66,8 @@ def create_crawlers_router(pages_repo, links_repo, config_service: ConfigService
                 d["page_content"] = p.page_content
             if include_plain_text:
                 d["plain_text"] = p.plain_text
+            if include_filtered_plain_text:
+                d["filtered_plain_text"] = p.filtered_plain_text
             return d
 
         def gen_ndjson():
@@ -197,25 +194,5 @@ def create_crawlers_router(pages_repo, links_repo, config_service: ConfigService
             }
 
         return [r_to_dict(r) for r in runs]
-
-    @router.post("/runs/clear")
-    def clear_runs(req: ClearRunsRequest):
-        """Mark recent incomplete runs for a config as finished.
-
-        Useful to clear stale incomplete runs before attempting resume logic.
-        """
-        config_name = req.config
-        if not config_name:
-            raise HTTPException(status_code=400, detail="missing config")
-        cfg = config_service.get_config(config_name)
-        if not cfg:
-            raise HTTPException(status_code=404, detail="config not found")
-
-        try:
-            cnt = crawls_repo.clear_incomplete_runs(cfg.config_id, within_seconds=req.within_seconds, message=req.message)
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"could not clear runs: {e}")
-
-        return {"status": "cleared", "count": cnt}
 
     return router

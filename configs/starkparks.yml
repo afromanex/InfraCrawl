@@ -1,5 +1,17 @@
 root_urls:
   - https://starkparks.com/
+  - https://eventsby720.com/
+  - https://www.downtowncanton.com/events/
+  - https://starkurbanleague.org/home/events/
+  - https://www.starkdd.org/events
+  - https://jacksontwp.com/events/
+  - https://starklibrary.bibliocommons.com/v2/events?featured=true
+  - https://plaintownshipamphitheater.com/events/
+  - https://allevents.in/canton/stark%20county#
+  - https://ci.ovationtix.com/35381
+  - https://business.cantonchamber.org/event-calendar
+  - https://www.profootballhof.com/events/
+  - https://biastarkeco.com/events/
 max_depth: 2
 refresh_days: 7
 robots: true

@@ -15,6 +15,7 @@ class Page(Base):
     page_url = Column(Text, unique=True, nullable=False)
     page_content = Column(Text, nullable=True)
     plain_text = Column(Text, nullable=True)
+    filtered_plain_text = Column(Text, nullable=True)
     http_status = Column(Integer, nullable=True)
     fetched_at = Column(DateTime(timezone=True), nullable=True)
     config_id = Column(Integer, nullable=True)
