@@ -1,6 +1,6 @@
 from typing import Optional
 from datetime import datetime
-from sqlalchemy import insert, update, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from infracrawl.db.engine import make_engine
@@ -77,7 +77,7 @@ class CrawlsRepository:
             cutoff = now - timedelta(seconds=within_seconds)
 
         with self.get_session() as session:
-            q = select(DBCrawlRun).where(DBCrawlRun.config_id == config_id, DBCrawlRun.end_timestamp == None)
+            q = select(DBCrawlRun).where(DBCrawlRun.config_id == config_id, DBCrawlRun.end_timestamp.is_(None))
             if cutoff is not None:
                 q = q.where(DBCrawlRun.start_timestamp >= cutoff)
             rows = session.execute(q).scalars().all()
