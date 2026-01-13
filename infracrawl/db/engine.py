@@ -12,11 +12,3 @@ def make_engine(database_url: Optional[str] = None) -> Engine:
         raise RuntimeError("DATABASE_URL not set")
     engine = create_engine(database_url)
     return engine
-
-
-def init_orm(engine: Optional[Engine] = None):
-    # Import models lazily to avoid circular imports at module import time
-    from infracrawl.db.models import Base
-
-    engine = engine or make_engine()
-    Base.metadata.create_all(engine)
