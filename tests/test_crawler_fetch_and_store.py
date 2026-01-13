@@ -8,12 +8,11 @@ def make_crawler_with(mocks=None):
     mocks = mocks or {}
     pages_repo = mocks.get("pages_repo", MagicMock())
     links_repo = mocks.get("links_repo", MagicMock())
-    configs_repo = mocks.get("configs_repo", MagicMock())
     http_service = mocks.get("http_service", MagicMock())
     content_review_service = mocks.get("content_review_service", MagicMock())
     robots_service = mocks.get("robots_service", MagicMock())
     link_processor = mocks.get("link_processor", MagicMock())
-    return Crawler(pages_repo=pages_repo, links_repo=links_repo, configs_repo=configs_repo,
+    return Crawler(pages_repo=pages_repo, links_repo=links_repo,
                    http_service=http_service, content_review_service=content_review_service,
                    robots_service=robots_service, link_processor=link_processor)
 

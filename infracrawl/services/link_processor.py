@@ -1,7 +1,9 @@
 import logging
+from typing import Callable, Optional
 from urllib.parse import urlparse
 
 from infracrawl.domain import Link
+from infracrawl.domain.crawl_context import CrawlContext
 
 logger = logging.getLogger(__name__)
 
@@ -16,12 +18,16 @@ class LinkProcessor:
         try:
             b = urlparse(base).hostname
             o = urlparse(other).hostname
+            # CLAUDE: Subdomains same-host is correct for most crawlers. Example: www.example.com and blog.example.com are same site.
             return b == o or (b and o and o.endswith('.' + b))
         except Exception:
             logger.exception("Error comparing hosts: base=%s, other=%s", base, other)
+            # CLAUDE: Returning False treats parse errors as external links - conservative and safe.
             return False
 
-    def process_links(self, current_root: str, base_url: str, html: str, from_id: int, context, depth: int, crawl_callback=None, extract_links_fn=None):
+    # TODO: 8 parameters - refactor later with CrawlState object
+    # CLAUDE: Acknowledged - defer until pattern emerges
+    def process_links(self, current_root: str, base_url: str, html: str, from_id: int, context: CrawlContext, depth: int, crawl_callback: Optional[Callable[[str, int], None]] = None, extract_links_fn: Optional[Callable[[str, str], list]] = None):
         """Extract links from `html` and persist them; schedule further crawling via `crawl_callback`.
 
         - `current_root` is the root URL for host filtering.
@@ -36,8 +42,14 @@ class LinkProcessor:
             if not self._same_host(current_root, link_url):
                 logger.debug("Skipping (external) %s -> not same host as %s", link_url, current_root)
                 continue
+            # TODO: DB call inside loop - N+1 query problem
+            # CLAUDE: Acknowledged - batch operations would require collecting all URLs first, losing streaming. Optimize if profiling shows bottleneck.
             to_id = self.pages_repo.ensure_page(link_url)
+            # TODO: Link domain object expects link_id: int but gets None
+            # CLAUDE: Domain model should use Optional[int] for link_id since repo assigns it. Low priority fix.
             link_obj = Link(link_id=None, link_from_id=from_id, link_to_id=to_id, anchor_text=anchor)
+            # TODO: Another DB call in loop
+            # CLAUDE: Same as above - batch would help but adds complexity. Defer.
             self.links_repo.insert_link(link_obj)
             if depth - 1 >= 0:
                 if crawl_callback is not None:

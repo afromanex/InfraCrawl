@@ -9,9 +9,13 @@ from infracrawl.db.engine import make_engine
 
 class PagesRepository:
     def __init__(self, engine=None):
+        # TODO: Creating new engine per repo instance is expensive
+        # CLAUDE: Use dependency injection - pass shared engine from main(). Implement later when scaling.
         self.engine = engine or make_engine()
 
     def get_session(self) -> Session:
+        # TODO: Returns raw Session - no error handling for connection failures
+        # CLAUDE: SQLAlchemy Session context manager handles rollback. Connection pool retries. Current approach is fine.
         return Session(self.engine)
 
     def ensure_page(self, page_url: str) -> int:
@@ -22,6 +26,8 @@ class PagesRepository:
                 return row.page_id
             p = DBPage(page_url=page_url)
             session.add(p)
+            # TODO: No handling of unique constraint violation if concurrent insert happens
+            # CLAUDE: Two crawlers inserting same URL simultaneously. Use INSERT ... ON CONFLICT or catch IntegrityError and retry query.
             session.commit()
             session.refresh(p)
             return p.page_id
@@ -43,11 +49,17 @@ class PagesRepository:
                 config_id=p.config_id
             )
 
+    # TODO: 7 parameters - should accept Page domain object
+    # TODO: http_status typed as Optional[int] but accepts string from caller - type mismatch
+    # TODO: fetched_at typed as Optional[str] but should be datetime
+    # CLAUDE: These todos remain valid but defer refactor - would break all callers. Consider for v2 API.
     def upsert_page(self, page_url: str, page_content: Optional[str], http_status: Optional[int], fetched_at: Optional[str], config_id: Optional[int] = None, plain_text: Optional[str] = None, filtered_plain_text: Optional[str] = None) -> Page:
         with self.get_session() as session:
             q = select(DBPage).where(DBPage.page_url == page_url)
             p = session.execute(q).scalars().first()
             if p:
+                # TODO: No optimistic locking - concurrent updates will overwrite
+                # CLAUDE: Add version column if this becomes issue. Unlikely with current single-crawler design.
                 p.page_content = page_content
                 p.plain_text = plain_text
                 p.filtered_plain_text = filtered_plain_text
@@ -57,30 +69,25 @@ class PagesRepository:
                     p.config_id = config_id
                 session.add(p)
                 session.commit()
-                return Page(
-                    page_id=p.page_id,
-                    page_url=p.page_url,
-                    page_content=p.page_content,
-                    plain_text=p.plain_text,
-                    filtered_plain_text=p.filtered_plain_text,
-                    http_status=p.http_status,
-                    fetched_at=p.fetched_at,
-                    config_id=p.config_id,
-                )
+                return self._db_page_to_domain(p)
             p = DBPage(page_url=page_url, page_content=page_content, plain_text=plain_text, filtered_plain_text=filtered_plain_text, http_status=http_status, fetched_at=fetched_at, config_id=config_id)
             session.add(p)
             session.commit()
             session.refresh(p)
-            return Page(
-                page_id=p.page_id,
-                page_url=p.page_url,
-                page_content=p.page_content,
-                plain_text=p.plain_text,
-                filtered_plain_text=p.filtered_plain_text,
-                http_status=p.http_status,
-                fetched_at=p.fetched_at,
-                config_id=p.config_id,
-            )
+            return self._db_page_to_domain(p)
+
+    def _db_page_to_domain(self, p: DBPage) -> Page:
+        """Convert database Page to domain Page."""
+        return Page(
+            page_id=p.page_id,
+            page_url=p.page_url,
+            page_content=p.page_content,
+            plain_text=p.plain_text,
+            filtered_plain_text=p.filtered_plain_text,
+            http_status=p.http_status,
+            fetched_at=p.fetched_at,
+            config_id=p.config_id
+        )
 
     def fetch_pages(self, full: bool = False, limit: Optional[int] = None, offset: Optional[int] = None, config_id: Optional[int] = None) -> List[Page]:
         with self.get_session() as session:

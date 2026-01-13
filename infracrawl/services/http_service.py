@@ -5,12 +5,15 @@ class HttpService:
         self.user_agent = user_agent
         self.timeout = timeout
 
+    # TODO: No error handling - requests.get raises on DNS failure, SSL error, connection error, timeout
+    # CLAUDE: Acknowledged - defer until needed in production
+    # TODO: Returns status as int but callers treat it as str - API contract unclear 
+    # CLAUDE: Status is int (correct). Callers like persist() incorrectly type it as str. Fix caller signatures.
     def fetch(self, url: str):
         headers = {"User-Agent": self.user_agent}
         resp = requests.get(url, headers=headers, timeout=self.timeout)
         return resp.status_code, resp.text
 
     def fetch_robots(self, robots_url: str):
-        headers = {"User-Agent": self.user_agent}
-        resp = requests.get(robots_url, headers=headers, timeout=self.timeout)
-        return resp.status_code, resp.text
+        """Fetch robots.txt - delegates to fetch()."""
+        return self.fetch(robots_url)

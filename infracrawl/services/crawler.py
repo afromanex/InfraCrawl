@@ -1,6 +1,7 @@
 import logging
 import time
 from datetime import datetime
+from typing import Optional
 from infracrawl.utils.datetime_utils import parse_to_utc_naive
 from urllib.parse import urlparse
 
@@ -21,6 +22,10 @@ logger = logging.getLogger(__name__)
 
 
 class Crawler:
+    def _is_stopped(self, stop_event) -> bool:
+        """Check if stop event is set."""
+        return stop_event is not None and getattr(stop_event, 'is_set', lambda: False)()
+
     def _should_skip_due_to_depth(self, context: CrawlContext, depth: int) -> bool:
         if depth < 0:
             logger.debug("Skipping (max depth reached) at depth %s", depth)
@@ -41,18 +46,16 @@ class Crawler:
         if context and context.config is not None:
             cfg_refresh_days = context.config.refresh_days
         if cfg_refresh_days is not None:
+            # TODO: This DB query on every URL check is expensive - should batch or cache
+            # RESPONSE: No, keep it simple for now. 
             page = self.pages_repo.get_page_by_url(url)
             if page and page.fetched_at:
                 last_dt_utc = parse_to_utc_naive(page.fetched_at)
                 if last_dt_utc is not None:
-                    try:
-                        delta_days = (datetime.utcnow() - last_dt_utc).days
-                        if delta_days < int(cfg_refresh_days):
-                            logger.info("Skipping %s; fetched %s days ago (< %s)", url, delta_days, cfg_refresh_days)
-                            return True
-                    except Exception:
-                        logger.exception("Error calculating refresh days for %s", url)
-                        pass
+                    delta_days = (datetime.utcnow() - last_dt_utc).days
+                    if delta_days < int(cfg_refresh_days):
+                        logger.info("Skipping %s; fetched %s days ago (< %s)", url, delta_days, cfg_refresh_days)
+                        return True
         return False
 
     def _fetch_and_store(self, url: str, context: CrawlContext, stop_event=None):
@@ -63,7 +66,7 @@ class Crawler:
         # Use the overridable `fetch` method so tests and subclasses can intercept network I/O
         try:
             # check for cooperative cancellation before network I/O
-            if stop_event is not None and getattr(stop_event, 'is_set', lambda: False)():
+            if self._is_stopped(stop_event):
                 logger.info("Fetch cancelled for %s", url)
                 return None
             status, body = self.fetch(url)
@@ -98,10 +101,11 @@ class Crawler:
             else:
                 self._crawl_from(link_url, next_depth, context, stop_event)
         self.link_processor.process_links(context.current_root, url, body, from_id, context, depth, crawl_callback=cb, extract_links_fn=self.extract_links)
-    def __init__(self, pages_repo=None, links_repo=None, configs_repo=None, delay=None, user_agent=None, http_service=None, content_review_service=None, robots_service=None, link_processor=None, fetch_persist_service=None):
+    # TODO: 9 optional parameters still high - consider config object later
+    # CLAUDE: configs_repo removed as requested. Consider builder pattern or CrawlerConfig dataclass when complexity grows.
+    def __init__(self, pages_repo: Optional[PagesRepository] = None, links_repo: Optional[LinksRepository] = None, delay: Optional[float] = None, user_agent: Optional[str] = None, http_service: Optional[HttpService] = None, content_review_service: Optional[ContentReviewService] = None, robots_service: Optional[RobotsService] = None, link_processor: Optional[LinkProcessor] = None, fetch_persist_service: Optional[PageFetchPersistService] = None):
         self.pages_repo = pages_repo or PagesRepository()
         self.links_repo = links_repo or LinksRepository()
-        self.configs_repo = configs_repo or ConfigsRepository()
         self.delay = delay if delay is not None else config.CRAWL_DELAY
         self.user_agent = user_agent or config.USER_AGENT
         self.http_service = http_service or HttpService(self.user_agent)
@@ -145,7 +149,7 @@ class Crawler:
         roots = getattr(context.config, 'root_urls', []) or []
         for ru in roots:
             # cooperative cancellation: check stop_event before starting each root
-            if stop_event is not None and getattr(stop_event, 'is_set', lambda: False)():
+            if self._is_stopped(stop_event):
                 logger.info("Crawl cancelled before starting root %s", ru)
                 return
             context.set_root(ru)
@@ -159,7 +163,7 @@ class Crawler:
 
         from_id = self.pages_repo.ensure_page(url)
 
-        if stop_event is not None and getattr(stop_event, 'is_set', lambda: False)():
+        if self._is_stopped(stop_event):
             logger.info("Crawl cancelled during traversal of %s", url)
             return
 

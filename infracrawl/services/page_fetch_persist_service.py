@@ -22,8 +22,21 @@ class PageFetchPersistService:
         self.http_service = http_service
         self.pages_repo = pages_repo
 
-    def _extract_content_text(self, html: str) -> str:
-        """Extract main content text from HTML, removing navigation, headers, footers, etc.
+    def _extract_texts_from_soup(self, soup: BeautifulSoup) -> tuple[str, str]:
+        """Extract both plain and filtered text from parsed HTML soup.
+        
+        Returns: (plain_text, filtered_plain_text)
+        """
+        # Generate unfiltered plain text
+        plain = soup.get_text(separator=" ", strip=True)
+        
+        # Generate filtered plain text by removing boilerplate
+        filtered = self._extract_content_text_from_soup(soup)
+        
+        return plain, filtered
+
+    def _extract_content_text_from_soup(self, soup: BeautifulSoup) -> str:
+        """Extract main content text from BeautifulSoup object, removing navigation, headers, footers, etc.
         
         This method removes common non-content elements before extracting text:
         - Navigation elements (nav, menu)
@@ -33,7 +46,8 @@ class PageFetchPersistService:
         - Sidebars and ads
         - Other boilerplate content
         """
-        soup = BeautifulSoup(html, "html.parser")
+        # Clone soup to avoid mutating original
+        soup = BeautifulSoup(str(soup), "html.parser")
         
         # Remove unwanted elements that don't contain main content
         unwanted_tags = [
@@ -70,6 +84,21 @@ class PageFetchPersistService:
         text = soup.get_text(separator="\n", strip=True)
         return text
 
+    def _extract_text_from_body(self, body: Optional[str]) -> tuple[Optional[str], Optional[str]]:
+        """Extract plain and filtered text from HTML body.
+        
+        Returns: (plain_text, filtered_plain_text) or (None, None) on error.
+        """
+        if not body:
+            return None, None
+        
+        try:
+            soup = BeautifulSoup(body, "html.parser")
+            return self._extract_texts_from_soup(soup)
+        except Exception:
+            logger.exception("Error extracting text from HTML body")
+            return None, None
+
     def fetch_and_persist(self, url: str, context: Optional[CrawlContext] = None) -> DomainPage:
         """Fetch `url` and persist it, returning the domain `Page`.
 
@@ -86,24 +115,13 @@ class PageFetchPersistService:
                 logger.exception("Error getting config_id from context for %s", url)
                 config_id = None
 
-        plain = None
-        filtered = None
-        try:
-            if body:
-                # Generate unfiltered plain text
-                soup = BeautifulSoup(body, "html.parser")
-                plain = soup.get_text(separator=" ", strip=True)
-                # Generate filtered plain text
-                filtered = self._extract_content_text(body)
-        except Exception:
-            logger.exception("Error extracting text from %s", url)
-            plain = None
-            filtered = None
+        plain, filtered = self._extract_text_from_body(body)
 
         page = self.pages_repo.upsert_page(url, body, status, fetched_at, config_id=config_id, plain_text=plain, filtered_plain_text=filtered)
         return page
 
-    def persist(self, url: str, status: str, body: Optional[str], fetched_at: str, context: Optional[CrawlContext] = None) -> DomainPage:
+    # CLAUDE: status should be int not str - persist() signature is wrong, callers pass int
+    def persist(self, url: str, status: int, body: Optional[str], fetched_at: str, context: Optional[CrawlContext] = None) -> DomainPage:
         """Persist a fetched page and return the domain `Page`."""
         config_id = None
         if context and getattr(context, 'config', None):
@@ -113,19 +131,7 @@ class PageFetchPersistService:
                 logger.exception("Error getting config_id from context for %s", url)
                 config_id = None
 
-        plain = None
-        filtered = None
-        try:
-            if body:
-                # Generate unfiltered plain text
-                soup = BeautifulSoup(body, "html.parser")
-                plain = soup.get_text(separator=" ", strip=True)
-                # Generate filtered plain text
-                filtered = self._extract_content_text(body)
-        except Exception:
-            logger.exception("Error extracting text from %s (status=%s)", url, status)
-            plain = None
-            filtered = None
+        plain, filtered = self._extract_text_from_body(body)
 
         page = self.pages_repo.upsert_page(url, body, status, fetched_at, config_id=config_id, plain_text=plain, filtered_plain_text=filtered)
         return page
