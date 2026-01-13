@@ -39,40 +39,18 @@ def create_crawlers_router(pages_repo, links_repo, config_service: ConfigService
             }
         },
     )
-    def export(config: Optional[str] = None, include_html: Optional[bool] = None, include_plain_text: Optional[bool] = None, include_filtered_plain_text: Optional[bool] = None, limit: Optional[int] = None):
-        # `include_html`, `include_plain_text`, and `include_filtered_plain_text` control which fields are returned.
-        include_html = bool(include_html)
-        include_plain_text = bool(include_plain_text)
-        include_filtered_plain_text = bool(include_filtered_plain_text)
+    def export(config: Optional[str] = None, limit: Optional[int] = None):
         config_id = None
         if config:
             cfg = config_service.get_config(config)
             if not cfg:
                 raise HTTPException(status_code=404, detail="config not found")
             config_id = cfg.config_id
-        # fetch full rows if any content field is requested
-        fetch_full = include_html or include_plain_text or include_filtered_plain_text
-        pages = pages_repo.fetch_pages(full=fetch_full, limit=limit, config_id=config_id)
-
-        def page_to_dict(p):
-            d = {
-                "page_id": p.page_id,
-                "page_url": p.page_url,
-                "http_status": p.http_status,
-                "fetched_at": p.fetched_at,
-                "config_id": p.config_id,
-            }
-            if include_html:
-                d["page_content"] = p.page_content
-            if include_plain_text:
-                d["plain_text"] = p.plain_text
-            if include_filtered_plain_text:
-                d["filtered_plain_text"] = p.filtered_plain_text
-            return d
+        pages = pages_repo.fetch_pages(full=True, limit=limit, config_id=config_id)
 
         def gen_ndjson():
             for p in pages:
-                yield (json.dumps(page_to_dict(p), default=str) + "\n").encode("utf-8")
+                yield (json.dumps(p.__dict__, default=str) + "\n").encode("utf-8")
 
         return StreamingResponse(gen_ndjson(), media_type="application/x-ndjson")
 
