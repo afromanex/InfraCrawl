@@ -16,6 +16,8 @@ def parse_to_utc_naive(value: Union[str, datetime, None]) -> Optional[datetime]:
         try:
             dt = datetime.fromisoformat(value)
         except Exception:
+            import logging
+            logging.debug("Could not parse datetime string: %s", value)
             return None
     try:
         if dt.tzinfo is not None:
@@ -24,4 +26,6 @@ def parse_to_utc_naive(value: Union[str, datetime, None]) -> Optional[datetime]:
             dt_utc = dt
         return dt_utc
     except Exception:
+        import logging
+        logging.exception("Error converting datetime to UTC: %s", dt)
         return None

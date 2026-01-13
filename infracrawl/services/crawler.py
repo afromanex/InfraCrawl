@@ -51,6 +51,7 @@ class Crawler:
                             logger.info("Skipping %s; fetched %s days ago (< %s)", url, delta_days, cfg_refresh_days)
                             return True
                     except Exception:
+                        logger.exception("Error calculating refresh days for %s", url)
                         pass
         return False
 
@@ -83,6 +84,7 @@ class Crawler:
             if sc < 200 or sc >= 300:
                 logger.warning("Non-success status for %s: %s", url, status)
         except Exception:
+            logger.exception("Error parsing status code for %s: %s", url, status)
             pass
 
         return body
@@ -123,6 +125,7 @@ class Crawler:
             o = urlparse(other).hostname
             return b == o or (b and o and o.endswith('.' + b))
         except Exception:
+            logger.exception("Error comparing hosts: base=%s, other=%s", base, other)
             return False
 
     def crawl(self, config: CrawlerConfig, stop_event=None):

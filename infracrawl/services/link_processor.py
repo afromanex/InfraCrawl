@@ -18,6 +18,7 @@ class LinkProcessor:
             o = urlparse(other).hostname
             return b == o or (b and o and o.endswith('.' + b))
         except Exception:
+            logger.exception("Error comparing hosts: base=%s, other=%s", base, other)
             return False
 
     def process_links(self, current_root: str, base_url: str, html: str, from_id: int, context, depth: int, crawl_callback=None, extract_links_fn=None):

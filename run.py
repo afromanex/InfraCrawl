@@ -40,6 +40,7 @@ def main():
     try:
         server_port = int(port_env) if port_env else 8000
     except Exception:
+        print(f"Warning: Invalid port value '{port_env}', using default 8000")
         server_port = 8000
     # Instantiate the crawler once and pass its `crawl` method as the callback
     crawler = Crawler(

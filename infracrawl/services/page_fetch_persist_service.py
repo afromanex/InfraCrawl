@@ -83,6 +83,7 @@ class PageFetchPersistService:
             try:
                 config_id = context.config.config_id
             except Exception:
+                logger.exception("Error getting config_id from context for %s", url)
                 config_id = None
 
         plain = None
@@ -95,6 +96,7 @@ class PageFetchPersistService:
                 # Generate filtered plain text
                 filtered = self._extract_content_text(body)
         except Exception:
+            logger.exception("Error extracting text from %s", url)
             plain = None
             filtered = None
 
@@ -108,6 +110,7 @@ class PageFetchPersistService:
             try:
                 config_id = context.config.config_id
             except Exception:
+                logger.exception("Error getting config_id from context for %s", url)
                 config_id = None
 
         plain = None
@@ -120,6 +123,7 @@ class PageFetchPersistService:
                 # Generate filtered plain text
                 filtered = self._extract_content_text(body)
         except Exception:
+            logger.exception("Error extracting text from %s (status=%s)", url, status)
             plain = None
             filtered = None
 

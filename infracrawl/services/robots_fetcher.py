@@ -19,4 +19,6 @@ class RobotsFetcher:
                 return robots_parser
             return None
         except Exception:
+            import logging
+            logging.exception("Error fetching/parsing robots.txt from %s", robots_url)
             return None

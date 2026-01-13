@@ -24,6 +24,7 @@ def _parse_schedule(schedule: Any):
         try:
             return CronTrigger.from_crontab(schedule)
         except Exception:
+            logger.exception("Error parsing cron schedule string: %s", schedule)
             return None
     if isinstance(schedule, dict):
         t = schedule.get("type")
@@ -32,12 +33,14 @@ def _parse_schedule(schedule: Any):
             try:
                 return CronTrigger(**args)
             except Exception:
+                logger.exception("Error creating cron trigger: %s", args)
                 return None
         if t == "interval":
             args = {k: v for k, v in schedule.items() if k != "type"}
             try:
                 return IntervalTrigger(**args)
             except Exception:
+                logger.exception("Error creating interval trigger: %s", args)
                 return None
     return None
 
@@ -58,6 +61,7 @@ class SchedulerService:
         try:
             self._config_watch_interval = int(os.getenv("INFRACRAWL_CONFIG_WATCH_INTERVAL", "60"))
         except Exception:
+            logger.exception("Error parsing INFRACRAWL_CONFIG_WATCH_INTERVAL, using default 60")
             self._config_watch_interval = 60
 
     def start(self):

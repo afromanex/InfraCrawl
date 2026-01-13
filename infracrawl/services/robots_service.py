@@ -23,10 +23,14 @@ class RobotsService:
                 try:
                     robots_parser = self.robots_fetcher.fetch(robots_url)
                 except Exception:
+                    import logging
+                    logging.exception("Error fetching robots.txt from %s", robots_url)
                     robots_parser = None
                 self._rp_cache[base] = robots_parser
             if robots_parser is None:
                 return True
             return robots_parser.can_fetch(self.user_agent, url)
         except Exception:
+            import logging
+            logging.exception("Error checking robots.txt permission for %s", url)
             return True
