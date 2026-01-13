@@ -118,4 +118,44 @@ Tests that prove behavior
 
 Fast feedback and low ceremony
 
-End of document.
+────────────────────────────────────────
+REVIEW MODES
+────────────────────────────────────────
+
+If a MODE is specified, prioritize that mode above all other concerns (except correctness/security-breaking issues).
+
+MODE: default
+- Follow the REVIEW PRIORITIES section as written.
+
+MODE: solid
+Focus on SOLID principles and boundaries:
+- Single Responsibility: flag classes/functions/modules doing multiple jobs; suggest splits.
+- Open/Closed: prefer extension points over modification only when justified (avoid premature abstractions).
+- Liskov: subclasses should be substitutable; flag surprising overrides/contract breaks.
+- Interface Segregation: avoid fat interfaces; prefer small, cohesive protocols/abstractions where used.
+- Dependency Inversion: dependencies should point inward; prefer injecting collaborators over importing globals.
+
+Commenting in MODE: solid:
+- Prefer fewer, higher-signal comments. Each comment should identify:
+  1) the violated principle,
+  2) why it matters here (concrete risk),
+  3) the smallest refactor that improves it.
+
+MODE: simplicity
+Focus on removing complexity:
+- Flag indirection, over-abstraction, cleverness, unnecessary patterns
+- Suggest simpler control flow and data structures
+- Prefer clear code over “future-proof” design
+
+MODE: api
+Focus on API shape and contracts:
+- Inputs/outputs, naming, error semantics, validation
+- Backwards compatibility risks
+- Consistency across the codebase
+
+MODE: tests
+Focus on test quality and coverage:
+- Missing tests tied to behavior changes
+- Brittle tests and unclear assertions
+- Test structure: arrange/act/assert clarity, avoiding over-mocking
+

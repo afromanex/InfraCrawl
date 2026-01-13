@@ -2,7 +2,8 @@ from urllib.parse import urljoin, urlparse
 
 from infracrawl.services.robots_fetcher import RobotsFetcher
 
-
+# TODO: Single Responsibility violation - RobotsService does robots.txt parsing + caching + permission checking. Risk: adding cache eviction (TTL, LRU) requires modifying service logic. Refactor: extract IRobotsCache interface; RobotsService becomes thin permission checker.
+# RESPONSE: What new clases would you suggest? For simplicity, we will keep it as is for now.
 class RobotsService:
     def __init__(self, http_service, user_agent, robots_fetcher: RobotsFetcher = None):
         # Backwards-compatible: callers may still pass an http_service with fetch_robots

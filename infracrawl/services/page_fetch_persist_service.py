@@ -92,6 +92,8 @@ class PageFetchPersistService:
         if not body:
             return None, None
         
+        # TODO: Dependency Inversion violation - hardcoded BeautifulSoup parser ("html.parser"). Risk: cannot use lxml or html5lib without editing service; testing requires real HTML parsing. Refactor: inject IHtmlParser interface with parse(html) -> ParsedDocument; BeautifulSoup becomes implementation detail.
+        # RESPONSE: Valid point. However, for simplicity we will keep it as is for now.
         try:
             soup = BeautifulSoup(body, "html.parser")
             return self._extract_texts_from_soup(soup)

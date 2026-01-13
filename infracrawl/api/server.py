@@ -12,10 +12,12 @@ from infracrawl.api.auth import require_admin
 from fastapi.staticfiles import StaticFiles
 
 
-def create_app(pages_repo, links_repo, config_service: ConfigService, start_crawl_callback):
+def create_app(pages_repo, links_repo, config_service: ConfigService, start_crawl_callback, crawl_registry: InMemoryCrawlRegistry = None, scheduler: SchedulerService = None):
     """Return a FastAPI app with control endpoints.
 
     - `start_crawl_callback(config)` will be scheduled as a background task when a crawl is requested.
+    - `crawl_registry` (optional): If not provided, creates InMemoryCrawlRegistry.
+    - `scheduler` (optional): If not provided, creates SchedulerService.
     """
 
     app = FastAPI(title="InfraCrawl Control API")
@@ -27,15 +29,17 @@ def create_app(pages_repo, links_repo, config_service: ConfigService, start_craw
     # Protect configuration and crawler control endpoints with admin token.
     app.include_router(create_configs_router(config_service), dependencies=[Depends(require_admin)])
     app.include_router(create_pages_router(pages_repo, config_service))
-    # create an in-memory crawl registry and pass into the crawlers router
-    crawl_registry = InMemoryCrawlRegistry()
+    # Create default registry if not provided (allows dependency injection for testing)
+    if crawl_registry is None:
+        crawl_registry = InMemoryCrawlRegistry()
     app.include_router(create_crawlers_router(pages_repo, links_repo, config_service, start_crawl_callback, crawl_registry), dependencies=[Depends(require_admin)])
 
     # Serve minimal UI
     app.mount("/ui", StaticFiles(directory="static", html=True), name="ui")
 
-    # Scheduler: schedule jobs declared inside YAML configs via `schedule` key.
-    scheduler = SchedulerService(config_service, start_crawl_callback, crawl_registry)
+    # Create default scheduler if not provided (allows dependency injection for testing)
+    if scheduler is None:
+        scheduler = SchedulerService(config_service, start_crawl_callback, crawl_registry)
 
     @app.on_event("startup")
     def _start_scheduler():

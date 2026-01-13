@@ -1,5 +1,7 @@
 import requests
 
+# TODO: Dependency Inversion violation - hardcoded requests.get() call. Risk: cannot swap to httpx, aiohttp, or async without rewriting; testing requires real HTTP or monkey-patching. Refactor: inject IHttpClient protocol with fetch(url, headers, timeout) method; requests becomes adapter.
+# RESPONSE: Valid point. However, for simplicity we will keep it as is for now.
 class HttpService:
     def __init__(self, user_agent: str, timeout: int = 10):
         self.user_agent = user_agent

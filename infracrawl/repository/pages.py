@@ -7,7 +7,42 @@ from infracrawl.domain import Page
 from infracrawl.db.engine import make_engine
 
 
+class PageMapper:
+    """Handles conversion between database models and domain objects.
+    
+    Separates domain mapping concern from repository database operations.
+    """
+    
+    @staticmethod
+    def to_domain(db_page: DBPage, full: bool = True) -> Page:
+        """Convert database Page model to domain Page object.
+        
+        Args:
+            db_page: Database Page model instance
+            full: If False, omit large fields (page_content, plain_text, filtered_plain_text)
+        """
+        return Page(
+            page_id=db_page.page_id,
+            page_url=db_page.page_url,
+            page_content=db_page.page_content if full else None,
+            plain_text=db_page.plain_text if full else None,
+            filtered_plain_text=db_page.filtered_plain_text if full else None,
+            http_status=db_page.http_status,
+            fetched_at=db_page.fetched_at,
+            config_id=db_page.config_id
+        )
+    
+    @staticmethod
+    def to_domain_list(db_pages: List[DBPage], full: bool = True) -> List[Page]:
+        """Convert list of database Pages to domain Pages."""
+        return [PageMapper.to_domain(p, full) for p in db_pages]
+
+
 class PagesRepository:
+    """Repository for Page database operations.
+    
+    Focuses on database queries and persistence, delegating domain conversion to PageMapper.
+    """
     def __init__(self, engine=None):
         # TODO: Creating new engine per repo instance is expensive
         # CLAUDE: Use dependency injection - pass shared engine from main(). Implement later when scaling.
@@ -38,16 +73,7 @@ class PagesRepository:
             p = session.execute(q).scalars().first()
             if not p:
                 return None
-            return Page(
-                page_id=p.page_id,
-                page_url=p.page_url,
-                page_content=p.page_content,
-                plain_text=p.plain_text,
-                filtered_plain_text=p.filtered_plain_text,
-                http_status=p.http_status,
-                fetched_at=p.fetched_at,
-                config_id=p.config_id
-            )
+            return PageMapper.to_domain(p)
 
     # TODO: 7 parameters - should accept Page domain object
     # TODO: http_status typed as Optional[int] but accepts string from caller - type mismatch
@@ -69,25 +95,12 @@ class PagesRepository:
                     p.config_id = config_id
                 session.add(p)
                 session.commit()
-                return self._db_page_to_domain(p)
+                return PageMapper.to_domain(p)
             p = DBPage(page_url=page_url, page_content=page_content, plain_text=plain_text, filtered_plain_text=filtered_plain_text, http_status=http_status, fetched_at=fetched_at, config_id=config_id)
             session.add(p)
             session.commit()
             session.refresh(p)
-            return self._db_page_to_domain(p)
-
-    def _db_page_to_domain(self, p: DBPage) -> Page:
-        """Convert database Page to domain Page."""
-        return Page(
-            page_id=p.page_id,
-            page_url=p.page_url,
-            page_content=p.page_content,
-            plain_text=p.plain_text,
-            filtered_plain_text=p.filtered_plain_text,
-            http_status=p.http_status,
-            fetched_at=p.fetched_at,
-            config_id=p.config_id
-        )
+            return PageMapper.to_domain(p)
 
     def fetch_pages(self, full: bool = False, limit: Optional[int] = None, offset: Optional[int] = None, config_id: Optional[int] = None) -> List[Page]:
         with self.get_session() as session:
@@ -100,16 +113,7 @@ class PagesRepository:
             if limit:
                 q = q.limit(limit)
             rows = session.execute(q).scalars().all()
-            return [Page(
-                page_id=p.page_id,
-                page_url=p.page_url,
-                page_content=p.page_content if full else None,
-                plain_text=p.plain_text if full else None,
-                filtered_plain_text=p.filtered_plain_text if full else None,
-                http_status=p.http_status,
-                fetched_at=p.fetched_at,
-                config_id=p.config_id
-            ) for p in rows]
+            return PageMapper.to_domain_list(rows, full=full)
 
     def get_page_by_id(self, page_id: int) -> Optional[Page]:
         with self.get_session() as session:
@@ -117,16 +121,7 @@ class PagesRepository:
             p = session.execute(q).scalars().first()
             if not p:
                 return None
-            return Page(
-                page_id=p.page_id,
-                page_url=p.page_url,
-                page_content=p.page_content,
-                plain_text=p.plain_text,
-                filtered_plain_text=p.filtered_plain_text,
-                http_status=p.http_status,
-                fetched_at=p.fetched_at,
-                config_id=p.config_id
-            )
+            return PageMapper.to_domain(p)
 
     def get_page_ids_by_config(self, config_id: int) -> List[int]:
         with self.get_session() as session:

@@ -1,6 +1,9 @@
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin
 
+# TODO: Dependency Inversion violation - hardcoded BeautifulSoup dependency. Risk: cannot swap to lxml or custom parser without editing this class; testing requires HTML parsing. Refactor: inject IHtmlParser interface; BeautifulSoup becomes adapter.
+# RESPONSE: Beautiful soup could be injected, but for simplicity we will keep it as is for now.
+
 class ContentReviewService:
     def extract_links(self, base_url: str, html: str):
         soup = BeautifulSoup(html, "html.parser")

@@ -20,7 +20,8 @@ from infracrawl.domain.crawl_context import CrawlContext
 
 logger = logging.getLogger(__name__)
 
-
+# TODO: Single Responsibility violation - Crawler orchestrates crawling, enforces robots.txt, manages depth, handles refresh logic, extracts links, persists pages. Risk: any change to one concern (e.g., robots policy) requires modifying Crawler. Refactor: extract CrawlOrchestrator as thin coordinator; push depth/robots/refresh checks into separate policy objects.
+# RESPONSE: We can extract to RobotsTxtService, but for simplicity we will keep it as is for now.
 class Crawler:
     def _is_stopped(self, stop_event) -> bool:
         """Check if stop event is set."""
@@ -114,6 +115,7 @@ class Crawler:
         self.link_processor = link_processor or LinkProcessor(self.content_review_service, self.pages_repo, self.links_repo)
         self.fetch_persist_service = fetch_persist_service or PageFetchPersistService(self.http_service, self.pages_repo)
 
+    # TODO: Liskov Substitution risk - fetch() is overridden in tests (see test_crawler_behavior.py) without formal contract. Subclass could return incompatible type breaking _fetch_and_store. Refactor: define IHttpFetcher protocol (fetch(url) -> tuple[int, str]); accept in __init__ instead of subclassing.
     def fetch(self, url: str):
         return self.http_service.fetch(url)
 

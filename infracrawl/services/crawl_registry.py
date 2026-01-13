@@ -21,6 +21,7 @@ class CrawlRecord:
     current_url: Optional[str] = None
     error: Optional[str] = None
 
+# TODO: Single Responsibility violation - InMemoryCrawlRegistry manages crawl records + threading.Event lifecycle + cancellation logic + thread safety. Risk: changing cancellation (e.g., asyncio.Event) requires understanding record management; testing cancellation requires full registry. Refactor: extract ICancellationManager interface; registry delegates to it.
 
 class InMemoryCrawlRegistry:
     """Thread-safe in-memory registry for active and recent crawls.

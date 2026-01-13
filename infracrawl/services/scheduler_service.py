@@ -9,6 +9,9 @@ from apscheduler.triggers.interval import IntervalTrigger
 logger = logging.getLogger(__name__)
 
 
+# TODO: Open/Closed violation - _parse_schedule hardcodes 'cron' and 'interval' types; adding new trigger type requires editing this function. Risk: cannot extend with custom triggers (e.g., 'calendar', 'combining'). Refactor: dict of trigger_type -> factory_fn; allow registering new factories externally.
+# RESPONSE: Valid point. However, for simplicity, we will keep it as is for now.
+
 def _parse_schedule(schedule: Any):
     """Return an APScheduler trigger from a schedule object.
 
@@ -44,6 +47,8 @@ def _parse_schedule(schedule: Any):
                 return None
     return None
 
+
+# TODO: Interface Segregation violation - SchedulerService receives full ConfigService but only calls list_configs(), get_config(), sync_configs_with_disk(). Risk: scheduler coupled to unused methods; testing requires full ConfigService mock. Refactor: define IConfigProvider protocol with just those 3 methods; accept that instead.
 
 class SchedulerService:
     def __init__(self, config_service, start_crawl_callback, crawl_registry, pages_repo=None, links_repo=None):

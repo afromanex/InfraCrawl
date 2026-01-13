@@ -13,6 +13,8 @@ import uvicorn
 import os
 
 
+# TODO: Dependency Inversion violation - module-level concrete instantiation of repos. Risk: testing requires monkey-patching globals; cannot swap SQLite for Postgres without editing this file. Refactor: move to factory function accepting engine, or use DI container (dependency-injector library).
+# RESPONSE: Valid point. For simplicity, we will keep it as is for now.
 pages_repo = PagesRepository()
 links_repo = LinksRepository()
 configs_repo = ConfigsRepository()
@@ -45,8 +47,7 @@ def main():
     # Instantiate the crawler once and pass its `crawl` method as the callback
     crawler = Crawler(
         pages_repo=pages_repo,
-        links_repo=links_repo,
-        configs_repo=configs_repo
+        links_repo=links_repo
     )
 
     app = create_app(pages_repo, links_repo, config_service, crawler.crawl)
