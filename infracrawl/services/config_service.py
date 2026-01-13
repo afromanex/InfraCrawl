@@ -75,3 +75,15 @@ class ConfigService:
             created_at=db_cfg.created_at,
             updated_at=db_cfg.updated_at,
         )
+
+    def get_config_yaml(self, name: str) -> Optional[str]:
+        """Return the raw YAML content of a config file."""
+        db_cfg = self.configs_repo.get_config(name)
+        if not db_cfg:
+            return None
+        path = db_cfg.config_path
+        full_path = path if os.path.isabs(path) else os.path.join(self.configs_dir, path)
+        if not os.path.isfile(full_path):
+            return None
+        with open(full_path, "r", encoding="utf-8") as f:
+            return f.read()

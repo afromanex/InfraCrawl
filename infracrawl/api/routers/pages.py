@@ -1,11 +1,12 @@
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from infracrawl.services.config_service import ConfigService
+from infracrawl.api.auth import require_admin
 
 
 def create_pages_router(pages_repo, config_service: ConfigService):
-    router = APIRouter(prefix="/pages", tags=["Pages"])
+    router = APIRouter(prefix="/pages", tags=["Pages"], dependencies=[Depends(require_admin)])
 
     @router.get("/")
     def list_pages(config: Optional[str] = None, include_page_content: Optional[bool] = None, limit: Optional[int] = 100, offset: Optional[int] = 0):
