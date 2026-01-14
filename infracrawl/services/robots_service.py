@@ -1,8 +1,9 @@
 from urllib.parse import urljoin, urlparse
+import logging
 
 from infracrawl.services.robots_fetcher import RobotsFetcher
 
-# TODO: Single Responsibility violation - RobotsService does robots.txt parsing + caching + permission checking. Risk: adding cache eviction (TTL, LRU) requires modifying service logic. Refactor: extract IRobotsCache interface; RobotsService becomes thin permission checker.
+# TODO: SRP - RobotsService does 3 jobs: (1) fetch robots.txt via RobotsFetcher (2) cache RobotFileParser per domain (3) check can_fetch permissions. Concrete risk: changing cache strategy (TTL, LRU) requires editing permission logic. Minimal fix: extract _rp_cache to RobotsCache class with get(base_url)->parser and set(base_url, parser) methods; inject in __init__.
 # RESPONSE: What new clases would you suggest? For simplicity, we will keep it as is for now.
 class RobotsService:
     def __init__(self, http_service, user_agent, robots_fetcher: RobotsFetcher = None):
@@ -24,7 +25,6 @@ class RobotsService:
                 try:
                     robots_parser = self.robots_fetcher.fetch(robots_url)
                 except Exception:
-                    import logging
                     logging.exception("Error fetching robots.txt from %s", robots_url)
                     robots_parser = None
                 self._rp_cache[base] = robots_parser
@@ -32,6 +32,5 @@ class RobotsService:
                 return True
             return robots_parser.can_fetch(self.user_agent, url)
         except Exception:
-            import logging
             logging.exception("Error checking robots.txt permission for %s", url)
             return True

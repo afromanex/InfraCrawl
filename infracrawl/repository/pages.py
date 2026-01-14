@@ -6,7 +6,7 @@ from infracrawl.db.models import Page as DBPage
 from infracrawl.domain import Page
 from infracrawl.db.engine import make_engine
 
-
+# TODO: SRP - PageMapper has single client (PagesRepository) and contains only static mapping logic. Concrete risk: navigating 2 abstractions for simple DB->domain conversion adds cognitive load. Minimal fix: inline to_domain() into callers as "Page(page_id=db.page_id, ...)"; delete PageMapper class.
 class PageMapper:
     """Handles conversion between database models and domain objects.
     

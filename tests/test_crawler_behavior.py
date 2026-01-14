@@ -33,7 +33,8 @@ def test_crawl_respects_max_depth(crawler_with_mocks):
 def test_crawl_skips_robots(crawler_with_mocks):
     crawler, pages_repo, links_repo = crawler_with_mocks
     pages_repo.ensure_page.return_value = 1
-    crawler._allowed_by_robots = MagicMock(return_value=False)
+    # Mock the policy's robots check
+    crawler.crawl_policy.should_skip_due_to_robots = MagicMock(return_value=True)
     crawler.fetch = MagicMock()
     crawler.extract_links = MagicMock()
     cfg = CrawlerConfig(config_id=None, config_path='p', root_urls=['http://example.com'], max_depth=1)

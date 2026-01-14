@@ -51,6 +51,7 @@ def _parse_schedule(schedule: Any):
 # TODO: Interface Segregation violation - SchedulerService receives full ConfigService but only calls list_configs(), get_config(), sync_configs_with_disk(). Risk: scheduler coupled to unused methods; testing requires full ConfigService mock. Refactor: define IConfigProvider protocol with just those 3 methods; accept that instead.
 
 class SchedulerService:
+    # TODO: Unused parameters pages_repo and links_repo kept for "backwards compatibility" but never used. Remove them - simpler signature.
     def __init__(self, config_service, start_crawl_callback, crawl_registry, pages_repo=None, links_repo=None):
         self.config_service = config_service
         self.start_crawl_callback = start_crawl_callback
@@ -59,6 +60,7 @@ class SchedulerService:
         self.pages_repo = pages_repo
         self.links_repo = links_repo
         self._sched: Optional[BackgroundScheduler] = None
+        # TODO: Lazy import inside __init__ is unnecessarily clever. Import CrawlsRepository at top of file like everything else.
         # lazy-instantiate crawls repo so scheduler can record runs
         from infracrawl.repository.crawls import CrawlsRepository
         self.crawls_repo = CrawlsRepository()
@@ -78,6 +80,7 @@ class SchedulerService:
         self.load_and_schedule_all()
         # schedule periodic config watcher to keep DB in sync with disk
         try:
+            # TODO: IntervalTrigger already imported at top - duplicate import inside method is unnecessary.
             # use an interval trigger to periodically scan configs
             from apscheduler.triggers.interval import IntervalTrigger
 
@@ -132,7 +135,6 @@ class SchedulerService:
             except Exception:
                 logger.exception("Could not schedule job for %s", full.config_path)
 
-    def _execute_scheduled_crawl(self, cfg_path: str):
     def _execute_scheduled_crawl(self, cfg_path: str):
         """Execute a scheduled crawl job for the given config path."""
         # When APScheduler calls this job, we perform the same logic as the

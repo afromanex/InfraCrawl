@@ -1,11 +1,12 @@
 from typing import Set, Optional
 from infracrawl.domain.config import CrawlerConfig
 
-
+# TODO: SRP - CrawlContext does 3 jobs: (1) stores CrawlerConfig reference (2) tracks visited URLs (3) manages current_root iteration state. Concrete risk: changing visited tracking (e.g., to bloom filter) requires modifying config holder. Minimal fix: extract VisitedTracker class with mark(url), is_visited(url) methods; inject in Crawler.__init__.
 class CrawlContext:
     def __init__(self, config: Optional[CrawlerConfig] = None):
         # store the full config; roots and max_depth come from here
         self.config = config
+        # TODO: Complex defensive code - getattr(config, 'max_depth', None) is not None. If config exists, max_depth should always exist. Simplify: self.max_depth = config.max_depth if config else None
         self.max_depth = config.max_depth if (config and getattr(config, 'max_depth', None) is not None) else None
         # current_root is set when iterating multiple root URLs
         self.current_root: Optional[str] = None

@@ -26,7 +26,9 @@ class CrawlersRouter:
     """Router class for crawler control endpoints.
     
     Encapsulates dependencies and endpoint logic, avoiding closure-based function factory.
-    \"""
+    """
+    # TODO: OCP - CrawlersRouter instantiates CrawlsRepository() directly in __init__. Concrete risk: cannot inject test/mock repo; couples router to production DB. Minimal fix: accept crawls_repo parameter in __init__ with default=None; set self.crawls_repo = crawls_repo or CrawlsRepository().
+    # RESPONSE: Repository should be injected. 
     
     def __init__(self, pages_repo, links_repo, config_service: ConfigService,
                  start_crawl_callback, crawl_registry: Optional[InMemoryCrawlRegistry] = None):
@@ -38,7 +40,7 @@ class CrawlersRouter:
         self.crawls_repo = CrawlsRepository()
     
     def create_router(self) -> APIRouter:
-        \"\"\"Create and configure the FastAPI router with all endpoints.\"\"\"
+        """Create and configure the FastAPI router with all endpoints."""
         router = APIRouter(prefix="/crawlers", tags=["Crawlers"])
         
         router.add_api_route(
@@ -102,6 +104,7 @@ class CrawlersRouter:
 
         def _run_and_track(cfg, cid=None, stop_event=None, run_id=None):
             try:
+                # TODO: Clever ternary with conditional call - just use simple if/else: if stop_event: callback(cfg, stop_event) else: callback(cfg)
                 self.start_crawl_callback(cfg, stop_event) if stop_event is not None else self.start_crawl_callback(cfg)
                 if cid and self.crawl_registry is not None:
                     self.crawl_registry.finish(cid, status="finished")
@@ -168,7 +171,7 @@ class CrawlersRouter:
         return {"status": "removed", "deleted_pages": deleted_pages, "deleted_links": deleted_links}
     
     def list_runs(self, limit: Optional[int] = 20):
-        \"\"\"Return the last `limit` crawl runs (most recent first).\"\"\"
+        """Return the last `limit` crawl runs (most recent first)."""
         try:
             runs = self.crawls_repo.list_runs(limit=limit)
         except Exception:
@@ -188,6 +191,6 @@ class CrawlersRouter:
 
 
 def create_crawlers_router(pages_repo, links_repo, config_service: ConfigService, start_crawl_callback, crawl_registry: InMemoryCrawlRegistry = None) -> APIRouter:
-    \"\"\"Factory function to create crawlers router for backwards compatibility.\"\"\"
+    """Factory function to create crawlers router for backwards compatibility."""
     router_instance = CrawlersRouter(pages_repo, links_repo, config_service, start_crawl_callback, crawl_registry)
     return router_instance.create_router()

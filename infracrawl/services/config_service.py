@@ -7,7 +7,7 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
-
+# TODO: SRP - ConfigFileLoader only used by ConfigService (single client), but adds full class layer. Concrete risk: changes to config loading require navigating 2 files. Minimal fix: inline 3 methods into ConfigService; testability unchanged (mock os.listdir/open instead of loader).
 class ConfigFileLoader:
     """Handles loading and parsing CrawlerConfig objects from YAML files.
     

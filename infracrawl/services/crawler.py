@@ -10,6 +10,7 @@ from infracrawl.services.content_review_service import ContentReviewService
 from infracrawl.services.robots_service import RobotsService
 from infracrawl.services.link_processor import LinkProcessor
 from infracrawl.services.page_fetch_persist_service import PageFetchPersistService
+from infracrawl.services.crawl_policy import CrawlPolicy
 
 from infracrawl import config
 from infracrawl.repository.pages import PagesRepository
@@ -26,38 +27,6 @@ class Crawler:
     def _is_stopped(self, stop_event) -> bool:
         """Check if stop event is set."""
         return stop_event is not None and getattr(stop_event, 'is_set', lambda: False)()
-
-    def _should_skip_due_to_depth(self, context: CrawlContext, depth: int) -> bool:
-        if depth < 0:
-            logger.debug("Skipping (max depth reached) at depth %s", depth)
-            return True
-        return False
-
-    def _should_skip_due_to_robots(self, url: str, context: CrawlContext) -> bool:
-        cfg_robots = True
-        if context and context.config is not None:
-            cfg_robots = context.config.robots
-        if not self._allowed_by_robots(url, cfg_robots):
-            logger.info("Skipping (robots) %s", url)
-            return True
-        return False
-
-    def _should_skip_due_to_refresh(self, url: str, context: CrawlContext) -> bool:
-        cfg_refresh_days = None
-        if context and context.config is not None:
-            cfg_refresh_days = context.config.refresh_days
-        if cfg_refresh_days is not None:
-            # TODO: This DB query on every URL check is expensive - should batch or cache
-            # RESPONSE: No, keep it simple for now. 
-            page = self.pages_repo.get_page_by_url(url)
-            if page and page.fetched_at:
-                last_dt_utc = parse_to_utc_naive(page.fetched_at)
-                if last_dt_utc is not None:
-                    delta_days = (datetime.utcnow() - last_dt_utc).days
-                    if delta_days < int(cfg_refresh_days):
-                        logger.info("Skipping %s; fetched %s days ago (< %s)", url, delta_days, cfg_refresh_days)
-                        return True
-        return False
 
     def _fetch_and_store(self, url: str, context: CrawlContext, stop_event=None):
         """Fetch a URL and persist the result using `FetchPersistService`.
@@ -94,6 +63,7 @@ class Crawler:
         return body
 
     def _process_links(self, url: str, body: str, from_id: int, context: CrawlContext, depth: int, _crawl_from=None, stop_event=None):
+        # TODO: _crawl_from parameter with fallback to self._crawl_from is confusing indirection. Just call self._crawl_from directly in callback, remove parameter.
         # Delegate link extraction, persistence and scheduling to LinkProcessor
         # Crawl callback prefers direct method but falls back to supplied callback
         def cb(link_url, next_depth):
@@ -103,8 +73,9 @@ class Crawler:
                 self._crawl_from(link_url, next_depth, context, stop_event)
         self.link_processor.process_links(context.current_root, url, body, from_id, context, depth, crawl_callback=cb, extract_links_fn=self.extract_links)
     # TODO: 9 optional parameters still high - consider config object later
+    # TODO: All this "param or Default()" dependency injection is over-complex. Either: 1) require all dependencies (fail fast), 2) use single config object, or 3) accept defaults are fine and stop allowing overrides.
     # CLAUDE: configs_repo removed as requested. Consider builder pattern or CrawlerConfig dataclass when complexity grows.
-    def __init__(self, pages_repo: Optional[PagesRepository] = None, links_repo: Optional[LinksRepository] = None, delay: Optional[float] = None, user_agent: Optional[str] = None, http_service: Optional[HttpService] = None, content_review_service: Optional[ContentReviewService] = None, robots_service: Optional[RobotsService] = None, link_processor: Optional[LinkProcessor] = None, fetch_persist_service: Optional[PageFetchPersistService] = None):
+    def __init__(self, pages_repo: Optional[PagesRepository] = None, links_repo: Optional[LinksRepository] = None, delay: Optional[float] = None, user_agent: Optional[str] = None, http_service: Optional[HttpService] = None, content_review_service: Optional[ContentReviewService] = None, robots_service: Optional[RobotsService] = None, link_processor: Optional[LinkProcessor] = None, fetch_persist_service: Optional[PageFetchPersistService] = None, crawl_policy: Optional[CrawlPolicy] = None):
         self.pages_repo = pages_repo or PagesRepository()
         self.links_repo = links_repo or LinksRepository()
         self.delay = delay if delay is not None else config.CRAWL_DELAY
@@ -114,8 +85,10 @@ class Crawler:
         self.robots_service = robots_service or RobotsService(self.http_service, self.user_agent)
         self.link_processor = link_processor or LinkProcessor(self.content_review_service, self.pages_repo, self.links_repo)
         self.fetch_persist_service = fetch_persist_service or PageFetchPersistService(self.http_service, self.pages_repo)
+        self.crawl_policy = crawl_policy or CrawlPolicy(self.pages_repo, self.robots_service)
 
     # TODO: Liskov Substitution risk - fetch() is overridden in tests (see test_crawler_behavior.py) without formal contract. Subclass could return incompatible type breaking _fetch_and_store. Refactor: define IHttpFetcher protocol (fetch(url) -> tuple[int, str]); accept in __init__ instead of subclassing.
+    # TODO: fetch(), _allowed_by_robots(), extract_links() are unnecessary wrapper methods. Call self.http_service.fetch() directly in _fetch_and_store, inline other wrappers.
     def fetch(self, url: str):
         return self.http_service.fetch(url)
 
@@ -169,11 +142,11 @@ class Crawler:
             logger.info("Crawl cancelled during traversal of %s", url)
             return
 
-        if self._should_skip_due_to_depth(context, depth):
+        if self.crawl_policy.should_skip_due_to_depth(depth):
             return
-        if self._should_skip_due_to_robots(url, context):
+        if self.crawl_policy.should_skip_due_to_robots(url, context):
             return
-        if self._should_skip_due_to_refresh(url, context):
+        if self.crawl_policy.should_skip_due_to_refresh(url, context):
             return
 
         body = self._fetch_and_store(url, context, stop_event)

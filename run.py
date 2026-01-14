@@ -12,8 +12,7 @@ from infracrawl.api.server import create_app
 import uvicorn
 import os
 
-
-# TODO: Dependency Inversion violation - module-level concrete instantiation of repos. Risk: testing requires monkey-patching globals; cannot swap SQLite for Postgres without editing this file. Refactor: move to factory function accepting engine, or use DI container (dependency-injector library).
+# TODO: DIP - Module-level repos (pages_repo, links_repo, configs_repo) create global mutable state. Concrete risk: tests cannot isolate DB; parallel test runs share state causing flakes. Minimal fix: move into main() as local variables; pass to create_app() and Crawler(); tests call main() with mock repos.
 # RESPONSE: Valid point. For simplicity, we will keep it as is for now.
 pages_repo = PagesRepository()
 links_repo = LinksRepository()
@@ -24,12 +23,7 @@ configs_repo = ConfigsRepository()
 # This keeps dependency injection explicit and allows the server to pass a `CrawlerConfig`
 # directly into `crawler.crawl(config)`.
 
-
-
 def main():
-
-    # Database schema should be initialized elsewhere if needed
-
     # Load YAML configs and upsert into DB. Remove DB configs not present on disk.
     try:
         config_service = ConfigService(configs_repo=configs_repo)

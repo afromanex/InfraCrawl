@@ -1,8 +1,7 @@
 from typing import Optional, Any
 from datetime import datetime
 
-# TODO: Interface Segregation violation - CrawlerConfig mixes DB metadata (config_id, created_at, updated_at) with domain config (root_urls, max_depth, robots). Risk: services needing config data must handle DB fields; domain logic coupled to persistence. Refactor: split into CrawlerConfigMetadata (id, timestamps) + CrawlerConfigData (roots, depth, robots); compose when needed.
-# RESPONSE: Valid point. However, for simplicity, we will keep a single class for now and consider refactoring later if complexity increases.
+# TODO: ISP - CrawlerConfig combines DB fields (config_id, created_at, updated_at) + domain fields (root_urls, max_depth). Concrete risk: crawler needs config but gets DB timestamps it ignores; DB repo must handle domain fields. Minimal fix: split into CrawlerConfigMetadata (id/timestamps) + CrawlerConfigData (roots/depth); compose where needed.
 class CrawlerConfig:
     def __init__(
         self,

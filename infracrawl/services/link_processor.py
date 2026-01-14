@@ -7,7 +7,7 @@ from infracrawl.domain.crawl_context import CrawlContext
 
 logger = logging.getLogger(__name__)
 
-
+# TODO: SRP - LinkProcessor does 3 jobs: (1) calls content_review_service.extract_links (2) persists links via links_repo (3) schedules crawls via callback. Concrete risk: changing link storage (batch inserts) requires editing crawl scheduling logic. Minimal fix: extract LinkPersister class with persist(from_id, to_id, anchor); processor focuses on orchestration.
 class LinkProcessor:
     def __init__(self, content_review_service, pages_repo, links_repo):
         self.content_review_service = content_review_service
@@ -33,6 +33,7 @@ class LinkProcessor:
         - `current_root` is the root URL for host filtering.
         - `crawl_callback(link_url, next_depth)` is invoked for links to be crawled (if provided).
         """
+        # TODO: Optional extract_links_fn parameter is over-engineering for testing. Tests should mock content_review_service.extract_links instead of passing function parameter.
         # Allow caller to supply an extract_links function (useful for testing/mocking)
         if extract_links_fn is None:
             links = self.content_review_service.extract_links(base_url, html)

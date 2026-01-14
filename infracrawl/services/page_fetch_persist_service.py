@@ -10,7 +10,8 @@ from bs4 import BeautifulSoup
 
 logger = logging.getLogger(__name__)
 
-
+# TODO: SRP - PageFetchPersistService does 3 jobs: (1) HTTP fetch via HttpService (2) HTML text extraction (plain + filtered) (3) DB persistence via PagesRepository. Concrete risk: changing HTML filtering (e.g., ML-based) requires editing service with fetch/persist logic. Minimal fix: extract TextExtractor class with extract_texts(html) method; inject in __init__.
+# TODO: DIP - _extract_text_from_body hardcodes BeautifulSoup(body, "html.parser"). Concrete risk: tests need full HTML parsing; cannot swap to fast lxml. Minimal fix: accept html_parser callable in __init__ (default=BeautifulSoup); call self.html_parser(body, "html.parser").
 class PageFetchPersistService:
     """Service that fetches a page via `HttpService` and persists it using `PagesRepository`.
 
@@ -46,6 +47,7 @@ class PageFetchPersistService:
         - Sidebars and ads
         - Other boilerplate content
         """
+        # TODO: Over-engineered filtering with soup cloning, double loops, lambda class matchers. Most sites don't need this. Simplify to just remove script/style/nav tags, skip the pattern matching loops and cloning.
         # Clone soup to avoid mutating original
         soup = BeautifulSoup(str(soup), "html.parser")
         
