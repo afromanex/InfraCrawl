@@ -121,7 +121,17 @@ class PageFetchPersistService:
 
         plain, filtered = self._extract_text_from_body(body)
 
-        page = self.pages_repo.upsert_page(url, body, status, fetched_at, config_id=config_id, plain_text=plain, filtered_plain_text=filtered)
+        page_obj = DomainPage(
+            page_id=None,  # Will be assigned by DB
+            page_url=url,
+            page_content=body,
+            plain_text=plain,
+            filtered_plain_text=filtered,
+            http_status=status,
+            fetched_at=fetched_at,
+            config_id=config_id
+        )
+        page = self.pages_repo.upsert_page(page_obj)
         return page
 
     # CLAUDE: status should be int not str - persist() signature is wrong, callers pass int
@@ -137,5 +147,15 @@ class PageFetchPersistService:
 
         plain, filtered = self._extract_text_from_body(body)
 
-        page = self.pages_repo.upsert_page(url, body, status, fetched_at, config_id=config_id, plain_text=plain, filtered_plain_text=filtered)
+        page_obj = DomainPage(
+            page_id=None,  # Will be assigned by DB
+            page_url=url,
+            page_content=body,
+            plain_text=plain,
+            filtered_plain_text=filtered,
+            http_status=status,
+            fetched_at=fetched_at,
+            config_id=config_id
+        )
+        page = self.pages_repo.upsert_page(page_obj)
         return page

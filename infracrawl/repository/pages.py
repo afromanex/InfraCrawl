@@ -1,4 +1,5 @@
 from typing import Optional, List
+from datetime import datetime
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -80,28 +81,37 @@ class PagesRepository:
                 return None
             return self._to_domain(p)
 
-    # TODO: 7 parameters - should accept Page domain object
-    # TODO: http_status typed as Optional[int] but accepts string from caller - type mismatch
-    # TODO: fetched_at typed as Optional[str] but should be datetime
-    # CLAUDE: These todos remain valid but defer refactor - would break all callers. Consider for v2 API.
-    def upsert_page(self, page_url: str, page_content: Optional[str], http_status: Optional[int], fetched_at: Optional[str], config_id: Optional[int] = None, plain_text: Optional[str] = None, filtered_plain_text: Optional[str] = None) -> Page:
+    def upsert_page(self, page: Page) -> Page:
+        """Upsert page using domain object. Accepts Page with page_id (ignored for upsert)."""
         with self.get_session() as session:
-            q = select(DBPage).where(DBPage.page_url == page_url)
+            q = select(DBPage).where(DBPage.page_url == page.page_url)
             p = session.execute(q).scalars().first()
             if p:
                 # TODO: No optimistic locking - concurrent updates will overwrite
                 # CLAUDE: Add version column if this becomes issue. Unlikely with current single-crawler design.
-                p.page_content = page_content
-                p.plain_text = plain_text
-                p.filtered_plain_text = filtered_plain_text
-                p.http_status = http_status
-                p.fetched_at = fetched_at
-                if config_id is not None:
-                    p.config_id = config_id
+                p.page_content = page.page_content
+                p.plain_text = page.plain_text
+                p.filtered_plain_text = page.filtered_plain_text
+                p.http_status = page.http_status
+                # Convert datetime to ISO string if needed
+                p.fetched_at = page.fetched_at.isoformat() if isinstance(page.fetched_at, datetime) else page.fetched_at
+                if page.config_id is not None:
+                    p.config_id = page.config_id
                 session.add(p)
                 session.commit()
+                session.refresh(p)
                 return self._to_domain(p)
-            p = DBPage(page_url=page_url, page_content=page_content, plain_text=plain_text, filtered_plain_text=filtered_plain_text, http_status=http_status, fetched_at=fetched_at, config_id=config_id)
+            
+            fetched_at_str = page.fetched_at.isoformat() if isinstance(page.fetched_at, datetime) else page.fetched_at
+            p = DBPage(
+                page_url=page.page_url,
+                page_content=page.page_content,
+                plain_text=page.plain_text,
+                filtered_plain_text=page.filtered_plain_text,
+                http_status=page.http_status,
+                fetched_at=fetched_at_str,
+                config_id=page.config_id
+            )
             session.add(p)
             session.commit()
             session.refresh(p)
