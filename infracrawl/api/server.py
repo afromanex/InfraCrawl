@@ -2,16 +2,18 @@
 from fastapi import FastAPI
 
 from infracrawl.services.config_service import ConfigService
-from infracrawl.api.routers.configs import create_configs_router
-from infracrawl.api.routers.pages import create_pages_router
-from infracrawl.api.routers.crawlers import create_crawlers_router
+from infracrawl.api.routers import (
+    create_configs_router,
+    create_pages_router,
+    create_crawlers_router,
+    create_systems_router,
+)
 from infracrawl.services.crawl_registry import InMemoryCrawlRegistry
 from infracrawl.services.scheduler_service import SchedulerService
 from infracrawl.repository.crawls import CrawlsRepository
 from fastapi import Depends
 from infracrawl.api.auth import require_admin
 from fastapi.staticfiles import StaticFiles
-from infracrawl.api.routers.systems import create_systems_router
 
 
 def create_app(pages_repo, links_repo, config_service: ConfigService, start_crawl_callback, crawl_registry: InMemoryCrawlRegistry = None, scheduler: SchedulerService = None):
