@@ -2,6 +2,7 @@ import logging
 import time
 from datetime import datetime
 from typing import Optional
+import requests
 from infracrawl.utils.datetime_utils import parse_to_utc_naive
 from urllib.parse import urlparse
 
@@ -80,7 +81,7 @@ class Crawler:
         self.links_repo = links_repo or LinksRepository()
         self.delay = delay if delay is not None else config.CRAWL_DELAY
         self.user_agent = user_agent or config.USER_AGENT
-        self.http_service = http_service or HttpService(self.user_agent)
+        self.http_service = http_service or HttpService(self.user_agent, http_client=requests.get)
         self.content_review_service = content_review_service or ContentReviewService()
         self.robots_service = robots_service or RobotsService(self.http_service, self.user_agent)
         self.link_processor = link_processor or LinkProcessor(self.content_review_service, self.pages_repo, self.links_repo)

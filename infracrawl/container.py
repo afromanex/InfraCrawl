@@ -1,5 +1,6 @@
 """Dependency injection container for the application."""
 from dependency_injector import containers, providers
+import requests
 
 from infracrawl.db.engine import make_engine
 from infracrawl.repository.pages import PagesRepository
@@ -44,6 +45,7 @@ class Container(containers.DeclarativeContainer):
     http_service = providers.Singleton(
         HttpService,
         user_agent=config.user_agent.as_(str),
+        http_client=providers.Object(requests.get),
         timeout=config.http_timeout.as_(int)
     )
     
