@@ -1,4 +1,5 @@
 from infracrawl.services.robots_service import RobotsService
+from infracrawl.services.http_response import HttpResponse
 
 class DummyHttp:
     def __init__(self, status, text):
@@ -7,7 +8,7 @@ class DummyHttp:
         self.called_urls = []
     def fetch_robots(self, url):
         self.called_urls.append(url)
-        return self.status, self.text
+        return HttpResponse(self.status, self.text)
 
 def test_allowed_by_robots_allows_if_disabled():
     svc = RobotsService(DummyHttp(200, ''), user_agent='TestAgent')
