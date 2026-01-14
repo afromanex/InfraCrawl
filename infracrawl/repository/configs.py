@@ -32,10 +32,10 @@ class ConfigsRepository:
             session.refresh(c)
             return c.config_id
 
-    def get_config(self, name: str) -> Optional[CrawlerConfig]:
+    def get_config(self, config_path: str) -> Optional[CrawlerConfig]:
+        """Get config by its file path (e.g., 'starkparks.yml')."""
         with self.get_session() as session:
-            # Find by config_path only. The `name` fallback has been removed.
-            q = select(DBCrawlerConfig).where(DBCrawlerConfig.config_path == name)
+            q = select(DBCrawlerConfig).where(DBCrawlerConfig.config_path == config_path)
             c = session.execute(q).scalars().first()
             if not c:
                 return None

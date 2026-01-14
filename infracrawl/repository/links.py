@@ -14,7 +14,8 @@ class LinksRepository:
     def get_session(self) -> Session:
         return Session(self.engine)
 
-    def insert_link(self, link: Link):
+    def insert_link(self, link: Link) -> Link:
+        """Insert link and return with assigned link_id."""
         with self.get_session() as session:
             db_link = DBLink(
                 link_from_id=link.link_from_id,
@@ -23,6 +24,13 @@ class LinksRepository:
             )
             session.add(db_link)
             session.commit()
+            session.refresh(db_link)
+            return Link(
+                link_id=db_link.link_id,
+                link_from_id=db_link.link_from_id,
+                link_to_id=db_link.link_to_id,
+                anchor_text=db_link.anchor_text
+            )
     
     def insert_links_batch(self, links: List[Link]):
         """Insert multiple links in a single transaction.

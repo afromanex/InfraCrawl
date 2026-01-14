@@ -95,9 +95,9 @@ class ConfigService:
         """Return all configs in the DB (name + config_path only)."""
         return self.configs_repo.list_configs()
 
-    def get_config(self, name: str) -> Optional[CrawlerConfig]:
+    def get_config(self, config_path: str) -> Optional[CrawlerConfig]:
         """Load full config from YAML using config_path from DB."""
-        db_cfg = self.configs_repo.get_config(name)
+        db_cfg = self.configs_repo.get_config(config_path)
         if not db_cfg:
             return None
         
@@ -108,9 +108,9 @@ class ConfigService:
             updated_at=db_cfg.updated_at
         )
 
-    def get_config_yaml(self, name: str) -> Optional[str]:
+    def get_config_yaml(self, config_path: str) -> Optional[str]:
         """Return the raw YAML content of a config file."""
-        db_cfg = self.configs_repo.get_config(name)
+        db_cfg = self.configs_repo.get_config(config_path)
         if not db_cfg:
             return None
         return self._get_config_yaml_content(db_cfg.config_path)

@@ -40,28 +40,28 @@ class Crawler:
             if self._is_stopped(stop_event):
                 logger.info("Fetch cancelled for %s", url)
                 return None
-            status, body = self.fetch(url)
+            response = self.fetch(url)
         except Exception as e:
             logger.error("Fetch error for %s: %s", url, e, exc_info=True)
             return None
 
         fetched_at = datetime.utcnow().isoformat()
         try:
-            page = self.fetch_persist_service.persist(url, status, body, fetched_at, context=context)
-            logger.info("Fetched %s -> status %s, page_id=%s", url, status, getattr(page, 'page_id', None))
+            page = self.fetch_persist_service.persist(url, response.status_code, response.text, fetched_at, context=context)
+            logger.info("Fetched %s -> status %s, page_id=%s", url, response.status_code, getattr(page, 'page_id', None))
         except Exception as e:
             logger.error("Storage error while saving %s: %s", url, e, exc_info=True)
             return None
 
         try:
-            sc = int(status)
+            sc = int(response.status_code)
             if sc < 200 or sc >= 300:
-                logger.warning("Non-success status for %s: %s", url, status)
+                logger.warning("Non-success status for %s: %s", url, response.status_code)
         except Exception:
-            logger.exception("Error parsing status code for %s: %s", url, status)
+            logger.exception("Error parsing status code for %s: %s", url, response.status_code)
             pass
 
-        return body
+        return response.text
 
     def _process_links(self, url: str, body: str, from_id: int, context: CrawlContext, depth: int, _crawl_from=None, stop_event=None):
         # TODO: _crawl_from parameter with fallback to self._crawl_from is confusing indirection. Just call self._crawl_from directly in callback, remove parameter.

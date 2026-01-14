@@ -2,6 +2,7 @@ import pytest
 from unittest.mock import MagicMock
 from infracrawl.services.crawler import Crawler
 from infracrawl.domain.config import CrawlerConfig
+from infracrawl.services.http_response import HttpResponse
 
 
 @pytest.fixture
@@ -21,7 +22,7 @@ def test_crawl_respects_max_depth(crawler_with_mocks):
     # Setup: ensure_page returns a fake id
     pages_repo.ensure_page.return_value = 1
     # Patch fetch to return dummy html
-    crawler.fetch = MagicMock(return_value=(200, '<html></html>'))
+    crawler.fetch = MagicMock(return_value=HttpResponse(200, '<html></html>'))
     crawler.extract_links = MagicMock(return_value=[])
     # Should only call ensure_page once for depth=0
     cfg = CrawlerConfig(config_id=None, config_path='p', root_urls=['http://example.com'], max_depth=0)
@@ -65,7 +66,7 @@ def test_crawl_inserts_links(crawler_with_mocks):
     # Mock batch method to return URL -> ID mapping
     pages_repo.ensure_pages_batch.return_value = {'http://example.com/next': 1}
     crawler._allowed_by_robots = MagicMock(return_value=True)
-    crawler.fetch = MagicMock(return_value=(200, '<html></html>'))
+    crawler.fetch = MagicMock(return_value=HttpResponse(200, '<html></html>'))
     crawler.extract_links = MagicMock(return_value=[('http://example.com/next', 'next')])
     links_repo.insert_links_batch = MagicMock()
     # Patch _same_host to always True

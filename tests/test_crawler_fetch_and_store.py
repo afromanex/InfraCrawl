@@ -2,6 +2,7 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 from infracrawl.services.crawler import Crawler
+from infracrawl.services.http_response import HttpResponse
 
 
 def make_crawler_with(mocks=None):
@@ -32,7 +33,7 @@ def test_fetch_raises_logs_and_returns_none(caplog):
 
 def test_storage_failure_logs_and_returns_none(caplog):
     http = MagicMock()
-    http.fetch.return_value = (200, "ok")
+    http.fetch.return_value = HttpResponse(200, "ok")
     pages = MagicMock()
     pages.upsert_page.side_effect = Exception("db write failed")
     c = make_crawler_with({"http_service": http, "pages_repo": pages})
@@ -46,7 +47,7 @@ def test_storage_failure_logs_and_returns_none(caplog):
 
 def test_non_200_status_is_logged_and_body_returned(caplog):
     http = MagicMock()
-    http.fetch.return_value = (500, "server error")
+    http.fetch.return_value = HttpResponse(500, "server error")
     pages = MagicMock()
     pages.upsert_page.return_value = 42
     c = make_crawler_with({"http_service": http, "pages_repo": pages})

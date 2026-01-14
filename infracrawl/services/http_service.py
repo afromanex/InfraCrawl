@@ -1,6 +1,8 @@
 import requests
 from typing import Callable
 
+from infracrawl.services.http_response import HttpResponse
+
 
 class HttpService:
     """
@@ -17,13 +19,12 @@ class HttpService:
 
     # TODO: No error handling - requests.get raises on DNS failure, SSL error, connection error, timeout
     # CLAUDE: Acknowledged - defer until needed in production
-    # TODO: Returns status as int but callers treat it as str - API contract unclear 
-    # CLAUDE: Status is int (correct). Callers like persist() incorrectly type it as str. Fix caller signatures.
-    def fetch(self, url: str):
+    def fetch(self, url: str) -> HttpResponse:
+        """Fetch URL and return response with status code and body text."""
         headers = {"User-Agent": self.user_agent}
         resp = self.http_client(url, headers=headers, timeout=self.timeout)
-        return resp.status_code, resp.text
+        return HttpResponse(resp.status_code, resp.text)
 
-    def fetch_robots(self, robots_url: str):
+    def fetch_robots(self, robots_url: str) -> HttpResponse:
         """Fetch robots.txt - delegates to fetch()."""
         return self.fetch(robots_url)

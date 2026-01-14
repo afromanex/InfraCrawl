@@ -108,7 +108,7 @@ class PageFetchPersistService:
 
         Raises on storage errors.
         """
-        status, body = self.http_service.fetch(url)
+        response = self.http_service.fetch(url)
 
         fetched_at = datetime.utcnow().isoformat()
         config_id = None
@@ -119,15 +119,15 @@ class PageFetchPersistService:
                 logger.exception("Error getting config_id from context for %s", url)
                 config_id = None
 
-        plain, filtered = self._extract_text_from_body(body)
+        plain, filtered = self._extract_text_from_body(response.text)
 
         page_obj = DomainPage(
             page_id=None,  # Will be assigned by DB
             page_url=url,
-            page_content=body,
+            page_content=response.text,
             plain_text=plain,
             filtered_plain_text=filtered,
-            http_status=status,
+            http_status=response.status_code,
             fetched_at=fetched_at,
             config_id=config_id
         )
