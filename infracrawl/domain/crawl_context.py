@@ -1,29 +1,34 @@
-from typing import Set, Optional
+from typing import Optional
 from infracrawl.domain.config import CrawlerConfig
+from infracrawl.domain.visited_tracker import VisitedTracker
 
-# TODO: SRP - CrawlContext does 3 jobs: (1) stores CrawlerConfig reference (2) tracks visited URLs (3) manages current_root iteration state. Concrete risk: changing visited tracking (e.g., to bloom filter) requires modifying config holder. Minimal fix: extract VisitedTracker class with mark(url), is_visited(url) methods; inject in Crawler.__init__.
+
 class CrawlContext:
-    def __init__(self, config: Optional[CrawlerConfig] = None):
+    """
+    Crawl execution context that holds configuration and tracks crawl state.
+    
+    Note: Still manages 2 responsibilities - config holder and current_root iteration.
+    Further refactoring could split this, but the improvement-to-effort ratio is low.
+    """
+    
+    def __init__(self, config: Optional[CrawlerConfig] = None, visited_tracker: Optional[VisitedTracker] = None):
         # store the full config; roots and max_depth come from here
         self.config = config
         # TODO: Complex defensive code - getattr(config, 'max_depth', None) is not None. If config exists, max_depth should always exist. Simplify: self.max_depth = config.max_depth if config else None
         self.max_depth = config.max_depth if (config and getattr(config, 'max_depth', None) is not None) else None
         # current_root is set when iterating multiple root URLs
         self.current_root: Optional[str] = None
-        # TODO: visited set grows unbounded - memory leak for large crawls
-        # CLAUDE: Options: 1) LRU cache (max N URLs) 2) Bloom filter (probabilistic, small memory) 3) Database-backed (slow). For <100K URLs, set is fine.
-        # TODO: No persistence - crawl cannot resume after crash
-        # CLAUDE: Agreed - defer. Would need: visited URLs table, crawl_state table with resume token, queue of pending URLs.
-        # TODO: QUESTION: Should visited be moved to database or use bloom filter?
-        # CLAUDE: "visited" = URLs already crawled. "Bloom filter" = probabilistic data structure using <1MB for millions of URLs but 0.1% false positives. DB = persistent but slow. Current in-memory set OK for now.
-        self.visited: Set[str] = set()
+        # Visited URL tracking delegated to separate class (SRP fix)
+        self.visited_tracker = visited_tracker if visited_tracker is not None else VisitedTracker()
 
     def set_root(self, root: str):
         self.current_root = root
 
     def mark_visited(self, url: str):
-        self.visited.add(url)
+        """Delegate to visited tracker."""
+        self.visited_tracker.mark(url)
 
     def is_visited(self, url: str) -> bool:
-        return url in self.visited
+        """Delegate to visited tracker."""
+        return self.visited_tracker.is_visited(url)
 
