@@ -2,7 +2,7 @@ import pytest
 from unittest.mock import MagicMock
 from infracrawl.services.crawler import Crawler
 from infracrawl.domain.config import CrawlerConfig
-from infracrawl.services.http_response import HttpResponse
+from infracrawl.domain.http_response import HttpResponse
 
 
 @pytest.fixture

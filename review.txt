@@ -221,4 +221,30 @@ Brittle tests and unclear assertions
 
 Prefer tests that prove behavior over implementation
 
+────────────────────────────────────────
+PACKAGE / FILE ORGANIZATION STANDARDS
+────────────────────────────────────────
+
+Goal: prevent "junk-drawer" modules (e.g., services/) and make module boundaries explicit.
+
+Rules:
+1) Each top-level package must represent a cohesive responsibility with a stable name.
+   - Avoid catch-all directories like `utils/`, `common/`, or `services/` unless strictly necessary.
+
+2) If a package contains multiple distinct sub-domains, it MUST be split into subpackages.
+   - Example: if multiple crawler implementations exist, prefer `services/crawlers/` over placing
+     all crawler code directly under `services/`.
+
+3) Module names must communicate intent (noun-based), not implementation detail.
+   - Good: `services/crawlers/stark_parks.py`
+   - Avoid: `services/stuff.py`, `helpers.py`, `misc.py`
+
+4) A module should have one primary reason to change.
+   - If a file mixes HTTP client code, DB persistence, and parsing/extraction, reviewers should
+     request a split into smaller modules with explicit contracts.
+
+5) Imports must follow ownership boundaries.
+   - Domain / model code must not import FastAPI, requests/httpx, or DB engines directly.
+   - API layer may import services; services may import repositories/clients; avoid circular imports.
+
 End of document.

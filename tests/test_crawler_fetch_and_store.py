@@ -2,7 +2,7 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 from infracrawl.services.crawler import Crawler
-from infracrawl.services.http_response import HttpResponse
+from infracrawl.domain.http_response import HttpResponse
 
 
 def make_crawler_with(mocks=None):

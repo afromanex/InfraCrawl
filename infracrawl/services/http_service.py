@@ -1,7 +1,7 @@
 import requests
 from typing import Callable
 
-from infracrawl.services.http_response import HttpResponse
+from infracrawl.domain.http_response import HttpResponse
 
 
 class HttpService:

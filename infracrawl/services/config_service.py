@@ -3,7 +3,7 @@ import logging
 import yaml
 from infracrawl.repository.configs import ConfigsRepository
 from infracrawl.domain.config import CrawlerConfig
-from infracrawl.services.exceptions import ConfigNotFoundError
+from infracrawl.exceptions import ConfigNotFoundError
 from typing import Optional
 
 logger = logging.getLogger(__name__)

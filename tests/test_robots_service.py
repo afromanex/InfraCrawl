@@ -1,5 +1,5 @@
 from infracrawl.services.robots_service import RobotsService
-from infracrawl.services.http_response import HttpResponse
+from infracrawl.domain.http_response import HttpResponse
 
 class DummyHttp:
     def __init__(self, status, text):
