@@ -1,4 +1,4 @@
-from typing import Any, Optional
+from typing import Any, Optional, Protocol
 import logging
 import os
 
@@ -7,6 +7,17 @@ from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 
 logger = logging.getLogger(__name__)
+
+
+class ConfigProvider(Protocol):
+    """Minimal interface for config access - ensures Interface Segregation Principle.
+    
+    SchedulerService only needs these 3 methods, not the full ConfigService.
+    This allows easier testing with minimal mocks and reduces coupling.
+    """
+    def list_configs(self): ...
+    def get_config(self, config_path: str): ...
+    def sync_configs_with_disk(self) -> None: ...
 
 
 # TODO: Open/Closed violation - _parse_schedule hardcodes 'cron' and 'interval' types; adding new trigger type requires editing this function. Risk: cannot extend with custom triggers (e.g., 'calendar', 'combining'). Refactor: dict of trigger_type -> factory_fn; allow registering new factories externally.
@@ -48,12 +59,12 @@ def _parse_schedule(schedule: Any):
     return None
 
 
-# TODO: Interface Segregation violation - SchedulerService receives full ConfigService but only calls list_configs(), get_config(), sync_configs_with_disk(). Risk: scheduler coupled to unused methods; testing requires full ConfigService mock. Refactor: define IConfigProvider protocol with just those 3 methods; accept that instead.
+# TODO: Open/Closed violation - _parse_schedule hardcodes 'cron' and 'interval' types; adding new trigger type requires editing this function. Risk: cannot extend with custom triggers (e.g., 'calendar', 'combining'). Refactor: dict of trigger_type -> factory_fn; allow registering new factories externally.
 
 class SchedulerService:
     # TODO: Unused parameters pages_repo and links_repo kept for "backwards compatibility" but never used. Remove them - simpler signature.
-    def __init__(self, config_service, start_crawl_callback, crawl_registry, pages_repo=None, links_repo=None):
-        self.config_service = config_service
+    def __init__(self, config_provider: ConfigProvider, start_crawl_callback, crawl_registry, pages_repo=None, links_repo=None):
+        self.config_service = config_provider
         self.start_crawl_callback = start_crawl_callback
         self.crawl_registry = crawl_registry
         # optional repositories (backwards-compatible): some callers pass these
