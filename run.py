@@ -1,32 +1,43 @@
 import json
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import urlparse, parse_qs
+from typing import Optional
 
-from infracrawl.repository.pages import PagesRepository
-from infracrawl.repository.links import LinksRepository
-from infracrawl.repository.configs import ConfigsRepository
 from infracrawl import config
-from infracrawl.services.crawler import Crawler
-from infracrawl.services.config_service import ConfigService
+from infracrawl.container import Container
 from infracrawl.api.server import create_app
 import uvicorn
 import os
 
-# TODO: DIP - Module-level repos (pages_repo, links_repo, configs_repo) create global mutable state. Concrete risk: tests cannot isolate DB; parallel test runs share state causing flakes. Minimal fix: move into main() as local variables; pass to create_app() and Crawler(); tests call main() with mock repos.
-# RESPONSE: Valid point. For simplicity, we will keep it as is for now.
-pages_repo = PagesRepository()
-links_repo = LinksRepository()
-configs_repo = ConfigsRepository()
 
-
-# Create a single Crawler instance and expose its `crawl` method as the server callback.
-# This keeps dependency injection explicit and allows the server to pass a `CrawlerConfig`
-# directly into `crawler.crawl(config)`.
-
-def main():
+def main(container: Optional[Container] = None):
+    """
+    Main entry point for the InfraCrawl application.
+    
+    Args:
+        container: Optional Container instance for dependency injection.
+                  If None, a new container will be created with default configuration.
+    """
+    # Create container if not provided (dependency injection)
+    if container is None:
+        container = Container()
+        # Configure with environment variables and defaults
+        container.config.database_url.from_value(config.DATABASE_URL)
+        container.config.user_agent.from_value(config.USER_AGENT)
+        container.config.http_timeout.from_value(10)
+        container.config.crawl_delay.from_value(config.CRAWL_DELAY)
+    
+    # Wire dependencies
+    container.wire(modules=[__name__])
+    
+    # Get services from container
+    pages_repo = container.pages_repository()
+    links_repo = container.links_repository()
+    config_service = container.config_service()
+    crawler = container.crawler()
+    
     # Load YAML configs and upsert into DB. Remove DB configs not present on disk.
     try:
-        config_service = ConfigService(configs_repo=configs_repo)
         config_service.sync_configs_with_disk()
     except Exception as e:
         print(f"Warning: could not load configs: {e}")
@@ -38,12 +49,7 @@ def main():
     except Exception:
         print(f"Warning: Invalid port value '{port_env}', using default 8000")
         server_port = 8000
-    # Instantiate the crawler once and pass its `crawl` method as the callback
-    crawler = Crawler(
-        pages_repo=pages_repo,
-        links_repo=links_repo
-    )
-
+    
     app = create_app(pages_repo, links_repo, config_service, crawler.crawl)
 
     print(f"Control server (FastAPI/uvicorn) listening on 0.0.0.0:{server_port}")
