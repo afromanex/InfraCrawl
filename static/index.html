@@ -80,7 +80,7 @@
               const cfg = ev.target.getAttribute('data-config');
               ev.target.disabled = true;
               try {
-                const res = await fetchJson('/crawlers/crawl', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({config: cfg}) });
+                const res = await fetchJson(`/crawlers/crawl/${encodeURIComponent(cfg)}/start`, { method: 'POST' });
                 alert('Started: ' + JSON.stringify(res));
               } catch (e) { alert('Error: ' + e.message) }
               ev.target.disabled = false;

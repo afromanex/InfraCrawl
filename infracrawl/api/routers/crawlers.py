@@ -56,7 +56,7 @@ class CrawlersRouter:
                 }
             }
         )
-        router.add_api_route("/crawl", self.crawl, methods=["POST"], status_code=202)
+        router.add_api_route("/crawl/{config}/start", self.crawl, methods=["POST"], status_code=202)
         router.add_api_route("/active", self.list_active_crawls, methods=["GET"])
         router.add_api_route("/active/{crawl_id}", self.get_crawl, methods=["GET"])
         router.add_api_route("/cancel/{crawl_id}", self.cancel_crawl, methods=["POST"])
@@ -80,10 +80,10 @@ class CrawlersRouter:
 
         return StreamingResponse(gen_ndjson(), media_type="application/x-ndjson")
     
-    def crawl(self, req: CrawlRequest, background_tasks: BackgroundTasks):
-        if not req.config:
+    def crawl(self, config: str, background_tasks: BackgroundTasks):
+        if not config:
             raise HTTPException(status_code=400, detail="missing config")
-        cfg = self.config_service.get_config(req.config)
+        cfg = self.config_service.get_config(config)
         if not cfg:
             raise HTTPException(status_code=404, detail="config not found")
         
