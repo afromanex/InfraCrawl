@@ -210,8 +210,6 @@ Focus on API shape and contracts:
 
 Inputs, outputs, naming, error semantics, validation
 
-Backwards compatibility risks
-
 Consistency across the codebase
 
 MODE: tests
