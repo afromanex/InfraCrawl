@@ -36,4 +36,6 @@ def test_config_domain_roundtrip():
     assert any(c.config_path == "pytest-config.yml" for c in configs)
     # Delete (by config_path)
     repo.delete_config("pytest-config.yml")
-    assert repo.get_config("pytest-config.yml") is None
+    # After deletion, config should not exist
+    deleted = repo.get_config("pytest-config.yml")
+    assert deleted is None

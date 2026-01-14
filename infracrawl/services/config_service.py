@@ -3,6 +3,7 @@ import logging
 import yaml
 from infracrawl.repository.configs import ConfigsRepository
 from infracrawl.domain.config import CrawlerConfig
+from infracrawl.services.exceptions import ConfigNotFoundError
 from typing import Optional
 
 logger = logging.getLogger(__name__)
@@ -95,18 +96,26 @@ class ConfigService:
         """Return all configs in the DB (name + config_path only)."""
         return self.configs_repo.list_configs()
 
-    def get_config(self, config_path: str) -> Optional[CrawlerConfig]:
-        """Load full config from YAML using config_path from DB."""
+    def get_config(self, config_path: str) -> CrawlerConfig:
+        """Load full config from YAML using config_path from DB.
+        
+        Raises:
+            ConfigNotFoundError: If config not in DB or YAML file missing/invalid
+        """
         db_cfg = self.configs_repo.get_config(config_path)
         if not db_cfg:
-            return None
+            raise ConfigNotFoundError(config_path, "not found in database")
         
-        return self._load_config_from_file(
+        full_config = self._load_config_from_file(
             db_cfg.config_path,
             config_id=db_cfg.config_id,
             created_at=db_cfg.created_at,
             updated_at=db_cfg.updated_at
         )
+        if not full_config:
+            raise ConfigNotFoundError(config_path, "YAML file missing or invalid")
+        
+        return full_config
 
     def get_config_yaml(self, config_path: str) -> Optional[str]:
         """Return the raw YAML content of a config file."""

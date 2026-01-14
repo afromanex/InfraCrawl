@@ -102,8 +102,10 @@ class SchedulerService:
 
         db_configs = self.config_service.list_configs()
         for db_cfg in db_configs:
-            full = self.config_service.get_config(db_cfg.config_path)
-            if not full:
+            try:
+                full = self.config_service.get_config(db_cfg.config_path)
+            except Exception as e:
+                logger.warning("Could not load config %s: %s", db_cfg.config_path, e)
                 continue
             trig = _parse_schedule(full.schedule)
             if trig is None:
@@ -129,9 +131,11 @@ class SchedulerService:
         # crawler callback cooperatively with stop event.
         try:
             cfg = self.config_service.get_config(cfg_path)
-            if not cfg:
-                logger.warning("Scheduled config not found: %s", cfg_path)
-                return
+        except Exception as e:
+            logger.warning("Scheduled config not found: %s - %s", cfg_path, e)
+            return
+        
+        try:
             # create DB run record
             run_id = None
             try:

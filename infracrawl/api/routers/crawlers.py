@@ -83,9 +83,10 @@ class CrawlersRouter:
     def crawl(self, config: str, background_tasks: BackgroundTasks):
         if not config:
             raise HTTPException(status_code=400, detail="missing config")
-        cfg = self.config_service.get_config(config)
-        if not cfg:
-            raise HTTPException(status_code=404, detail="config not found")
+        try:
+            cfg = self.config_service.get_config(config)
+        except Exception as e:
+            raise HTTPException(status_code=404, detail=f"config not found: {e}")
         
         crawl_id = None
         if self.crawl_registry is not None:
@@ -152,9 +153,10 @@ class CrawlersRouter:
         if not config_name:
             raise HTTPException(status_code=400, detail="missing config")
 
-        cfg = self.config_service.get_config(config_name)
-        if not cfg:
-            raise HTTPException(status_code=404, detail="config not found")
+        try:
+            cfg = self.config_service.get_config(config_name)
+        except Exception as e:
+            raise HTTPException(status_code=404, detail=f"config not found: {e}")
 
         try:
             page_ids = self.pages_repo.get_page_ids_by_config(cfg.config_id)
