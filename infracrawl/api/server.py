@@ -7,6 +7,7 @@ from infracrawl.api.routers.pages import create_pages_router
 from infracrawl.api.routers.crawlers import create_crawlers_router
 from infracrawl.services.crawl_registry import InMemoryCrawlRegistry
 from infracrawl.services.scheduler_service import SchedulerService
+from infracrawl.repository.crawls import CrawlsRepository
 from fastapi import Depends
 from infracrawl.api.auth import require_admin
 from fastapi.staticfiles import StaticFiles
@@ -31,7 +32,8 @@ def create_app(pages_repo, links_repo, config_service: ConfigService, start_craw
     # Create default registry if not provided (allows dependency injection for testing)
     if crawl_registry is None:
         crawl_registry = InMemoryCrawlRegistry()
-    app.include_router(create_crawlers_router(pages_repo, links_repo, config_service, start_crawl_callback, crawl_registry), dependencies=[Depends(require_admin)])
+    crawls_repo = CrawlsRepository()
+    app.include_router(create_crawlers_router(pages_repo, links_repo, config_service, start_crawl_callback, crawl_registry, crawls_repo), dependencies=[Depends(require_admin)])
 
     # Serve minimal UI
     app.mount("/ui", StaticFiles(directory="static", html=True), name="ui")

@@ -27,17 +27,15 @@ class CrawlersRouter:
     
     Encapsulates dependencies and endpoint logic, avoiding closure-based function factory.
     """
-    # TODO: OCP - CrawlersRouter instantiates CrawlsRepository() directly in __init__. Concrete risk: cannot inject test/mock repo; couples router to production DB. Minimal fix: accept crawls_repo parameter in __init__ with default=None; set self.crawls_repo = crawls_repo or CrawlsRepository().
-    # RESPONSE: Repository should be injected. 
-    
     def __init__(self, pages_repo, links_repo, config_service: ConfigService,
-                 start_crawl_callback, crawl_registry: Optional[InMemoryCrawlRegistry] = None):
+                 start_crawl_callback, crawl_registry: Optional[InMemoryCrawlRegistry],
+                 crawls_repo: CrawlsRepository):
         self.pages_repo = pages_repo
         self.links_repo = links_repo
         self.config_service = config_service
         self.start_crawl_callback = start_crawl_callback
         self.crawl_registry = crawl_registry
-        self.crawls_repo = CrawlsRepository()
+        self.crawls_repo = crawls_repo
     
     def create_router(self) -> APIRouter:
         """Create and configure the FastAPI router with all endpoints."""
@@ -190,7 +188,7 @@ class CrawlersRouter:
         return [r_to_dict(r) for r in runs]
 
 
-def create_crawlers_router(pages_repo, links_repo, config_service: ConfigService, start_crawl_callback, crawl_registry: InMemoryCrawlRegistry = None) -> APIRouter:
+def create_crawlers_router(pages_repo, links_repo, config_service: ConfigService, start_crawl_callback, crawl_registry: InMemoryCrawlRegistry, crawls_repo: CrawlsRepository) -> APIRouter:
     """Factory function to create crawlers router for backwards compatibility."""
-    router_instance = CrawlersRouter(pages_repo, links_repo, config_service, start_crawl_callback, crawl_registry)
+    router_instance = CrawlersRouter(pages_repo, links_repo, config_service, start_crawl_callback, crawl_registry, crawls_repo)
     return router_instance.create_router()
