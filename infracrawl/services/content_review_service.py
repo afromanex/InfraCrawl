@@ -3,7 +3,12 @@ from urllib.parse import urljoin
 
 # TODO: DIP - ContentReviewService hardcodes BeautifulSoup(html, "html.parser"). Concrete risk: tests require full HTML parsing; cannot use fast lxml parser without editing class. Minimal fix: accept parser_fn callable in __init__ (default=lambda h: BeautifulSoup(h, "html.parser")); tests pass lambda returning mock.
 class ContentReviewService:
-    def extract_links(self, base_url: str, html: str):
+    def extract_links(self, base_url: str, html: str) -> list[tuple[str, str]]:
+        """Extract links from HTML.
+        
+        Returns:
+            List of (absolute_url, anchor_text) tuples
+        """
         soup = BeautifulSoup(html, "html.parser")
         urls = []
         for a in soup.find_all("a", href=True):
