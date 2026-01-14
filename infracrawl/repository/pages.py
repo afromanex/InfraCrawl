@@ -45,6 +45,32 @@ class PagesRepository:
             session.commit()
             session.refresh(p)
             return p.page_id
+    
+    def ensure_pages_batch(self, page_urls: List[str]) -> dict[str, int]:
+        """Ensure multiple pages exist and return mapping of URL -> page_id.
+        
+        Batch operation to reduce N+1 queries. Returns dict mapping each URL to its page_id.
+        """
+        if not page_urls:
+            return {}
+        
+        with self.get_session() as session:
+            # Find existing pages
+            q = select(DBPage).where(DBPage.page_url.in_(page_urls))
+            existing = session.execute(q).scalars().all()
+            url_to_id = {p.page_url: p.page_id for p in existing}
+            
+            # Insert missing pages
+            missing_urls = set(page_urls) - set(url_to_id.keys())
+            if missing_urls:
+                new_pages = [DBPage(page_url=url) for url in missing_urls]
+                session.add_all(new_pages)
+                session.commit()
+                for p in new_pages:
+                    session.refresh(p)
+                    url_to_id[p.page_url] = p.page_id
+            
+            return url_to_id
 
     def get_page_by_url(self, page_url: str) -> Optional[Page]:
         with self.get_session() as session:

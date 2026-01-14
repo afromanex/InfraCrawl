@@ -39,19 +39,34 @@ class LinkProcessor:
             links = self.content_review_service.extract_links(base_url, html)
         else:
             links = extract_links_fn(base_url, html)
+        
+        # Filter to same-host links only
+        same_host_links = []
         for link_url, anchor in links:
             if not self._same_host(current_root, link_url):
                 logger.debug("Skipping (external) %s -> not same host as %s", link_url, current_root)
                 continue
-            # TODO: DB call inside loop - N+1 query problem
-            # CLAUDE: Acknowledged - batch operations would require collecting all URLs first, losing streaming. Optimize if profiling shows bottleneck.
-            to_id = self.pages_repo.ensure_page(link_url)
-            # TODO: Link domain object expects link_id: int but gets None
-            # CLAUDE: Domain model should use Optional[int] for link_id since repo assigns it. Low priority fix.
-            link_obj = Link(link_id=None, link_from_id=from_id, link_to_id=to_id, anchor_text=anchor)
-            # TODO: Another DB call in loop
-            # CLAUDE: Same as above - batch would help but adds complexity. Defer.
-            self.links_repo.insert_link(link_obj)
-            if depth - 1 >= 0:
-                if crawl_callback is not None:
-                    crawl_callback(link_url, depth - 1)
+            same_host_links.append((link_url, anchor))
+        
+        if not same_host_links:
+            return
+        
+        # Batch ensure all pages (single DB query)
+        link_urls = [url for url, _ in same_host_links]
+        url_to_id = self.pages_repo.ensure_pages_batch(link_urls)
+        
+        # Create link objects for batch insert
+        # TODO: Link domain object expects link_id: int but gets None
+        # CLAUDE: Domain model should use Optional[int] for link_id since repo assigns it. Low priority fix.
+        link_objects = [
+            Link(link_id=None, link_from_id=from_id, link_to_id=url_to_id[link_url], anchor_text=anchor)
+            for link_url, anchor in same_host_links
+        ]
+        
+        # Batch insert all links (single DB transaction)
+        self.links_repo.insert_links_batch(link_objects)
+        
+        # Schedule crawls for next depth
+        if depth - 1 >= 0 and crawl_callback is not None:
+            for link_url, _ in same_host_links:
+                crawl_callback(link_url, depth - 1)

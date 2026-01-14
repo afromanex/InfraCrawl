@@ -13,7 +13,7 @@ from infracrawl.api.auth import require_admin
 from fastapi.staticfiles import StaticFiles
 from infracrawl.api.routers.systems import create_systems_router
 
-# TODO: DIP - create_app() lazy-imports systems router inside function body. Concrete risk: import errors only caught at runtime after server starts; harder to track dependencies. Minimal fix: move "from infracrawl.api.routers.systems import create_systems_router" to top imports.
+
 def create_app(pages_repo, links_repo, config_service: ConfigService, start_crawl_callback, crawl_registry: InMemoryCrawlRegistry = None, scheduler: SchedulerService = None):
     """Return a FastAPI app with control endpoints.
 

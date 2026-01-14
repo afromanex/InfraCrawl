@@ -23,6 +23,26 @@ class LinksRepository:
             )
             session.add(db_link)
             session.commit()
+    
+    def insert_links_batch(self, links: List[Link]):
+        """Insert multiple links in a single transaction.
+        
+        Batch operation to reduce N+1 queries.
+        """
+        if not links:
+            return
+        
+        with self.get_session() as session:
+            db_links = [
+                DBLink(
+                    link_from_id=link.link_from_id,
+                    link_to_id=link.link_to_id,
+                    anchor_text=link.anchor_text
+                )
+                for link in links
+            ]
+            session.add_all(db_links)
+            session.commit()
 
     def fetch_links(self, limit: Optional[int] = None, config_id: Optional[int] = None) -> List[Link]:
         with self.get_session() as session:

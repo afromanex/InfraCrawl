@@ -62,16 +62,16 @@ def test_crawl_refresh_days_skips_recent(crawler_with_mocks):
 
 def test_crawl_inserts_links(crawler_with_mocks):
     crawler, pages_repo, links_repo = crawler_with_mocks
-    # Always return a valid page id for any call
-    pages_repo.ensure_page.return_value = 1
+    # Mock batch method to return URL -> ID mapping
+    pages_repo.ensure_pages_batch.return_value = {'http://example.com/next': 1}
     crawler._allowed_by_robots = MagicMock(return_value=True)
     crawler.fetch = MagicMock(return_value=(200, '<html></html>'))
     crawler.extract_links = MagicMock(return_value=[('http://example.com/next', 'next')])
-    links_repo.insert_link = MagicMock()
+    links_repo.insert_links_batch = MagicMock()
     # Patch _same_host to always True
     crawler._same_host = MagicMock(return_value=True)
     pages_repo.upsert_page.return_value = 1
     cfg = CrawlerConfig(config_id=None, config_path='p', root_urls=['http://example.com'], max_depth=1)
     crawler.crawl(cfg)
-    # Should insert a link
-    assert links_repo.insert_link.called
+    # Should insert links via batch method
+    assert links_repo.insert_links_batch.called
