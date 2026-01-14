@@ -19,6 +19,7 @@ from infracrawl.repository.links import LinksRepository
 from infracrawl.repository.configs import ConfigsRepository
 from infracrawl.domain.config import CrawlerConfig
 from infracrawl.domain.crawl_context import CrawlContext
+from infracrawl.domain.crawl_result import CrawlResult
 
 logger = logging.getLogger(__name__)
 
@@ -63,16 +64,32 @@ class Crawler:
 
         return response.text
 
-    def _process_links(self, url: str, body: str, from_id: int, context: CrawlContext, depth: int, _crawl_from=None, stop_event=None):
+    def _process_links(self, url: str, body: str, from_id: int, context: CrawlContext, depth: int, _crawl_from=None, stop_event=None) -> tuple[int, bool]:
+        """Extract and process links from page body.
+        
+        Returns:
+            (pages_crawled, stopped) tuple for child pages
+        """
         # TODO: _crawl_from parameter with fallback to self._crawl_from is confusing indirection. Just call self._crawl_from directly in callback, remove parameter.
         # Delegate link extraction, persistence and scheduling to LinkProcessor
         # Crawl callback prefers direct method but falls back to supplied callback
+        pages_crawled = 0
+        stopped = False
+        
         def cb(link_url, next_depth):
+            nonlocal pages_crawled, stopped
+            if stopped:
+                return
             if _crawl_from is not None:
-                _crawl_from(link_url, next_depth, stop_event)
+                result = _crawl_from(link_url, next_depth, stop_event)
             else:
-                self._crawl_from(link_url, next_depth, context, stop_event)
+                result = self._crawl_from(link_url, next_depth, context, stop_event)
+            pages_crawled += result[0]
+            if result[1]:
+                stopped = True
+                
         self.link_processor.process_links(context.current_root, url, body, from_id, context, depth, crawl_callback=cb, extract_links_fn=self.extract_links)
+        return (pages_crawled, stopped)
     # TODO: 9 optional parameters still high - consider config object later
     # TODO: All this "param or Default()" dependency injection is over-complex. Either: 1) require all dependencies (fail fast), 2) use single config object, or 3) accept defaults are fine and stop allowing overrides.
     # CLAUDE: configs_repo removed as requested. Consider builder pattern or CrawlerConfig dataclass when complexity grows.
@@ -108,11 +125,14 @@ class Crawler:
             logger.exception("Error comparing hosts: base=%s, other=%s", base, other)
             return False
 
-    def crawl(self, config: CrawlerConfig, stop_event=None):
+    def crawl(self, config: CrawlerConfig, stop_event=None) -> CrawlResult:
         """Crawl using the provided `CrawlerConfig` object.
 
         Iterates `config.root_urls` and performs depth-limited crawling from
         each root, using `config.max_depth` and other config options.
+        
+        Returns:
+            CrawlResult with pages_crawled count and stopped flag
         """
         if config is None:
             raise ValueError("config is required for crawl")
@@ -122,39 +142,61 @@ class Crawler:
         if context.max_depth is None:
             context.max_depth = config.DEFAULT_DEPTH
 
+        pages_crawled = 0
+        stopped = False
         roots = getattr(context.config, 'root_urls', []) or []
         for ru in roots:
             # cooperative cancellation: check stop_event before starting each root
             if self._is_stopped(stop_event):
                 logger.info("Crawl cancelled before starting root %s", ru)
-                return
+                stopped = True
+                break
             context.set_root(ru)
-            self._crawl_from(ru, context.max_depth, context, stop_event)
+            result = self._crawl_from(ru, context.max_depth, context, stop_event)
+            pages_crawled += result[0]
+            if result[1]:  # stopped
+                stopped = True
+                break
+        
+        return CrawlResult(pages_crawled=pages_crawled, stopped=stopped)
 
-    def _crawl_from(self, url: str, depth: int, context: CrawlContext, stop_event=None):
+    def _crawl_from(self, url: str, depth: int, context: CrawlContext, stop_event=None) -> tuple[int, bool]:
+        """Crawl from a URL recursively up to depth.
+        
+        Returns:
+            (pages_crawled, stopped) tuple
+        """
         if context.is_visited(url):
             logger.debug("Skipping (visited) %s", url)
-            return
+            return (0, False)
         context.mark_visited(url)
 
         from_id = self.pages_repo.ensure_page(url)
 
         if self._is_stopped(stop_event):
             logger.info("Crawl cancelled during traversal of %s", url)
-            return
+            return (0, True)
 
         if self.crawl_policy.should_skip_due_to_depth(depth):
-            return
+            return (0, False)
         if self.crawl_policy.should_skip_due_to_robots(url, context):
-            return
+            return (0, False)
         if self.crawl_policy.should_skip_due_to_refresh(url, context):
-            return
+            return (0, False)
 
         body = self._fetch_and_store(url, context, stop_event)
         if body is None:
-            return
+            return (0, False)
 
+        pages_crawled = 1
+        stopped = False
+        
         time.sleep(self.delay)
-        self._process_links(url, body, from_id, context, depth, None, stop_event)
+        child_result = self._process_links(url, body, from_id, context, depth, None, stop_event)
+        pages_crawled += child_result[0]
+        if child_result[1]:
+            stopped = True
+        
+        return (pages_crawled, stopped)
 
         
