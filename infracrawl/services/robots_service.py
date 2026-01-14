@@ -1,17 +1,27 @@
 from urllib.parse import urljoin, urlparse
 import logging
+from typing import Optional
 
 from infracrawl.services.robots_fetcher import RobotsFetcher
+from infracrawl.services.robots_cache import RobotsCache
 
-# TODO: SRP - RobotsService does 3 jobs: (1) fetch robots.txt via RobotsFetcher (2) cache RobotFileParser per domain (3) check can_fetch permissions. Concrete risk: changing cache strategy (TTL, LRU) requires editing permission logic. Minimal fix: extract _rp_cache to RobotsCache class with get(base_url)->parser and set(base_url, parser) methods; inject in __init__.
-# RESPONSE: What new clases would you suggest? For simplicity, we will keep it as is for now.
+
 class RobotsService:
-    def __init__(self, http_service, user_agent, robots_fetcher: RobotsFetcher = None):
+    """
+    Service for checking robots.txt permissions.
+    
+    Orchestrates fetching, caching, and permission checking for robots.txt files.
+    Cache is now injectable for testing and independent cache strategy changes.
+    """
+    
+    def __init__(self, http_service, user_agent: str, 
+                 robots_fetcher: Optional[RobotsFetcher] = None,
+                 cache: Optional[RobotsCache] = None):
         # Backwards-compatible: callers may still pass an http_service with fetch_robots
         self.http_service = http_service
         self.user_agent = user_agent
-        self._rp_cache = {}
-        self.robots_fetcher = robots_fetcher or RobotsFetcher(http_service)
+        self.robots_fetcher = robots_fetcher if robots_fetcher is not None else RobotsFetcher(http_service)
+        self.cache = cache if cache is not None else RobotsCache()
 
     def allowed_by_robots(self, url: str, robots_enabled: bool) -> bool:
         if not robots_enabled:
@@ -19,7 +29,7 @@ class RobotsService:
         try:
             parsed = urlparse(url)
             base = f"{parsed.scheme}://{parsed.netloc}"
-            robots_parser = self._rp_cache.get(base)
+            robots_parser = self.cache.get(base)
             if robots_parser is None:
                 robots_url = urljoin(base, "/robots.txt")
                 try:
@@ -27,7 +37,7 @@ class RobotsService:
                 except Exception:
                     logging.exception("Error fetching robots.txt from %s", robots_url)
                     robots_parser = None
-                self._rp_cache[base] = robots_parser
+                self.cache.set(base, robots_parser)
             if robots_parser is None:
                 return True
             return robots_parser.can_fetch(self.user_agent, url)
