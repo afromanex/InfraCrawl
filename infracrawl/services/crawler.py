@@ -48,7 +48,7 @@ class Crawler:
 
         fetched_at = datetime.utcnow().isoformat()
         try:
-            page = self.fetch_persist_service.persist(url, response.status_code, response.text, fetched_at, context=context)
+            page = self.fetch_persist_service.extract_and_persist(url, response.status_code, response.text, fetched_at, context=context)
             logger.info("Fetched %s -> status %s, page_id=%s", url, response.status_code, getattr(page, 'page_id', None))
         except Exception as e:
             logger.error("Storage error while saving %s: %s", url, e, exc_info=True)

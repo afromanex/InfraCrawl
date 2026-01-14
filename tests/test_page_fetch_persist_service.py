@@ -9,7 +9,7 @@ class DummyHttp:
 def test_plain_text_extracted_and_persisted(tmp_path):
     pages_repo = PagesRepository()
     svc = PageFetchPersistService(http_service=DummyHttp(), pages_repo=pages_repo)
-    page = svc.persist('http://example.com', '200', '<html><body>Hi there</body></html>', '2026-01-01T00:00:00Z')
+    page = svc.extract_and_persist('http://example.com', '200', '<html><body>Hi there</body></html>', '2026-01-01T00:00:00Z')
     assert page is not None
     # fetched page should have plain_text populated
     stored = pages_repo.get_page_by_url('http://example.com')
@@ -38,7 +38,7 @@ def test_filtered_plain_text_removes_boilerplate():
     
     pages_repo = PagesRepository()
     svc = PageFetchPersistService(http_service=DummyHttp(), pages_repo=pages_repo)
-    page = svc.persist('http://test.com', '200', html, '2026-01-12T00:00:00Z')
+    page = svc.extract_and_persist('http://test.com', '200', html, '2026-01-12T00:00:00Z')
     
     stored = pages_repo.get_page_by_url('http://test.com')
     assert stored is not None

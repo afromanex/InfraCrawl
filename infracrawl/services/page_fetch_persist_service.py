@@ -134,9 +134,13 @@ class PageFetchPersistService:
         page = self.pages_repo.upsert_page(page_obj)
         return page
 
-    # CLAUDE: status should be int not str - persist() signature is wrong, callers pass int
-    def persist(self, url: str, status: int, body: Optional[str], fetched_at: str, context: Optional[CrawlContext] = None) -> DomainPage:
-        """Persist a fetched page and return the domain `Page`."""
+    # CLAUDE: status should be int not str - extract_and_persist() signature is wrong, callers pass int
+    def extract_and_persist(self, url: str, status: int, body: Optional[str], fetched_at: str, context: Optional[CrawlContext] = None) -> DomainPage:
+        """Extract text from fetched page body and persist it, returning the domain `Page`.
+        
+        Note: This method does NOT fetch the page - it expects the body to be provided.
+        Use fetch_and_persist() if you need to fetch the page first.
+        """
         config_id = None
         if context and getattr(context, 'config', None):
             try:
