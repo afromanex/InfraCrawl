@@ -31,17 +31,26 @@ class CrawlsRepository:
             q = select(DBCrawlRun).where(DBCrawlRun.run_id == run_id)
             r = session.execute(q).scalars().first()
             if not r:
-                return False
+                raise ValueError(f"CrawlRun with run_id={run_id} not found")
             r.end_timestamp = now
             r.exception = exception
             session.add(r)
             session.commit()
-            return True
 
-    def get_run(self, run_id: int) -> Optional[DBCrawlRun]:
+    def get_run(self, run_id: int) -> Optional[DomainCrawlRun]:
         with self.get_session() as session:
             q = select(DBCrawlRun).where(DBCrawlRun.run_id == run_id)
-            return session.execute(q).scalars().first()
+            r = session.execute(q).scalars().first()
+            if not r:
+                return None
+        # Resolve config path if available
+        cfg_repo = ConfigsRepository(self.engine)
+        cfg_path = None
+        if r.config_id is not None:
+            cfg = cfg_repo.get_config_by_id(r.config_id)
+            if cfg:
+                cfg_path = cfg.config_path
+        return DomainCrawlRun(r.run_id, r.config_id, cfg_path, r.start_timestamp, r.end_timestamp, r.exception)
 
     def list_runs(self, limit: int = 20):
         """Return recent runs as domain objects, including config path if available."""

@@ -14,7 +14,7 @@ class ConfigsRepository:
     def get_session(self) -> Session:
         return Session(self.engine)
 
-    def upsert_config(self, config: CrawlerConfig) -> int:
+    def upsert_config(self, config: CrawlerConfig) -> CrawlerConfig:
         with self.get_session() as session:
             # Upsert by config_path only. Backwards compatibility by name removed.
             q = select(DBCrawlerConfig).where(DBCrawlerConfig.config_path == config.config_path)
@@ -23,14 +23,25 @@ class ConfigsRepository:
                 c.config_path = config.config_path
                 session.add(c)
                 session.commit()
-                return c.config_id
+                session.refresh(c)
+                return CrawlerConfig(
+                    config_id=c.config_id,
+                    config_path=c.config_path,
+                    created_at=c.created_at,
+                    updated_at=c.updated_at
+                )
             c = DBCrawlerConfig(
                 config_path=config.config_path
             )
             session.add(c)
             session.commit()
             session.refresh(c)
-            return c.config_id
+            return CrawlerConfig(
+                config_id=c.config_id,
+                config_path=c.config_path,
+                created_at=c.created_at,
+                updated_at=c.updated_at
+            )
 
     def get_config(self, config_path: str) -> Optional[CrawlerConfig]:
         """Get config by its file path (e.g., 'starkparks.yml')."""
@@ -70,10 +81,10 @@ class ConfigsRepository:
                 updated_at=c.updated_at
             ) for c in rows]
 
-    def delete_config(self, name: str):
+    def delete_config(self, config_path: str):
         with self.get_session() as session:
             # Delete by config_path only. No legacy name-based lookup.
-            q = select(DBCrawlerConfig).where(DBCrawlerConfig.config_path == name)
+            q = select(DBCrawlerConfig).where(DBCrawlerConfig.config_path == config_path)
             c = session.execute(q).scalars().first()
             if c:
                 session.delete(c)

@@ -79,9 +79,9 @@ class ConfigService:
         for fname in self._list_config_files():
             config_obj = self._load_config_from_file(fname)
             if config_obj:
-                cid = self.configs_repo.upsert_config(config_obj)
+                result = self.configs_repo.upsert_config(config_obj)
                 loaded_paths.add(fname)
-                logger.info("Loaded config %s -> id=%s", fname, cid)
+                logger.info("Loaded config %s -> id=%s", fname, result.config_id)
         
         # Remove configs in DB that are not present on disk
         existing_configs = self.configs_repo.list_configs()

@@ -12,8 +12,9 @@ def test_config_domain_roundtrip():
         refresh_days=5
     )
     # Insert
-    config_id = repo.upsert_config(config)
-    assert isinstance(config_id, int)
+    result = repo.upsert_config(config)
+    assert isinstance(result, CrawlerConfig)
+    assert isinstance(result.config_id, int)
     # Fetch by config_path
     loaded = repo.get_config("pytest-config.yml")
     assert loaded is not None
