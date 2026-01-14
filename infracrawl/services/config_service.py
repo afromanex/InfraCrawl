@@ -7,23 +7,21 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
-# TODO: SRP - ConfigFileLoader only used by ConfigService (single client), but adds full class layer. Concrete risk: changes to config loading require navigating 2 files. Minimal fix: inline 3 methods into ConfigService; testability unchanged (mock os.listdir/open instead of loader).
-class ConfigFileLoader:
-    """Handles loading and parsing CrawlerConfig objects from YAML files.
+
+class ConfigService:
+    """Manages crawler configurations, synchronizing YAML files with database."""
     
-    Separates file I/O and YAML parsing concerns from database synchronization.
-    """
-    
-    def __init__(self, configs_dir: Optional[str] = None):
+    def __init__(self, configs_repo: Optional[ConfigsRepository] = None, configs_dir: Optional[str] = None):
+        self.configs_repo = configs_repo or ConfigsRepository()
         self.configs_dir = configs_dir or os.path.join(os.getcwd(), "configs")
     
-    def list_config_files(self) -> list[str]:
+    def _list_config_files(self) -> list[str]:
         """Return list of YAML filenames in configs directory."""
         return [fname for fname in os.listdir(self.configs_dir)
                 if fname.endswith(".yml") or fname.endswith(".yaml")]
     
-    def load_config_from_file(self, config_path: str, config_id: Optional[int] = None,
-                             created_at=None, updated_at=None) -> Optional[CrawlerConfig]:
+    def _load_config_from_file(self, config_path: str, config_id: Optional[int] = None,
+                              created_at=None, updated_at=None) -> Optional[CrawlerConfig]:
         """Load a CrawlerConfig from a YAML file.
         
         Args:
@@ -62,7 +60,7 @@ class ConfigFileLoader:
             logger.warning("Could not load config %s: %s", config_path, e)
             return None
     
-    def get_config_yaml_content(self, config_path: str) -> Optional[str]:
+    def _get_config_yaml_content(self, config_path: str) -> Optional[str]:
         """Return raw YAML content of a config file."""
         full_path = config_path if os.path.isabs(config_path) else os.path.join(self.configs_dir, config_path)
         if not os.path.isfile(full_path):
@@ -73,16 +71,13 @@ class ConfigFileLoader:
         except Exception as e:
             logger.warning("Could not read config file %s: %s", config_path, e)
             return None
-
-
-class ConfigService:
-    """Manages crawler configurations, synchronizing YAML files with database."""
+    
     def sync_configs_with_disk(self):
         """Scan configs directory, upsert to DB, remove orphaned DB configs."""
         loaded_paths = set()
         
-        for fname in self.config_loader.list_config_files():
-            config_obj = self.config_loader.load_config_from_file(fname)
+        for fname in self._list_config_files():
+            config_obj = self._load_config_from_file(fname)
             if config_obj:
                 cid = self.configs_repo.upsert_config(config_obj)
                 loaded_paths.add(fname)
@@ -96,11 +91,6 @@ class ConfigService:
             self.configs_repo.delete_config(path)
             logger.info("Removed DB config not present on disk: %s", path)
 
-    def __init__(self, configs_repo: Optional[ConfigsRepository] = None, configs_dir: Optional[str] = None, config_loader: Optional[ConfigFileLoader] = None):
-        self.configs_repo = configs_repo or ConfigsRepository()
-        self.configs_dir = configs_dir or os.path.join(os.getcwd(), "configs")
-        self.config_loader = config_loader or ConfigFileLoader(self.configs_dir)
-
     def list_configs(self):
         """Return all configs in the DB (name + config_path only)."""
         return self.configs_repo.list_configs()
@@ -111,7 +101,7 @@ class ConfigService:
         if not db_cfg:
             return None
         
-        return self.config_loader.load_config_from_file(
+        return self._load_config_from_file(
             db_cfg.config_path,
             config_id=db_cfg.config_id,
             created_at=db_cfg.created_at,
@@ -123,4 +113,4 @@ class ConfigService:
         db_cfg = self.configs_repo.get_config(name)
         if not db_cfg:
             return None
-        return self.config_loader.get_config_yaml_content(db_cfg.config_path)
+        return self._get_config_yaml_content(db_cfg.config_path)

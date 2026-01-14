@@ -6,21 +6,21 @@ from infracrawl.db.models import Page as DBPage
 from infracrawl.domain import Page
 from infracrawl.db.engine import make_engine
 
-# TODO: SRP - PageMapper has single client (PagesRepository) and contains only static mapping logic. Concrete risk: navigating 2 abstractions for simple DB->domain conversion adds cognitive load. Minimal fix: inline to_domain() into callers as "Page(page_id=db.page_id, ...)"; delete PageMapper class.
-class PageMapper:
-    """Handles conversion between database models and domain objects.
+
+class PagesRepository:
+    """Repository for Page database operations."""
+    def __init__(self, engine=None):
+        # TODO: Creating new engine per repo instance is expensive
+        # CLAUDE: Use dependency injection - pass shared engine from main(). Implement later when scaling.
+        self.engine = engine or make_engine()
+
+    def get_session(self) -> Session:
+        # TODO: Returns raw Session - no error handling for connection failures
+        # CLAUDE: SQLAlchemy Session context manager handles rollback. Connection pool retries. Current approach is fine.
+        return Session(self.engine)
     
-    Separates domain mapping concern from repository database operations.
-    """
-    
-    @staticmethod
-    def to_domain(db_page: DBPage, full: bool = True) -> Page:
-        """Convert database Page model to domain Page object.
-        
-        Args:
-            db_page: Database Page model instance
-            full: If False, omit large fields (page_content, plain_text, filtered_plain_text)
-        """
+    def _to_domain(self, db_page: DBPage, full: bool = True) -> Page:
+        """Convert database Page to domain Page."""
         return Page(
             page_id=db_page.page_id,
             page_url=db_page.page_url,
@@ -31,27 +31,6 @@ class PageMapper:
             fetched_at=db_page.fetched_at,
             config_id=db_page.config_id
         )
-    
-    @staticmethod
-    def to_domain_list(db_pages: List[DBPage], full: bool = True) -> List[Page]:
-        """Convert list of database Pages to domain Pages."""
-        return [PageMapper.to_domain(p, full) for p in db_pages]
-
-
-class PagesRepository:
-    """Repository for Page database operations.
-    
-    Focuses on database queries and persistence, delegating domain conversion to PageMapper.
-    """
-    def __init__(self, engine=None):
-        # TODO: Creating new engine per repo instance is expensive
-        # CLAUDE: Use dependency injection - pass shared engine from main(). Implement later when scaling.
-        self.engine = engine or make_engine()
-
-    def get_session(self) -> Session:
-        # TODO: Returns raw Session - no error handling for connection failures
-        # CLAUDE: SQLAlchemy Session context manager handles rollback. Connection pool retries. Current approach is fine.
-        return Session(self.engine)
 
     def ensure_page(self, page_url: str) -> int:
         with self.get_session() as session:
@@ -73,7 +52,7 @@ class PagesRepository:
             p = session.execute(q).scalars().first()
             if not p:
                 return None
-            return PageMapper.to_domain(p)
+            return self._to_domain(p)
 
     # TODO: 7 parameters - should accept Page domain object
     # TODO: http_status typed as Optional[int] but accepts string from caller - type mismatch
@@ -95,12 +74,12 @@ class PagesRepository:
                     p.config_id = config_id
                 session.add(p)
                 session.commit()
-                return PageMapper.to_domain(p)
+                return self._to_domain(p)
             p = DBPage(page_url=page_url, page_content=page_content, plain_text=plain_text, filtered_plain_text=filtered_plain_text, http_status=http_status, fetched_at=fetched_at, config_id=config_id)
             session.add(p)
             session.commit()
             session.refresh(p)
-            return PageMapper.to_domain(p)
+            return self._to_domain(p)
 
     def fetch_pages(self, full: bool = False, limit: Optional[int] = None, offset: Optional[int] = None, config_id: Optional[int] = None) -> List[Page]:
         with self.get_session() as session:
@@ -113,7 +92,7 @@ class PagesRepository:
             if limit:
                 q = q.limit(limit)
             rows = session.execute(q).scalars().all()
-            return PageMapper.to_domain_list(rows, full=full)
+            return [self._to_domain(row, full=full) for row in rows]
 
     def get_page_by_id(self, page_id: int) -> Optional[Page]:
         with self.get_session() as session:
@@ -121,7 +100,7 @@ class PagesRepository:
             p = session.execute(q).scalars().first()
             if not p:
                 return None
-            return PageMapper.to_domain(p)
+            return self._to_domain(p)
 
     def get_page_ids_by_config(self, config_id: int) -> List[int]:
         with self.get_session() as session:
