@@ -3,7 +3,6 @@ root_urls:
 max_depth: 1
 refresh_days: 7
 robots: true
-# Run every 30 seconds for testing
-schedule:
-  type: "interval"
-  seconds: 86400 # change to like 30 seconds for quicker tests
+# Run daily at 2 AM (cron format: minute hour day month day_of_week)
+# For testing more frequently, use: "*/30 * * * *" (every 30 minutes)
+schedule: "0 2 * * *"

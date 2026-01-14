@@ -4,7 +4,6 @@ import os
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
-from apscheduler.triggers.interval import IntervalTrigger
 
 logger = logging.getLogger(__name__)
 
@@ -20,46 +19,23 @@ class ConfigProvider(Protocol):
     def sync_configs_with_disk(self) -> None: ...
 
 
-# TODO: Open/Closed violation - _parse_schedule hardcodes 'cron' and 'interval' types; adding new trigger type requires editing this function. Risk: cannot extend with custom triggers (e.g., 'calendar', 'combining'). Refactor: dict of trigger_type -> factory_fn; allow registering new factories externally.
-# RESPONSE: Valid point. However, for simplicity, we will keep it as is for now.
-
 def _parse_schedule(schedule: Any):
-    """Return an APScheduler trigger from a schedule object.
+    """Return an APScheduler CronTrigger from a cron schedule string.
 
-    Accepts:
-    - a cron string like '0 2 * * *' (crontab)
-    - a dict with 'type': 'cron' and cron fields (minute, hour, day, month, day_of_week)
-    - a dict with 'type': 'interval' and interval fields (seconds, minutes, hours, days)
+    Accepts cron strings like '0 2 * * *' (crontab format).
+    Returns None if schedule is invalid or cannot be parsed.
     """
     if schedule is None:
         return None
-    # cron string
     if isinstance(schedule, str):
         try:
             return CronTrigger.from_crontab(schedule)
         except Exception:
-            logger.exception("Error parsing cron schedule string: %s", schedule)
+            logger.exception("Error parsing cron schedule: %s", schedule)
             return None
-    if isinstance(schedule, dict):
-        t = schedule.get("type")
-        if t == "cron":
-            args = {k: v for k, v in schedule.items() if k != "type"}
-            try:
-                return CronTrigger(**args)
-            except Exception:
-                logger.exception("Error creating cron trigger: %s", args)
-                return None
-        if t == "interval":
-            args = {k: v for k, v in schedule.items() if k != "type"}
-            try:
-                return IntervalTrigger(**args)
-            except Exception:
-                logger.exception("Error creating interval trigger: %s", args)
-                return None
+    logger.warning("Unsupported schedule format: %s (only cron strings supported)", type(schedule))
     return None
 
-
-# TODO: Open/Closed violation - _parse_schedule hardcodes 'cron' and 'interval' types; adding new trigger type requires editing this function. Risk: cannot extend with custom triggers (e.g., 'calendar', 'combining'). Refactor: dict of trigger_type -> factory_fn; allow registering new factories externally.
 
 class SchedulerService:
     # TODO: Unused parameters pages_repo and links_repo kept for "backwards compatibility" but never used. Remove them - simpler signature.
