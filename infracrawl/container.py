@@ -17,6 +17,7 @@ from infracrawl.services.robots_service import RobotsService
 from infracrawl.services.page_fetch_persist_service import PageFetchPersistService
 from infracrawl.services.link_processor import LinkProcessor
 from infracrawl.services.content_review_service import ContentReviewService
+from infracrawl.services.crawl_executor import CrawlExecutor
 from infracrawl.services.crawl_registry import InMemoryCrawlRegistry
 from infracrawl.services.scheduler_service import SchedulerService
 from infracrawl.repository.crawls import CrawlsRepository
@@ -140,23 +141,25 @@ class Container(containers.DeclarativeContainer):
         ConfigService,
         configs_repo=configs_repository
     )
+
+    crawl_executor = providers.Factory(
+        CrawlExecutor,
+        pages_repo=pages_repository,
+        crawl_policy=crawl_policy,
+        link_processor=link_processor,
+        fetch_persist_service=page_fetch_persist_service,
+        delay_seconds=config.CRAWL_DELAY.as_(float),
+        fetcher_factory=fetcher_factory,
+        extract_links_fn=providers.Callable(
+            lambda crs: crs.extract_links,
+            content_review_service,
+        ),
+    )
     
     # Crawler - Factory to allow multiple instances with different configs
     crawler = providers.Factory(
         Crawler,
-        pages_repo=pages_repository,
-        links_repo=links_repository,
-        delay=config.CRAWL_DELAY.as_(float),
-        user_agent=config.USER_AGENT.as_(str),
-        http_service=http_service,
-        fetcher=page_fetcher,
-        headless_fetcher=headless_fetcher,
-        fetcher_factory=fetcher_factory,
-        content_review_service=content_review_service,
-        robots_service=robots_service,
-        link_processor=link_processor,
-        fetch_persist_service=page_fetch_persist_service,
-        crawl_policy=crawl_policy
+        executor=crawl_executor,
     )
 
     # Scheduler - Singleton instance

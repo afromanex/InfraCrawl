@@ -5,11 +5,12 @@ from typing import Callable, Optional
 
 from infracrawl.domain.crawl_context import CrawlContext
 from infracrawl.domain.crawl_result import CrawlResult
+from infracrawl.domain.http_response import HttpResponse
+from infracrawl.services.fetcher_factory import FetcherFactory
 
 logger = logging.getLogger(__name__)
 
 
-FetchFn = Callable[[str, object, str], object]
 ExtractLinksFn = Callable[[str, str], list]
 
 
@@ -29,7 +30,7 @@ class CrawlExecutor:
         link_processor,
         fetch_persist_service,
         delay_seconds: float,
-        fetch_fn: Callable[[str, object, str], object],
+        fetcher_factory: FetcherFactory,
         extract_links_fn: Callable[[str, str], list],
     ):
         self.pages_repo = pages_repo
@@ -37,7 +38,7 @@ class CrawlExecutor:
         self.link_processor = link_processor
         self.fetch_persist_service = fetch_persist_service
         self.delay_seconds = delay_seconds
-        self.fetch_fn = fetch_fn
+        self.fetcher_factory = fetcher_factory
         self.extract_links_fn = extract_links_fn
 
     def _is_stopped(self, stop_event) -> bool:
@@ -54,7 +55,10 @@ class CrawlExecutor:
                 return None
             if context is None or getattr(context, "config", None) is None:
                 raise ValueError("context.config is required")
-            response = self.fetch_fn(url, stop_event, context.config.fetch_mode)
+            response: HttpResponse = self.fetcher_factory.get(context.config.fetch_mode).fetch(
+                url,
+                stop_event=stop_event,
+            )
         except Exception as e:
             logger.error("Fetch error for %s: %s", url, e, exc_info=True)
             return None
@@ -63,15 +67,15 @@ class CrawlExecutor:
         try:
             page = self.fetch_persist_service.extract_and_persist(
                 url,
-                getattr(response, "status_code", None),
-                getattr(response, "text", None),
+                response.status_code,
+                response.text,
                 fetched_at,
                 context=context,
             )
             logger.info(
                 "Fetched %s -> status %s, page_id=%s",
                 url,
-                getattr(response, "status_code", None),
+                response.status_code,
                 getattr(page, "page_id", None),
             )
         except Exception as e:
@@ -79,13 +83,13 @@ class CrawlExecutor:
             return None
 
         try:
-            sc = int(getattr(response, "status_code", None))
+            sc = int(response.status_code)
             if sc < 200 or sc >= 300:
-                logger.warning("Non-success status for %s: %s", url, getattr(response, "status_code", None))
+                logger.warning("Non-success status for %s: %s", url, response.status_code)
         except Exception:
-            logger.exception("Error parsing status code for %s: %s", url, getattr(response, "status_code", None))
+            logger.exception("Error parsing status code for %s: %s", url, response.status_code)
 
-        return getattr(response, "text", None)
+        return response.text
 
     def process_links(
         self,

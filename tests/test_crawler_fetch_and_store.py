@@ -2,6 +2,10 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 from infracrawl.services.crawler import Crawler
+from infracrawl.services.crawl_executor import CrawlExecutor
+from infracrawl.services.fetcher import HttpServiceFetcher
+from infracrawl.services.fetcher_factory import FetcherFactory
+from infracrawl.services.page_fetch_persist_service import PageFetchPersistService
 from infracrawl.domain.http_response import HttpResponse
 
 
@@ -10,12 +14,20 @@ def make_crawler_with(mocks=None):
     pages_repo = mocks.get("pages_repo", MagicMock())
     links_repo = mocks.get("links_repo", MagicMock())
     http_service = mocks.get("http_service", MagicMock())
-    content_review_service = mocks.get("content_review_service", MagicMock())
-    robots_service = mocks.get("robots_service", MagicMock())
-    link_processor = mocks.get("link_processor", MagicMock())
-    return Crawler(pages_repo=pages_repo, links_repo=links_repo,
-                   http_service=http_service, content_review_service=content_review_service,
-                   robots_service=robots_service, link_processor=link_processor)
+    fetcher = HttpServiceFetcher(http_service)
+    fetcher_factory = FetcherFactory(http_fetcher=fetcher, headless_fetcher=fetcher)
+
+    fetch_persist_service = PageFetchPersistService(http_service=http_service, pages_repo=pages_repo)
+    executor = CrawlExecutor(
+        pages_repo=pages_repo,
+        crawl_policy=MagicMock(),
+        link_processor=MagicMock(),
+        fetch_persist_service=fetch_persist_service,
+        delay_seconds=0,
+        fetcher_factory=fetcher_factory,
+        extract_links_fn=MagicMock(),
+    )
+    return Crawler(executor=executor)
 
 
 def test_fetch_raises_logs_and_returns_none(caplog):
