@@ -15,6 +15,7 @@ from infracrawl.services.headless_browser_fetcher import PlaywrightHeadlessFetch
 from infracrawl.services.robots_service import RobotsService
 from infracrawl.services.page_fetch_persist_service import PageFetchPersistService
 from infracrawl.services.link_processor import LinkProcessor
+from infracrawl.services.link_persister import LinkPersister
 from infracrawl.services.content_review_service import ContentReviewService
 from infracrawl.services.crawl_executor import CrawlExecutor
 from infracrawl.services.crawl_registry import InMemoryCrawlRegistry
@@ -128,12 +129,17 @@ class Container(containers.DeclarativeContainer):
         http_service=http_service,
         pages_repo=pages_repository
     )
+
+    link_persister = providers.Singleton(
+        LinkPersister,
+        pages_repo=pages_repository,
+        links_repo=links_repository,
+    )
     
     link_processor = providers.Singleton(
         LinkProcessor,
         content_review_service=content_review_service,
-        pages_repo=pages_repository,
-        links_repo=links_repository
+        link_persister=link_persister,
     )
     
     config_service = providers.Singleton(

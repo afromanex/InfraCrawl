@@ -2,6 +2,7 @@ import pytest
 from unittest.mock import MagicMock
 from infracrawl.services.crawl_executor import CrawlExecutor
 from infracrawl.services.link_processor import LinkProcessor
+from infracrawl.services.link_persister import LinkPersister
 from infracrawl.domain.config import CrawlerConfig
 from infracrawl.domain.http_response import HttpResponse
 
@@ -15,7 +16,8 @@ def executor_with_mocks():
     fetcher_factory.get.return_value = fetcher
 
     content_review_service = MagicMock()
-    link_processor = LinkProcessor(content_review_service, pages_repo, links_repo)
+    link_persister = LinkPersister(pages_repo, links_repo)
+    link_processor = LinkProcessor(content_review_service, link_persister)
 
     crawl_policy = MagicMock()
     crawl_policy.should_skip_due_to_depth.return_value = False

@@ -2,17 +2,16 @@ import logging
 from typing import Callable, Optional
 from urllib.parse import urlparse
 
-from infracrawl.domain import Link
+from infracrawl.services.link_persister import LinkPersister
 from infracrawl.domain.crawl_context import CrawlContext
 
 logger = logging.getLogger(__name__)
 
 # TODO: SRP - LinkProcessor does 3 jobs: (1) calls content_review_service.extract_links (2) persists links via links_repo (3) schedules crawls via callback. Concrete risk: changing link storage (batch inserts) requires editing crawl scheduling logic. Minimal fix: extract LinkPersister class with persist(from_id, to_id, anchor); processor focuses on orchestration.
 class LinkProcessor:
-    def __init__(self, content_review_service, pages_repo, links_repo):
+    def __init__(self, content_review_service, link_persister: LinkPersister):
         self.content_review_service = content_review_service
-        self.pages_repo = pages_repo
-        self.links_repo = links_repo
+        self.link_persister = link_persister
 
     def _same_host(self, base: str, other: str) -> bool:
         try:
@@ -50,21 +49,9 @@ class LinkProcessor:
         
         if not same_host_links:
             return
-        
-        # Batch ensure all pages (single DB query)
-        link_urls = [url for url, _ in same_host_links]
-        url_to_id = self.pages_repo.ensure_pages_batch(link_urls)
-        
-        # Create link objects for batch insert
-        # TODO: Link domain object expects link_id: int but gets None
-        # CLAUDE: Domain model should use Optional[int] for link_id since repo assigns it. Low priority fix.
-        link_objects = [
-            Link(link_id=None, link_from_id=from_id, link_to_id=url_to_id[link_url], anchor_text=anchor)
-            for link_url, anchor in same_host_links
-        ]
-        
-        # Batch insert all links (single DB transaction)
-        self.links_repo.insert_links_batch(link_objects)
+
+        # Persist links (batch DB work)
+        self.link_persister.persist_links(from_id=from_id, links=same_host_links)
         
         # Schedule crawls for next depth
         if depth - 1 >= 0 and crawl_callback is not None:
