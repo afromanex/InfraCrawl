@@ -1,9 +1,11 @@
 from typing import Any, Optional, Protocol
 import logging
 import os
+from datetime import datetime, timezone
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
+from apscheduler.triggers.date import DateTrigger
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +60,7 @@ class SchedulerService:
         self._sched.start()
         logger.info("Scheduler started")
         self.load_and_schedule_all()
+        self._recover_incomplete_runs_on_startup()
         # schedule periodic config watcher to keep DB in sync with disk
         try:
             # TODO: IntervalTrigger already imported at top - duplicate import inside method is unnecessary.
@@ -73,6 +76,70 @@ class SchedulerService:
             logger.info("Scheduled config watcher every %s seconds", self._config_watch_interval)
         except Exception:
             logger.exception("Could not schedule config watcher")
+
+    def _recover_incomplete_runs_on_startup(self):
+        """Best-effort recovery for service disruptions.
+
+        Level 1 recovery: mark any DB crawl runs left incomplete (no end_timestamp)
+        as finished with a clear exception message.
+
+        Optionally, restart those crawls from root by scheduling an immediate job.
+        """
+        if self.crawls_repo is None:
+            return
+        if not self._sched:
+            return
+
+        mode = os.getenv("INFRACRAWL_RECOVERY_MODE", "mark").strip().lower()
+        if mode in {"off", "0", "false", "none"}:
+            return
+
+        within_seconds = None
+        within_raw = os.getenv("INFRACRAWL_RECOVERY_WITHIN_SECONDS")
+        if within_raw:
+            try:
+                within_seconds = int(within_raw)
+            except Exception:
+                logger.exception("Invalid INFRACRAWL_RECOVERY_WITHIN_SECONDS: %r", within_raw)
+                within_seconds = None
+
+        message = os.getenv("INFRACRAWL_RECOVERY_MESSAGE", "job found incomplete on startup")
+
+        try:
+            configs = self.config_service.list_configs()
+        except Exception:
+            logger.exception("Could not list configs for recovery")
+            return
+
+        for db_cfg in configs:
+            cfg_id = getattr(db_cfg, "config_id", None)
+            cfg_path = getattr(db_cfg, "config_path", None)
+            if cfg_id is None or not cfg_path:
+                continue
+
+            try:
+                count = self.crawls_repo.mark_incomplete_runs(cfg_id, within_seconds=within_seconds, message=message)
+            except Exception:
+                logger.exception("Failed marking incomplete runs for config %s", cfg_path)
+                continue
+
+            if count <= 0:
+                continue
+
+            logger.info("Recovered %s incomplete run(s) for %s", count, cfg_path)
+
+            if mode == "restart":
+                try:
+                    job_id = f"recovery:{cfg_path}"
+                    self._sched.add_job(
+                        lambda p=cfg_path: self._execute_scheduled_crawl(p),
+                        trigger=DateTrigger(run_date=datetime.now(timezone.utc)),
+                        id=job_id,
+                        replace_existing=True,
+                    )
+                    logger.info("Scheduled recovery restart for %s", cfg_path)
+                except Exception:
+                    logger.exception("Failed scheduling recovery restart for %s", cfg_path)
 
     def shutdown(self, wait: bool = True):
         if not self._sched:

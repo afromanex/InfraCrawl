@@ -114,3 +114,33 @@ class CrawlsRepository:
                 logging.exception("Failed cleaning pages/links for config %s", config_id)
 
         return count
+
+    def mark_incomplete_runs(self, config_id: int, within_seconds: Optional[int] = None, message: Optional[str] = None) -> int:
+        """Mark recent incomplete runs for a config as finished.
+
+        This is intentionally non-destructive: it does NOT delete any pages or links.
+        Returns the number of runs marked finished.
+        """
+        from datetime import timedelta
+
+        now = datetime.utcnow()
+        cutoff = None
+        if within_seconds is not None:
+            cutoff = now - timedelta(seconds=within_seconds)
+
+        with self.get_session() as session:
+            q = select(DBCrawlRun).where(DBCrawlRun.config_id == config_id, DBCrawlRun.end_timestamp.is_(None))
+            if cutoff is not None:
+                q = q.where(DBCrawlRun.start_timestamp >= cutoff)
+            rows = session.execute(q).scalars().all()
+            count = 0
+            for r in rows:
+                r.end_timestamp = now
+                r.exception = message or "job found incomplete on startup"
+                session.add(r)
+                count += 1
+            if count:
+                session.commit()
+            else:
+                session.rollback()
+            return count
