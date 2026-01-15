@@ -103,8 +103,10 @@ class CrawlersRouter:
 
         def _run_and_track(cfg, cid=None, stop_event=None, run_id=None):
             try:
-                # TODO: Clever ternary with conditional call - just use simple if/else: if stop_event: callback(cfg, stop_event) else: callback(cfg)
-                self.start_crawl_callback(cfg, stop_event) if stop_event is not None else self.start_crawl_callback(cfg)
+                if stop_event is not None:
+                    self.start_crawl_callback(cfg, stop_event)
+                else:
+                    self.start_crawl_callback(cfg)
                 if cid and self.crawl_registry is not None:
                     self.crawl_registry.finish(cid, status="finished")
                 if run_id is not None:

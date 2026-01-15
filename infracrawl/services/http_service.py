@@ -2,6 +2,7 @@ import requests
 from typing import Callable
 
 from infracrawl.domain.http_response import HttpResponse
+from infracrawl.exceptions import HttpFetchError
 
 
 class HttpService:
@@ -17,12 +18,14 @@ class HttpService:
         self.timeout = timeout
         self.http_client = http_client
 
-    # TODO: No error handling - requests.get raises on DNS failure, SSL error, connection error, timeout
-    # CLAUDE: Acknowledged - defer until needed in production
+    # Network/transport failures are normalized by raising HttpFetchError.
     def fetch(self, url: str) -> HttpResponse:
         """Fetch URL and return response with status code and body text."""
         headers = {"User-Agent": self.user_agent}
-        resp = self.http_client(url, headers=headers, timeout=self.timeout)
+        try:
+            resp = self.http_client(url, headers=headers, timeout=self.timeout)
+        except requests.exceptions.RequestException as e:
+            raise HttpFetchError(url, e) from e
         return HttpResponse(resp.status_code, resp.text)
 
     def fetch_robots(self, robots_url: str) -> HttpResponse:

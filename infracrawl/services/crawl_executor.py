@@ -7,6 +7,7 @@ from infracrawl.domain.crawl_context import CrawlContext
 from infracrawl.domain.crawl_result import CrawlResult
 from infracrawl.domain.http_response import HttpResponse
 from infracrawl.domain.visited_tracker import VisitedTracker
+from infracrawl.exceptions import HttpFetchError
 from infracrawl.services.fetcher_factory import FetcherFactory
 
 logger = logging.getLogger(__name__)
@@ -62,6 +63,9 @@ class CrawlExecutor:
                 url,
                 stop_event=stop_event,
             )
+        except HttpFetchError as e:
+            logger.warning("Fetch failed for %s: %s", url, e)
+            return None
         except Exception as e:
             logger.error("Fetch error for %s: %s", url, e, exc_info=True)
             return None

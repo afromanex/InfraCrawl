@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
+from apscheduler.triggers.interval import IntervalTrigger
 
 from infracrawl.services.crawl_run_recovery import CrawlRunRecovery
 from infracrawl.services.scheduled_crawl_job_runner import ScheduledCrawlJobRunner
@@ -85,10 +86,7 @@ class SchedulerService:
         self._recover_incomplete_runs_on_startup()
         # schedule periodic config watcher to keep DB in sync with disk
         try:
-            # TODO: IntervalTrigger already imported at top - duplicate import inside method is unnecessary.
             # use an interval trigger to periodically scan configs
-            from apscheduler.triggers.interval import IntervalTrigger
-
             self._sched.add_job(
                 self._run_config_watcher,
                 trigger=IntervalTrigger(seconds=self._config_watch_interval),

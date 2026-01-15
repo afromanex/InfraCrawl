@@ -14,8 +14,7 @@ class CrawlContext:
     def __init__(self, config: Optional[CrawlerConfig] = None, visited_tracker: Optional[VisitedTracker] = None):
         # store the full config; roots and max_depth come from here
         self.config = config
-        # TODO: Complex defensive code - getattr(config, 'max_depth', None) is not None. If config exists, max_depth should always exist. Simplify: self.max_depth = config.max_depth if config else None
-        self.max_depth = config.max_depth if (config and getattr(config, 'max_depth', None) is not None) else None
+        self.max_depth = config.max_depth if config else None
         # current_root is set when iterating multiple root URLs
         self.current_root: Optional[str] = None
         # Visited URL tracking delegated to separate class (SRP fix)
