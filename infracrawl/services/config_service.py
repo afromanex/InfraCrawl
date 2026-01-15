@@ -1,10 +1,12 @@
-import os
 import logging
-import yaml
 from infracrawl.repository.configs import ConfigsRepository
 from infracrawl.domain.config import CrawlerConfig
 from infracrawl.exceptions import ConfigNotFoundError
 from typing import Optional
+
+from infracrawl.services.config_file_store import ConfigFileStore
+from infracrawl.services.crawler_config_parser import CrawlerConfigParser
+from infracrawl.services.config_syncer import ConfigSyncer
 
 logger = logging.getLogger(__name__)
 
@@ -12,91 +14,29 @@ logger = logging.getLogger(__name__)
 class ConfigService:
     """Manages crawler configurations, synchronizing YAML files with database."""
     
-    def __init__(self, configs_repo: ConfigsRepository, configs_dir: Optional[str] = None):
+    def __init__(
+        self,
+        configs_repo: ConfigsRepository,
+        configs_dir: Optional[str] = None,
+        file_store: Optional[ConfigFileStore] = None,
+        parser: Optional[CrawlerConfigParser] = None,
+        syncer: Optional[ConfigSyncer] = None,
+    ):
         self.configs_repo = configs_repo
-        self.configs_dir = configs_dir or os.path.join(os.getcwd(), "configs")
-    
-    def _list_config_files(self) -> list[str]:
-        """Return list of YAML filenames in configs directory."""
-        return [fname for fname in os.listdir(self.configs_dir)
-                if fname.endswith(".yml") or fname.endswith(".yaml")]
-    
-    def _load_config_from_file(self, config_path: str, config_id: Optional[int] = None,
-                              created_at=None, updated_at=None) -> Optional[CrawlerConfig]:
-        """Load a CrawlerConfig from a YAML file.
-        
-        Args:
-            config_path: Filename or absolute path to config file
-            config_id: Optional database ID to include in config
-            created_at: Optional creation timestamp
-            updated_at: Optional update timestamp
-            
-        Returns:
-            CrawlerConfig object or None if file cannot be loaded
-        """
-        full_path = config_path if os.path.isabs(config_path) else os.path.join(self.configs_dir, config_path)
-        if not os.path.isfile(full_path):
-            return None
-        
-        try:
-            with open(full_path, "r", encoding="utf-8") as f:
-                data = yaml.safe_load(f)
-            
-            if not isinstance(data, dict):
-                logger.warning("Config file %s does not contain a dictionary", config_path)
-                return None
+        configs_dir_final = configs_dir
+        if configs_dir_final is None:
+            import os
 
-            fetch_mode = data.get("fetch_mode")
-            if fetch_mode is None:
-                logger.warning("Config file %s is missing required field 'fetch_mode'", config_path)
-                return None
-            
-            return CrawlerConfig(
-                config_id=config_id,
-                config_path=os.path.basename(config_path),
-                root_urls=data.get("root_urls", []),
-                max_depth=data.get("max_depth"),
-                robots=data.get("robots", True),
-                refresh_days=data.get("refresh_days"),
-                fetch_mode=fetch_mode,
-                schedule=data.get("schedule"),
-                created_at=created_at,
-                updated_at=updated_at
-            )
-        except Exception as e:
-            logger.warning("Could not load config %s: %s", config_path, e)
-            return None
-    
-    def _get_config_yaml_content(self, config_path: str) -> Optional[str]:
-        """Return raw YAML content of a config file."""
-        full_path = config_path if os.path.isabs(config_path) else os.path.join(self.configs_dir, config_path)
-        if not os.path.isfile(full_path):
-            return None
-        try:
-            with open(full_path, "r", encoding="utf-8") as f:
-                return f.read()
-        except Exception as e:
-            logger.warning("Could not read config file %s: %s", config_path, e)
-            return None
+            configs_dir_final = os.path.join(os.getcwd(), "configs")
+        self.configs_dir = configs_dir_final
+
+        self.file_store = file_store or ConfigFileStore(configs_dir=self.configs_dir)
+        self.parser = parser or CrawlerConfigParser()
+        self.syncer = syncer or ConfigSyncer(file_store=self.file_store, configs_repo=self.configs_repo, parser=self.parser)
     
     def sync_configs_with_disk(self):
         """Scan configs directory, upsert to DB, remove orphaned DB configs."""
-        loaded_paths = set()
-        
-        for fname in self._list_config_files():
-            config_obj = self._load_config_from_file(fname)
-            if config_obj:
-                result = self.configs_repo.upsert_config(config_obj)
-                loaded_paths.add(fname)
-                logger.info("Loaded config %s -> id=%s", fname, result.config_id)
-        
-        # Remove configs in DB that are not present on disk
-        existing_configs = self.configs_repo.list_configs()
-        existing_paths = set(c.config_path for c in existing_configs)
-        to_remove = existing_paths - loaded_paths
-        for path in to_remove:
-            self.configs_repo.delete_config(path)
-            logger.info("Removed DB config not present on disk: %s", path)
+        self.syncer.sync()
 
     def list_configs(self):
         """Return all configs in the DB (name + config_path only)."""
@@ -111,16 +51,25 @@ class ConfigService:
         db_cfg = self.configs_repo.get_config(config_path)
         if not db_cfg:
             raise ConfigNotFoundError(config_path, "not found in database")
-        
-        full_config = self._load_config_from_file(
-            db_cfg.config_path,
+
+        try:
+            data = self.file_store.load_yaml_dict(db_cfg.config_path)
+        except Exception as e:
+            logger.warning("Could not load config %s: %s", db_cfg.config_path, e)
+            data = None
+        if not isinstance(data, dict):
+            raise ConfigNotFoundError(config_path, "YAML file missing or invalid")
+
+        full_config = self.parser.parse(
+            config_path=db_cfg.config_path,
+            data=data,
             config_id=db_cfg.config_id,
             created_at=db_cfg.created_at,
-            updated_at=db_cfg.updated_at
+            updated_at=db_cfg.updated_at,
         )
         if not full_config:
             raise ConfigNotFoundError(config_path, "YAML file missing or invalid")
-        
+
         return full_config
 
     def get_config_yaml(self, config_path: str) -> Optional[str]:
@@ -128,4 +77,8 @@ class ConfigService:
         db_cfg = self.configs_repo.get_config(config_path)
         if not db_cfg:
             return None
-        return self._get_config_yaml_content(db_cfg.config_path)
+        try:
+            return self.file_store.read_raw_yaml(db_cfg.config_path)
+        except Exception as e:
+            logger.warning("Could not read config file %s: %s", db_cfg.config_path, e)
+            return None
