@@ -1,4 +1,5 @@
-from typing import Set
+from collections import OrderedDict
+from typing import Optional
 
 
 class VisitedTracker:
@@ -12,19 +13,32 @@ class VisitedTracker:
     - Reuse across different crawl contexts
     """
     
-    def __init__(self):
-        # TODO: visited set grows unbounded - memory leak for large crawls
-        # CLAUDE: Options: 1) LRU cache (max N URLs) 2) Bloom filter (probabilistic, small memory) 3) Database-backed (slow). For <100K URLs, set is fine.
-        # TODO: No persistence - crawl cannot resume after crash
-        # CLAUDE: Agreed - defer. Would need: visited URLs table, crawl_state table with resume token, queue of pending URLs.
-        # TODO: QUESTION: Should visited be moved to database or use bloom filter?
-        # CLAUDE: "visited" = URLs already crawled. "Bloom filter" = probabilistic data structure using <1MB for millions of URLs but 0.1% false positives. DB = persistent but slow. Current in-memory set OK for now.
-        self._visited: Set[str] = set()
+    def __init__(self, max_size: Optional[int] = 100_000):
+        """Create a visited tracker.
+
+        `max_size` bounds memory usage by evicting least-recently-added URLs.
+        If `max_size` is None or <= 0, the tracker behaves as unbounded.
+        """
+        self._max_size = int(max_size) if max_size is not None else None
+        if self._max_size is not None and self._max_size <= 0:
+            self._max_size = None
+
+        # OrderedDict gives us a lightweight LRU-like set.
+        self._visited: "OrderedDict[str, None]" = OrderedDict()
     
     def mark(self, url: str) -> None:
         """Mark a URL as visited."""
-        self._visited.add(url)
+        if url in self._visited:
+            self._visited.move_to_end(url)
+            return
+        self._visited[url] = None
+        if self._max_size is not None:
+            while len(self._visited) > self._max_size:
+                self._visited.popitem(last=False)
     
     def is_visited(self, url: str) -> bool:
         """Check if a URL has been visited."""
-        return url in self._visited
+        if url in self._visited:
+            self._visited.move_to_end(url)
+            return True
+        return False

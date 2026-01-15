@@ -13,6 +13,7 @@ from infracrawl.services.fetcher import HttpServiceFetcher
 from infracrawl.services.fetcher_factory import FetcherFactory
 from infracrawl.services.headless_browser_fetcher import PlaywrightHeadlessFetcher, PlaywrightHeadlessOptions
 from infracrawl.services.robots_service import RobotsService
+from infracrawl.services.robots_cache import RobotsCache
 from infracrawl.services.page_fetch_persist_service import PageFetchPersistService
 from infracrawl.services.link_processor import LinkProcessor
 from infracrawl.services.link_persister import LinkPersister
@@ -25,6 +26,48 @@ from infracrawl import config as env
 from sqlalchemy.orm import sessionmaker
 
 
+# Environment variables used by the container (read via `infracrawl.config` helpers).
+#
+# Notes:
+# - Types are enforced by the helper used (`get_int_env`, `get_float_env`, etc.).
+# - Defaults shown here are the effective defaults used when the env var is unset.
+# - These are injected into services via `config = providers.Configuration(default=ENV)`.
+#
+# DATABASE_URL (str | optional)
+#   PostgreSQL connection string. If unset, the app will rely on whatever default behavior
+#   `make_engine()` implements for a missing URL (tests typically provide one).
+#
+# USER_AGENT (str, default: "InfraCrawl/0.1")
+#   User-Agent header for outbound HTTP requests and robots.txt fetching.
+#
+# HTTP_TIMEOUT (int seconds, default: 10)
+#   Timeout for outbound HTTP requests. Also reused for headless fetcher timeout.
+#
+# CRAWL_DELAY (float seconds, default: 1.0)
+#   Politeness delay between page fetches within a crawl.
+#
+# INFRACRAWL_CONFIG_WATCH_INTERVAL (int seconds, default: 60)
+#   How frequently the scheduler polls for config changes / scheduled work.
+#
+# INFRACRAWL_RECOVERY_MODE (str, default: "restart")
+#   Startup behavior when incomplete crawl runs are found (e.g. "restart").
+#   Value is normalized with `.strip().lower()`.
+#
+# INFRACRAWL_RECOVERY_WITHIN_SECONDS (int seconds | optional)
+#   If set, only attempts recovery for runs whose last activity is within this window.
+#
+# INFRACRAWL_RECOVERY_MESSAGE (str, default: "job found incomplete on startup")
+#   Stored/logged message used when recovery logic detects an incomplete run.
+#
+# INFRACRAWL_VISITED_MAX_URLS (int, default: 100000)
+#   Upper bound for the per-crawl visited URL tracker (LRU eviction) to prevent
+#   unbounded memory growth on large crawls.
+#
+# INFRACRAWL_ROBOTS_CACHE_MAX_SIZE (int, default: 2048)
+#   Max number of domains to keep in the in-memory robots.txt cache (LRU eviction).
+#
+# INFRACRAWL_ROBOTS_CACHE_TTL_SECONDS (int seconds, default: 3600)
+#   TTL for robots.txt cache entries. Entries older than TTL are treated as missing.
 ENV = {
     "DATABASE_URL": env.get_optional_str_env("DATABASE_URL"),
     "USER_AGENT": env.get_str_env("USER_AGENT", "InfraCrawl/0.1"),
@@ -34,6 +77,9 @@ ENV = {
     "INFRACRAWL_RECOVERY_MODE": env.get_str_env("INFRACRAWL_RECOVERY_MODE", "restart").strip().lower(),
     "INFRACRAWL_RECOVERY_WITHIN_SECONDS": env.get_optional_int_env("INFRACRAWL_RECOVERY_WITHIN_SECONDS"),
     "INFRACRAWL_RECOVERY_MESSAGE": env.get_str_env("INFRACRAWL_RECOVERY_MESSAGE", "job found incomplete on startup"),
+    "INFRACRAWL_VISITED_MAX_URLS": env.get_int_env("INFRACRAWL_VISITED_MAX_URLS", 100_000),
+    "INFRACRAWL_ROBOTS_CACHE_MAX_SIZE": env.get_int_env("INFRACRAWL_ROBOTS_CACHE_MAX_SIZE", 2048),
+    "INFRACRAWL_ROBOTS_CACHE_TTL_SECONDS": env.get_int_env("INFRACRAWL_ROBOTS_CACHE_TTL_SECONDS", 3600),
 }
 
 
@@ -107,11 +153,18 @@ class Container(containers.DeclarativeContainer):
         http_fetcher=page_fetcher,
         headless_fetcher=headless_fetcher,
     )
+
+    robots_cache = providers.Singleton(
+        RobotsCache,
+        max_size=config.INFRACRAWL_ROBOTS_CACHE_MAX_SIZE.as_(int),
+        ttl_seconds=config.INFRACRAWL_ROBOTS_CACHE_TTL_SECONDS.as_(int),
+    )
     
     robots_service = providers.Singleton(
         RobotsService,
         http_service=http_service,
-        user_agent=config.USER_AGENT.as_(str)
+        user_agent=config.USER_AGENT.as_(str),
+        cache=robots_cache,
     )
     
     content_review_service = providers.Singleton(
@@ -159,6 +212,7 @@ class Container(containers.DeclarativeContainer):
             lambda crs: crs.extract_links,
             content_review_service,
         ),
+        visited_tracker_max_urls=config.INFRACRAWL_VISITED_MAX_URLS.as_(int),
     )
 
     # Scheduler - Singleton instance

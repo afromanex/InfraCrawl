@@ -6,6 +6,7 @@ from typing import Callable, Optional
 from infracrawl.domain.crawl_context import CrawlContext
 from infracrawl.domain.crawl_result import CrawlResult
 from infracrawl.domain.http_response import HttpResponse
+from infracrawl.domain.visited_tracker import VisitedTracker
 from infracrawl.services.fetcher_factory import FetcherFactory
 
 logger = logging.getLogger(__name__)
@@ -32,6 +33,7 @@ class CrawlExecutor:
         delay_seconds: float,
         fetcher_factory: FetcherFactory,
         extract_links_fn: Callable[[str, str], list],
+        visited_tracker_max_urls: int = 100_000,
     ):
         self.pages_repo = pages_repo
         self.crawl_policy = crawl_policy
@@ -40,6 +42,7 @@ class CrawlExecutor:
         self.delay_seconds = delay_seconds
         self.fetcher_factory = fetcher_factory
         self.extract_links_fn = extract_links_fn
+        self.visited_tracker_max_urls = int(visited_tracker_max_urls)
 
     def _is_stopped(self, stop_event) -> bool:
         return stop_event is not None and getattr(stop_event, "is_set", lambda: False)()
@@ -136,7 +139,11 @@ class CrawlExecutor:
         if config is None:
             raise ValueError("config is required for crawl")
 
-        context = CrawlContext(config)
+        # Prevent unbounded memory usage on large crawls.
+        context = CrawlContext(
+            config,
+            visited_tracker=VisitedTracker(max_size=self.visited_tracker_max_urls),
+        )
 
         pages_crawled = 0
         stopped = False
