@@ -1,12 +1,15 @@
 import os
+import logging
+from pathlib import Path
+
 try:
 	from dotenv import load_dotenv
-	load_dotenv()
-except Exception:
-	# python-dotenv not installed in this environment; rely on environment variables
-	import sys
-	print("Warning: python-dotenv not available, using environment variables only", file=sys.stderr)
-	pass
+except ImportError:
+	logging.warning("python-dotenv not available; using environment variables only")
+else:
+	loaded = load_dotenv()
+	if not loaded and Path(".env").exists():
+		raise RuntimeError(".env file present but failed to load")
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 USER_AGENT = os.getenv("USER_AGENT", "InfraCrawl/0.1")
