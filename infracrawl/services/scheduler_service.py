@@ -4,7 +4,9 @@ from datetime import datetime, timezone
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
-from apscheduler.triggers.date import DateTrigger
+
+from infracrawl.services.crawl_run_recovery import CrawlRunRecovery
+from infracrawl.services.scheduled_crawl_job_runner import ScheduledCrawlJobRunner
 
 logger = logging.getLogger(__name__)
 
@@ -61,6 +63,18 @@ class SchedulerService:
         self._recovery_within_seconds = recovery_within_seconds
         self._recovery_message = recovery_message
 
+        self._job_runner = ScheduledCrawlJobRunner(
+            config_provider=self.config_service,
+            start_crawl_callback=self.start_crawl_callback,
+            crawl_registry=self.crawl_registry,
+            crawls_repo=self.crawls_repo,
+        )
+        self._recovery = CrawlRunRecovery(
+            config_provider=self.config_service,
+            crawls_repo=self.crawls_repo,
+            schedule_restart_fn=self._execute_scheduled_crawl,
+        )
+
     def start(self):
         if self._sched is not None:
             return
@@ -88,56 +102,15 @@ class SchedulerService:
     def _recover_incomplete_runs_on_startup(self):
         """Best-effort recovery for service disruptions.
 
-        Level 1 recovery: mark any DB crawl runs left incomplete (no end_timestamp)
-        as finished with a clear exception message.
-
-        Optionally, restart those crawls from root by scheduling an immediate job.
+        Kept as a SchedulerService method for backwards compatibility and tests,
+        but delegated to CrawlRunRecovery.
         """
-        if self.crawls_repo is None:
-            return
-        if not self._sched:
-            return
-
-        if self._recovery_mode in {"off", "0", "false", "none"}:
-            return
-        within_seconds = self._recovery_within_seconds
-        message = self._recovery_message
-
-        try:
-            configs = self.config_service.list_configs()
-        except Exception:
-            logger.exception("Could not list configs for recovery")
-            return
-
-        for db_cfg in configs:
-            cfg_id = getattr(db_cfg, "config_id", None)
-            cfg_path = getattr(db_cfg, "config_path", None)
-            if cfg_id is None or not cfg_path:
-                continue
-
-            try:
-                count = self.crawls_repo.mark_incomplete_runs(cfg_id, within_seconds=within_seconds, message=message)
-            except Exception:
-                logger.exception("Failed marking incomplete runs for config %s", cfg_path)
-                continue
-
-            if count <= 0:
-                continue
-
-            logger.info("Recovered %s incomplete run(s) for %s", count, cfg_path)
-
-            if self._recovery_mode == "restart":
-                try:
-                    job_id = f"recovery:{cfg_path}"
-                    self._sched.add_job(
-                        lambda p=cfg_path: self._execute_scheduled_crawl(p),
-                        trigger=DateTrigger(run_date=datetime.now(timezone.utc)),
-                        id=job_id,
-                        replace_existing=True,
-                    )
-                    logger.info("Scheduled recovery restart for %s", cfg_path)
-                except Exception:
-                    logger.exception("Failed scheduling recovery restart for %s", cfg_path)
+        self._recovery.recover(
+            sched=self._sched,
+            mode=self._recovery_mode,
+            within_seconds=self._recovery_within_seconds,
+            message=self._recovery_message,
+        )
 
     def shutdown(self, wait: bool = True):
         if not self._sched:
@@ -185,50 +158,8 @@ class SchedulerService:
     def _execute_scheduled_crawl(self, cfg_path: str):
         """Execute a scheduled crawl job for the given config path."""
         # When APScheduler calls this job, we perform the same logic as the
-        # HTTP `/crawl` endpoint: register in registry and call the
-        # crawl callback cooperatively with stop event.
-        try:
-            cfg = self.config_service.get_config(cfg_path)
-        except Exception as e:
-            logger.warning("Scheduled config not found: %s - %s", cfg_path, e)
-            return
-        
-        try:
-            # create DB run record
-            run_id = None
-            try:
-                run_id = self.crawls_repo.create_run(cfg.config_id)
-            except Exception:
-                logger.exception("Could not create run record for %s", cfg_path)
-
-            cid = None
-            if self.crawl_registry is not None:
-                cid = self.crawl_registry.start(config_name=cfg.config_path, config_id=cfg.config_id)
-            stop_event = self.crawl_registry.get_stop_event(cid) if self.crawl_registry is not None else None
-            try:
-                # call crawl callback directly (this may block until finished);
-                # APSScheduler runs this in a worker thread so it's fine.
-                self.start_crawl_callback(cfg, stop_event) if stop_event is not None else self.start_crawl_callback(cfg)
-                if cid and self.crawl_registry is not None:
-                    self.crawl_registry.finish(cid, status="finished")
-                # finish DB run record
-                if run_id is not None:
-                    try:
-                        self.crawls_repo.finish_run(run_id)
-                    except Exception:
-                        logger.exception("Could not finish run record for %s run=%s", cfg_path, run_id)
-            except Exception as e:
-                if cid and self.crawl_registry is not None:
-                    self.crawl_registry.finish(cid, status="failed", error=str(e))
-                # record exception in DB run
-                if run_id is not None:
-                    try:
-                        self.crawls_repo.finish_run(run_id, exception=str(e))
-                    except Exception:
-                        logger.exception("Could not finish run record (failed) for %s run=%s", cfg_path, run_id)
-                logger.exception("Scheduled crawl failed for %s", cfg_path)
-        except Exception:
-            logger.exception("Error running scheduled job for %s", cfg_path)
+        # HTTP `/crawl` endpoint.
+        self._job_runner.run(cfg_path)
 
     def _run_config_watcher(self):
         """Periodic job: sync configs on disk with DB and reload scheduled crawl jobs."""
