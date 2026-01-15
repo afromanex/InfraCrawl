@@ -6,7 +6,6 @@ import logging
 from infracrawl.services.config_service import ConfigService
 from infracrawl.api.routers import (
     create_configs_router,
-    create_pages_router,
     create_crawlers_router,
     create_systems_router,
 )
@@ -62,7 +61,6 @@ def create_app(pages_repo, links_repo, config_service: ConfigService, start_craw
     app.include_router(create_systems_router())
     # Protect configuration and crawler control endpoints with admin token.
     app.include_router(create_configs_router(config_service), dependencies=[Depends(require_admin)])
-    app.include_router(create_pages_router(pages_repo, config_service))
     app.include_router(create_crawlers_router(pages_repo, links_repo, config_service, start_crawl_callback, crawl_registry, crawls_repo), dependencies=[Depends(require_admin)])
 
     # Serve minimal UI
