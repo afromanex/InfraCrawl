@@ -76,21 +76,9 @@ class Crawler:
             link_processor=self.link_processor,
             fetch_persist_service=self.fetch_persist_service,
             delay_seconds=self.delay,
-            fetch_fn=lambda url, stop_event, fetch_mode: self.fetch(url, stop_event=stop_event, fetch_mode=fetch_mode),
-            extract_links_fn=lambda base_url, html: self.extract_links(base_url, html),
+            fetch_fn=lambda url, stop_event, fetch_mode: self.fetcher_factory.get(fetch_mode).fetch(url, stop_event=stop_event),
+            extract_links_fn=lambda base_url, html: self.content_review_service.extract_links(base_url, html),
         )
-
-    # TODO: Liskov Substitution risk - fetch() is overridden in tests (see test_crawler_behavior.py) without formal contract. Subclass could return incompatible type breaking _fetch_and_store. Refactor: define IHttpFetcher protocol (fetch(url) -> tuple[int, str]); accept in __init__ instead of subclassing.
-    # TODO: fetch(), _allowed_by_robots(), extract_links() are unnecessary wrapper methods. Call self.http_service.fetch() directly in _fetch_and_store, inline other wrappers.
-    def fetch(self, url: str, stop_event=None, fetch_mode: str = None):
-        chosen = self.fetcher_factory.get(fetch_mode)
-        return chosen.fetch(url, stop_event=stop_event)
-
-    def _allowed_by_robots(self, url: str, robots_enabled: bool) -> bool:
-        return self.robots_service.allowed_by_robots(url, robots_enabled)
-
-    def extract_links(self, base_url: str, html: str):
-        return self.content_review_service.extract_links(base_url, html)
 
     def crawl(self, config: CrawlerConfig, stop_event=None) -> CrawlResult:
         return self._executor.crawl(config, stop_event)

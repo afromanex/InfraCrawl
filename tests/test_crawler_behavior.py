@@ -22,13 +22,13 @@ def test_crawl_respects_max_depth(crawler_with_mocks):
     # Setup: ensure_page returns a fake id
     pages_repo.ensure_page.return_value = 1
     # Patch fetch to return dummy html
-    crawler.fetch = MagicMock(return_value=HttpResponse(200, '<html></html>'))
-    crawler.extract_links = MagicMock(return_value=[])
+    crawler.fetcher.fetch = MagicMock(return_value=HttpResponse(200, '<html></html>'))
+    crawler.content_review_service.extract_links = MagicMock(return_value=[])
     # Should only call ensure_page once for depth=0
     cfg = CrawlerConfig(config_id=None, config_path='p', root_urls=['http://example.com'], max_depth=0, fetch_mode="http")
     crawler.crawl(cfg)
     assert pages_repo.ensure_page.call_count == 1
-    assert crawler.fetch.call_count == 1
+    assert crawler.fetcher.fetch.call_count == 1
 
 
 def test_crawl_skips_robots(crawler_with_mocks):
@@ -36,20 +36,19 @@ def test_crawl_skips_robots(crawler_with_mocks):
     pages_repo.ensure_page.return_value = 1
     # Mock the policy's robots check
     crawler.crawl_policy.should_skip_due_to_robots = MagicMock(return_value=True)
-    crawler.fetch = MagicMock()
-    crawler.extract_links = MagicMock()
+    crawler.fetcher.fetch = MagicMock()
+    crawler.content_review_service.extract_links = MagicMock()
     cfg = CrawlerConfig(config_id=None, config_path='p', root_urls=['http://example.com'], max_depth=1, fetch_mode="http")
     crawler.crawl(cfg)
     # Should not fetch if robots disallowed
-    assert not crawler.fetch.called
+    assert not crawler.fetcher.fetch.called
 
 
 def test_crawl_refresh_days_skips_recent(crawler_with_mocks):
     crawler, pages_repo, links_repo = crawler_with_mocks
     pages_repo.ensure_page.return_value = 1
-    crawler._allowed_by_robots = MagicMock(return_value=True)
-    crawler.fetch = MagicMock()
-    crawler.extract_links = MagicMock()
+    crawler.fetcher.fetch = MagicMock()
+    crawler.content_review_service.extract_links = MagicMock()
     # Simulate config with refresh_days=10
     cfg = CrawlerConfig(config_id=123, config_path='p', root_urls=['http://example.com'], max_depth=1, robots=True, refresh_days=10, fetch_mode="http")
     # Simulate page fetched 1 day ago
@@ -58,19 +57,18 @@ def test_crawl_refresh_days_skips_recent(crawler_with_mocks):
     pages_repo.get_page_by_url.return_value = type('page', (), {'fetched_at': yesterday})
     crawler.crawl(cfg)
     # Should not fetch if fetched less than refresh_days ago
-    assert not crawler.fetch.called
+    assert not crawler.fetcher.fetch.called
 
 
 def test_crawl_inserts_links(crawler_with_mocks):
     crawler, pages_repo, links_repo = crawler_with_mocks
     # Mock batch method to return URL -> ID mapping
     pages_repo.ensure_pages_batch.return_value = {'http://example.com/next': 1}
-    crawler._allowed_by_robots = MagicMock(return_value=True)
-    crawler.fetch = MagicMock(return_value=HttpResponse(200, '<html></html>'))
-    crawler.extract_links = MagicMock(return_value=[('http://example.com/next', 'next')])
+    crawler.fetcher.fetch = MagicMock(return_value=HttpResponse(200, '<html></html>'))
+    crawler.content_review_service.extract_links = MagicMock(return_value=[('http://example.com/next', 'next')])
     links_repo.insert_links_batch = MagicMock()
     # Patch _same_host to always True
-    crawler._same_host = MagicMock(return_value=True)
+    crawler.link_processor._same_host = MagicMock(return_value=True)
     pages_repo.upsert_page.return_value = 1
     cfg = CrawlerConfig(config_id=None, config_path='p', root_urls=['http://example.com'], max_depth=1, fetch_mode="http")
     crawler.crawl(cfg)
