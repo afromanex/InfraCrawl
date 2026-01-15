@@ -36,12 +36,12 @@ def test_container_creates_services():
     http_service = container.http_service()
     robots_service = container.robots_service()
     config_service = container.config_service()
-    crawler = container.crawler()
+    crawl_executor = container.crawl_executor()
     
     assert http_service is not None
     assert robots_service is not None
     assert config_service is not None
-    assert crawler is not None
+    assert crawl_executor is not None
 
 
 def test_main_accepts_injected_container():

@@ -7,7 +7,6 @@ from infracrawl.repository.pages import PagesRepository
 from infracrawl.repository.links import LinksRepository
 from infracrawl.repository.configs import ConfigsRepository
 from infracrawl.services.config_service import ConfigService
-from infracrawl.services.crawler import Crawler
 from infracrawl.services.crawl_policy import CrawlPolicy
 from infracrawl.services.http_service import HttpService
 from infracrawl.services.fetcher import HttpServiceFetcher
@@ -155,18 +154,12 @@ class Container(containers.DeclarativeContainer):
             content_review_service,
         ),
     )
-    
-    # Crawler - Factory to allow multiple instances with different configs
-    crawler = providers.Factory(
-        Crawler,
-        executor=crawl_executor,
-    )
 
     # Scheduler - Singleton instance
     scheduler_service = providers.Singleton(
         SchedulerService,
         config_provider=config_service,
-        start_crawl_callback=crawler.provided.crawl,
+        start_crawl_callback=crawl_executor.provided.crawl,
         crawl_registry=crawl_registry,
         crawls_repo=crawls_repository,
         config_watch_interval_seconds=config.INFRACRAWL_CONFIG_WATCH_INTERVAL.as_(int),

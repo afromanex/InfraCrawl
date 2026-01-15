@@ -19,7 +19,7 @@ class CrawlExecutor:
 
     This class owns the crawl control-flow (traversal, cancellation checks, calling
     fetch/persist, and delegating link processing). It intentionally does NOT
-    construct dependencies (that stays in the DI layer / Crawler facade).
+    construct dependencies (that stays in the DI layer).
     """
 
     def __init__(

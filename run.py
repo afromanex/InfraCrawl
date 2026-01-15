@@ -28,7 +28,7 @@ def main(container: Optional[Container] = None):
     pages_repo = container.pages_repository()
     links_repo = container.links_repository()
     config_service = container.config_service()
-    crawler = container.crawler()
+    crawl_executor = container.crawl_executor()
     crawl_registry = container.crawl_registry()
     crawls_repo = container.crawls_repository()
     scheduler = container.scheduler_service()
@@ -51,7 +51,7 @@ def main(container: Optional[Container] = None):
         pages_repo,
         links_repo,
         config_service,
-        crawler.crawl,
+        crawl_executor.crawl,
         crawl_registry=crawl_registry,
         scheduler=scheduler,
         crawls_repo=crawls_repo,

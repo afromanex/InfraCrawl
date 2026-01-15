@@ -186,7 +186,7 @@ class SchedulerService:
         """Execute a scheduled crawl job for the given config path."""
         # When APScheduler calls this job, we perform the same logic as the
         # HTTP `/crawl` endpoint: register in registry and call the
-        # crawler callback cooperatively with stop event.
+        # crawl callback cooperatively with stop event.
         try:
             cfg = self.config_service.get_config(cfg_path)
         except Exception as e:
@@ -206,7 +206,7 @@ class SchedulerService:
                 cid = self.crawl_registry.start(config_name=cfg.config_path, config_id=cfg.config_id)
             stop_event = self.crawl_registry.get_stop_event(cid) if self.crawl_registry is not None else None
             try:
-                # call crawler directly (this may block until finished);
+                # call crawl callback directly (this may block until finished);
                 # APSScheduler runs this in a worker thread so it's fine.
                 self.start_crawl_callback(cfg, stop_event) if stop_event is not None else self.start_crawl_callback(cfg)
                 if cid and self.crawl_registry is not None:

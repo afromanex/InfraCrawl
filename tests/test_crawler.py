@@ -1,6 +1,5 @@
 import pytest
 from unittest.mock import MagicMock
-from infracrawl.services.crawler import Crawler
 from infracrawl.services.crawl_executor import CrawlExecutor
 from infracrawl.services.fetcher_factory import FetcherFactory
 
@@ -11,7 +10,7 @@ def mock_repos():
         'links_repo': MagicMock(),
     }
 
-def test_crawler_init_uses_injected_repos(mock_repos):
+def test_crawl_executor_init_uses_injected_collaborators(mock_repos):
     dummy_fetcher = MagicMock()
     fetcher_factory = FetcherFactory(http_fetcher=dummy_fetcher, headless_fetcher=dummy_fetcher)
     executor = CrawlExecutor(
@@ -23,5 +22,4 @@ def test_crawler_init_uses_injected_repos(mock_repos):
         fetcher_factory=fetcher_factory,
         extract_links_fn=MagicMock(),
     )
-    crawler = Crawler(executor=executor)
-    assert crawler._executor is executor
+    assert executor.pages_repo is mock_repos['pages_repo']
