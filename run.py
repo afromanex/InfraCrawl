@@ -3,7 +3,6 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import urlparse, parse_qs
 from typing import Optional
 
-from infracrawl import config
 from infracrawl.container import Container
 from infracrawl.api.server import create_app
 import uvicorn
@@ -21,15 +20,6 @@ def main(container: Optional[Container] = None):
     # Create container if not provided (dependency injection)
     if container is None:
         container = Container()
-        # Configure with environment variables and defaults
-        container.config.database_url.from_value(config.DATABASE_URL)
-        container.config.user_agent.from_value(config.USER_AGENT)
-        container.config.http_timeout.from_value(10)
-        container.config.crawl_delay.from_value(config.CRAWL_DELAY)
-        container.config.scheduler_config_watch_interval_seconds.from_value(config.scheduler_config_watch_interval_seconds())
-        container.config.recovery_mode.from_value(config.recovery_mode())
-        container.config.recovery_within_seconds.from_value(config.recovery_within_seconds())
-        container.config.recovery_message.from_value(config.recovery_message())
     
     # Wire dependencies
     container.wire(modules=[__name__])

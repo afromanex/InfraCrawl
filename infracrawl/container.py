@@ -17,19 +17,32 @@ from infracrawl.services.content_review_service import ContentReviewService
 from infracrawl.services.crawl_registry import InMemoryCrawlRegistry
 from infracrawl.services.scheduler_service import SchedulerService
 from infracrawl.repository.crawls import CrawlsRepository
+from infracrawl import config as env
 from sqlalchemy.orm import sessionmaker
+
+
+ENV = {
+    "DATABASE_URL": env.get_optional_str_env("DATABASE_URL"),
+    "USER_AGENT": env.get_str_env("USER_AGENT", "InfraCrawl/0.1"),
+    "HTTP_TIMEOUT": env.get_int_env("HTTP_TIMEOUT", 10),
+    "CRAWL_DELAY": env.get_float_env("CRAWL_DELAY", 1.0),
+    "INFRACRAWL_CONFIG_WATCH_INTERVAL": env.get_int_env("INFRACRAWL_CONFIG_WATCH_INTERVAL", 60),
+    "INFRACRAWL_RECOVERY_MODE": env.get_str_env("INFRACRAWL_RECOVERY_MODE", "restart").strip().lower(),
+    "INFRACRAWL_RECOVERY_WITHIN_SECONDS": env.get_optional_int_env("INFRACRAWL_RECOVERY_WITHIN_SECONDS"),
+    "INFRACRAWL_RECOVERY_MESSAGE": env.get_str_env("INFRACRAWL_RECOVERY_MESSAGE", "job found incomplete on startup"),
+}
 
 
 class Container(containers.DeclarativeContainer):
     """Dependency injection container for InfraCrawl application."""
     
     # Configuration
-    config = providers.Configuration()
+    config = providers.Configuration(default=ENV)
     
     # Database engine - Singleton to reuse connection pool
     db_engine = providers.Singleton(
         make_engine,
-        database_url=config.database_url
+        database_url=config.DATABASE_URL
     )
     # Session factory bound to the engine
     session_factory = providers.Factory(
@@ -66,15 +79,15 @@ class Container(containers.DeclarativeContainer):
     # Services - Singleton instances
     http_service = providers.Singleton(
         HttpService,
-        user_agent=config.user_agent.as_(str),
+        user_agent=config.USER_AGENT.as_(str),
         http_client=providers.Object(requests.get),
-        timeout=config.http_timeout.as_(int)
+        timeout=config.HTTP_TIMEOUT.as_(int)
     )
     
     robots_service = providers.Singleton(
         RobotsService,
         http_service=http_service,
-        user_agent=config.user_agent.as_(str)
+        user_agent=config.USER_AGENT.as_(str)
     )
     
     content_review_service = providers.Singleton(
@@ -110,8 +123,8 @@ class Container(containers.DeclarativeContainer):
         Crawler,
         pages_repo=pages_repository,
         links_repo=links_repository,
-        delay=config.crawl_delay.as_(float),
-        user_agent=config.user_agent.as_(str),
+        delay=config.CRAWL_DELAY.as_(float),
+        user_agent=config.USER_AGENT.as_(str),
         http_service=http_service,
         content_review_service=content_review_service,
         robots_service=robots_service,
@@ -127,8 +140,8 @@ class Container(containers.DeclarativeContainer):
         start_crawl_callback=crawler.provided.crawl,
         crawl_registry=crawl_registry,
         crawls_repo=crawls_repository,
-        config_watch_interval_seconds=config.scheduler_config_watch_interval_seconds.as_(int),
-        recovery_mode=config.recovery_mode.as_(str),
-        recovery_within_seconds=config.recovery_within_seconds,
-        recovery_message=config.recovery_message.as_(str),
+        config_watch_interval_seconds=config.INFRACRAWL_CONFIG_WATCH_INTERVAL.as_(int),
+        recovery_mode=config.INFRACRAWL_RECOVERY_MODE.as_(str),
+        recovery_within_seconds=config.INFRACRAWL_RECOVERY_WITHIN_SECONDS,
+        recovery_message=config.INFRACRAWL_RECOVERY_MESSAGE.as_(str),
     )

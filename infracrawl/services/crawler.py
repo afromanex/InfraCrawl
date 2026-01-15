@@ -13,7 +13,7 @@ from infracrawl.services.link_processor import LinkProcessor
 from infracrawl.services.page_fetch_persist_service import PageFetchPersistService
 from infracrawl.services.crawl_policy import CrawlPolicy
 
-from infracrawl import config
+from infracrawl import config as env
 from infracrawl.repository.pages import PagesRepository
 from infracrawl.repository.links import LinksRepository
 from infracrawl.repository.configs import ConfigsRepository
@@ -96,8 +96,8 @@ class Crawler:
     def __init__(self, pages_repo: PagesRepository, links_repo: LinksRepository, delay: Optional[float] = None, user_agent: Optional[str] = None, http_service: Optional[HttpService] = None, content_review_service: Optional[ContentReviewService] = None, robots_service: Optional[RobotsService] = None, link_processor: Optional[LinkProcessor] = None, fetch_persist_service: Optional[PageFetchPersistService] = None, crawl_policy: Optional[CrawlPolicy] = None):
         self.pages_repo = pages_repo
         self.links_repo = links_repo
-        self.delay = delay if delay is not None else config.CRAWL_DELAY
-        self.user_agent = user_agent or config.USER_AGENT
+        self.delay = delay if delay is not None else env.get_float_env("CRAWL_DELAY", 1.0)
+        self.user_agent = user_agent or env.get_str_env("USER_AGENT", "InfraCrawl/0.1")
         self.http_service = http_service or HttpService(self.user_agent, http_client=requests.get)
         self.content_review_service = content_review_service or ContentReviewService()
         self.robots_service = robots_service or RobotsService(self.http_service, self.user_agent)
@@ -140,7 +140,7 @@ class Crawler:
         context = CrawlContext(config)
         # Ensure max_depth is set
         if context.max_depth is None:
-            context.max_depth = config.DEFAULT_DEPTH
+            context.max_depth = env.get_int_env("DEFAULT_DEPTH", 2)
 
         pages_crawled = 0
         stopped = False

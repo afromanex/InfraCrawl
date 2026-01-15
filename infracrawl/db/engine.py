@@ -3,7 +3,7 @@ from typing import Optional
 from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine
 
-from infracrawl import config
+from infracrawl import config as env
 
 # Simple cache to avoid creating multiple Engine objects in the same process.
 _ENGINE: Optional[Engine] = None
@@ -16,7 +16,7 @@ def make_engine(database_url: Optional[str] = None) -> Engine:
     creating many engines when repository instances are created.
     """
     global _ENGINE
-    database_url = database_url or config.DATABASE_URL
+    database_url = database_url or env.get_optional_str_env("DATABASE_URL")
     if not database_url:
         raise RuntimeError("DATABASE_URL not set")
     if _ENGINE is None:

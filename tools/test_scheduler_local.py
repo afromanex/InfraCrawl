@@ -11,7 +11,7 @@ sys.path.insert(0, ROOT)
 from infracrawl.services.config_service import ConfigService
 from infracrawl.services.crawl_registry import InMemoryCrawlRegistry
 from infracrawl.services.scheduler_service import SchedulerService
-from infracrawl import config
+from infracrawl import config as env
 from infracrawl.repository.configs import ConfigsRepository
 from sqlalchemy.orm import sessionmaker
 from infracrawl.db.engine import make_engine
@@ -39,10 +39,10 @@ def main():
         dummy_crawl,
         registry,
         crawls_repo,
-        config_watch_interval_seconds=config.scheduler_config_watch_interval_seconds(),
-        recovery_mode=config.recovery_mode(),
-        recovery_within_seconds=config.recovery_within_seconds(),
-        recovery_message=config.recovery_message(),
+        config_watch_interval_seconds=env.get_int_env("INFRACRAWL_CONFIG_WATCH_INTERVAL", 60),
+        recovery_mode=env.get_str_env("INFRACRAWL_RECOVERY_MODE", "restart").strip().lower(),
+        recovery_within_seconds=env.get_optional_int_env("INFRACRAWL_RECOVERY_WITHIN_SECONDS"),
+        recovery_message=env.get_str_env("INFRACRAWL_RECOVERY_MESSAGE", "job found incomplete on startup"),
     )
     sched.start()
 

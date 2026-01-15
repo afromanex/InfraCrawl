@@ -10,9 +10,9 @@ from infracrawl.container import Container
 def test_container_creates_dependencies():
     """Test that the container creates all required dependencies."""
     container = Container()
-    container.config.database_url.from_value(None)
-    container.config.user_agent.from_value("TestBot/1.0")
-    container.config.http_timeout.from_value(10)
+    container.config.DATABASE_URL.from_value(None)
+    container.config.USER_AGENT.from_value("TestBot/1.0")
+    container.config.HTTP_TIMEOUT.from_value(10)
     
     # Verify repositories can be created
     pages_repo = container.pages_repository()
@@ -27,10 +27,10 @@ def test_container_creates_dependencies():
 def test_container_creates_services():
     """Test that the container creates service instances."""
     container = Container()
-    container.config.database_url.from_value(None)
-    container.config.user_agent.from_value("TestBot/1.0")
-    container.config.http_timeout.from_value(10)
-    container.config.crawl_delay.from_value(1.0)
+    container.config.DATABASE_URL.from_value(None)
+    container.config.USER_AGENT.from_value("TestBot/1.0")
+    container.config.HTTP_TIMEOUT.from_value(10)
+    container.config.CRAWL_DELAY.from_value(1.0)
     
     # Verify services can be created
     http_service = container.http_service()
@@ -48,10 +48,10 @@ def test_main_accepts_injected_container():
     """Test that main() can accept an injected container for testing."""
     # Create a test container with mocked dependencies
     container = Container()
-    container.config.database_url.from_value(None)
-    container.config.user_agent.from_value("TestBot/1.0")
-    container.config.http_timeout.from_value(10)
-    container.config.crawl_delay.from_value(1.0)
+    container.config.DATABASE_URL.from_value(None)
+    container.config.USER_AGENT.from_value("TestBot/1.0")
+    container.config.HTTP_TIMEOUT.from_value(10)
+    container.config.CRAWL_DELAY.from_value(1.0)
     
     # Override specific providers with mocks
     container.config_service.override(Mock(sync_configs_with_disk=Mock()))

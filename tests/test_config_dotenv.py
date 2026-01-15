@@ -31,7 +31,7 @@ def test_missing_dotenv_logs_warning(monkeypatch, caplog):
     monkeypatch.setenv("USER_AGENT", "X-Agent")
     sys.modules.pop("infracrawl.config", None)
     cfg = _reload_config()
-    assert cfg.USER_AGENT == "X-Agent"
+    assert cfg.get_str_env("USER_AGENT", "InfraCrawl/0.1") == "X-Agent"
 
 
 def test_dotenv_present_but_fails_to_load(monkeypatch, tmp_path):
@@ -62,4 +62,4 @@ def test_dotenv_loads_sets_variables(monkeypatch, tmp_path):
     monkeypatch.setitem(sys.modules, "dotenv", fake)
     sys.modules.pop("infracrawl.config", None)
     cfg = _reload_config()
-    assert cfg.USER_AGENT == "DotenvAgent"
+    assert cfg.get_str_env("USER_AGENT", "InfraCrawl/0.1") == "DotenvAgent"
