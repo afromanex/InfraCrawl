@@ -14,6 +14,9 @@ from infracrawl.services.robots_service import RobotsService
 from infracrawl.services.page_fetch_persist_service import PageFetchPersistService
 from infracrawl.services.link_processor import LinkProcessor
 from infracrawl.services.content_review_service import ContentReviewService
+from infracrawl.services.crawl_registry import InMemoryCrawlRegistry
+from infracrawl.services.scheduler_service import SchedulerService
+from infracrawl.repository.crawls import CrawlsRepository
 from sqlalchemy.orm import sessionmaker
 
 
@@ -49,6 +52,15 @@ class Container(containers.DeclarativeContainer):
     configs_repository = providers.Singleton(
         ConfigsRepository,
         session_factory=session_factory
+    )
+
+    crawls_repository = providers.Singleton(
+        CrawlsRepository,
+        session_factory=session_factory
+    )
+
+    crawl_registry = providers.Singleton(
+        InMemoryCrawlRegistry
     )
     
     # Services - Singleton instances
@@ -106,4 +118,17 @@ class Container(containers.DeclarativeContainer):
         link_processor=link_processor,
         fetch_persist_service=page_fetch_persist_service,
         crawl_policy=crawl_policy
+    )
+
+    # Scheduler - Singleton instance
+    scheduler_service = providers.Singleton(
+        SchedulerService,
+        config_provider=config_service,
+        start_crawl_callback=crawler.provided.crawl,
+        crawl_registry=crawl_registry,
+        crawls_repo=crawls_repository,
+        config_watch_interval_seconds=config.scheduler_config_watch_interval_seconds.as_(int),
+        recovery_mode=config.recovery_mode.as_(str),
+        recovery_within_seconds=config.recovery_within_seconds,
+        recovery_message=config.recovery_message.as_(str),
     )

@@ -26,6 +26,10 @@ def main(container: Optional[Container] = None):
         container.config.user_agent.from_value(config.USER_AGENT)
         container.config.http_timeout.from_value(10)
         container.config.crawl_delay.from_value(config.CRAWL_DELAY)
+        container.config.scheduler_config_watch_interval_seconds.from_value(config.scheduler_config_watch_interval_seconds())
+        container.config.recovery_mode.from_value(config.recovery_mode())
+        container.config.recovery_within_seconds.from_value(config.recovery_within_seconds())
+        container.config.recovery_message.from_value(config.recovery_message())
     
     # Wire dependencies
     container.wire(modules=[__name__])
@@ -35,6 +39,9 @@ def main(container: Optional[Container] = None):
     links_repo = container.links_repository()
     config_service = container.config_service()
     crawler = container.crawler()
+    crawl_registry = container.crawl_registry()
+    crawls_repo = container.crawls_repository()
+    scheduler = container.scheduler_service()
     
     # Load YAML configs and upsert into DB. Remove DB configs not present on disk.
     try:
@@ -50,7 +57,15 @@ def main(container: Optional[Container] = None):
         print(f"Warning: Invalid port value '{port_env}', using default 8000")
         server_port = 8000
     
-    app = create_app(pages_repo, links_repo, config_service, crawler.crawl)
+    app = create_app(
+        pages_repo,
+        links_repo,
+        config_service,
+        crawler.crawl,
+        crawl_registry=crawl_registry,
+        scheduler=scheduler,
+        crawls_repo=crawls_repo,
+    )
 
     print(f"Control server (FastAPI/uvicorn) listening on 0.0.0.0:{server_port}")
     try:

@@ -1,6 +1,5 @@
 from typing import Any, Optional, Protocol
 import logging
-import os
 from datetime import datetime, timezone
 
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -40,18 +39,27 @@ def _parse_schedule(schedule: Any):
 
 
 class SchedulerService:
-    def __init__(self, config_provider: ConfigProvider, start_crawl_callback, crawl_registry, crawls_repo):
+    def __init__(
+        self,
+        config_provider: ConfigProvider,
+        start_crawl_callback,
+        crawl_registry,
+        crawls_repo,
+        *,
+        config_watch_interval_seconds: int = 60,
+        recovery_mode: str = "restart",
+        recovery_within_seconds: Optional[int] = None,
+        recovery_message: str = "job found incomplete on startup",
+    ):
         self.config_service = config_provider
         self.start_crawl_callback = start_crawl_callback
         self.crawl_registry = crawl_registry
         self.crawls_repo = crawls_repo
         self._sched: Optional[BackgroundScheduler] = None
-        # config watcher interval (seconds). Can be overridden via env var
-        try:
-            self._config_watch_interval = int(os.getenv("INFRACRAWL_CONFIG_WATCH_INTERVAL", "60"))
-        except Exception:
-            logger.exception("Error parsing INFRACRAWL_CONFIG_WATCH_INTERVAL, using default 60")
-            self._config_watch_interval = 60
+        self._config_watch_interval = int(config_watch_interval_seconds)
+        self._recovery_mode = (recovery_mode or "restart").strip().lower()
+        self._recovery_within_seconds = recovery_within_seconds
+        self._recovery_message = recovery_message
 
     def start(self):
         if self._sched is not None:
@@ -90,20 +98,10 @@ class SchedulerService:
         if not self._sched:
             return
 
-        mode = os.getenv("INFRACRAWL_RECOVERY_MODE", "mark").strip().lower()
-        if mode in {"off", "0", "false", "none"}:
+        if self._recovery_mode in {"off", "0", "false", "none"}:
             return
-
-        within_seconds = None
-        within_raw = os.getenv("INFRACRAWL_RECOVERY_WITHIN_SECONDS")
-        if within_raw:
-            try:
-                within_seconds = int(within_raw)
-            except Exception:
-                logger.exception("Invalid INFRACRAWL_RECOVERY_WITHIN_SECONDS: %r", within_raw)
-                within_seconds = None
-
-        message = os.getenv("INFRACRAWL_RECOVERY_MESSAGE", "job found incomplete on startup")
+        within_seconds = self._recovery_within_seconds
+        message = self._recovery_message
 
         try:
             configs = self.config_service.list_configs()
@@ -128,7 +126,7 @@ class SchedulerService:
 
             logger.info("Recovered %s incomplete run(s) for %s", count, cfg_path)
 
-            if mode == "restart":
+            if self._recovery_mode == "restart":
                 try:
                     job_id = f"recovery:{cfg_path}"
                     self._sched.add_job(

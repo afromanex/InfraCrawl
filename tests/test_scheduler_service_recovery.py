@@ -46,18 +46,22 @@ class DummyScheduler:
         })
 
 
-def test_recovery_mark_mode_marks_incomplete_runs(monkeypatch):
-    monkeypatch.setenv("INFRACRAWL_RECOVERY_MODE", "mark")
-    monkeypatch.delenv("INFRACRAWL_RECOVERY_WITHIN_SECONDS", raising=False)
-    monkeypatch.setenv("INFRACRAWL_RECOVERY_MESSAGE", "startup recovery")
-
+def test_recovery_mark_mode_marks_incomplete_runs():
     provider = DummyConfigProvider([
         DummyConfig(1, "a.yml"),
         DummyConfig(2, "b.yml"),
     ])
     crawls_repo = DummyCrawlsRepo({1: 2, 2: 0})
 
-    svc = SchedulerService(provider, start_crawl_callback=lambda *a, **k: None, crawl_registry=None, crawls_repo=crawls_repo)
+    svc = SchedulerService(
+        provider,
+        start_crawl_callback=lambda *a, **k: None,
+        crawl_registry=None,
+        crawls_repo=crawls_repo,
+        recovery_mode="mark",
+        recovery_within_seconds=None,
+        recovery_message="startup recovery",
+    )
     svc._sched = DummyScheduler()
 
     svc._recover_incomplete_runs_on_startup()
@@ -69,18 +73,22 @@ def test_recovery_mark_mode_marks_incomplete_runs(monkeypatch):
     assert svc._sched.added == []
 
 
-def test_recovery_restart_mode_schedules_restart_for_configs_with_incomplete(monkeypatch):
-    monkeypatch.setenv("INFRACRAWL_RECOVERY_MODE", "restart")
-    monkeypatch.setenv("INFRACRAWL_RECOVERY_WITHIN_SECONDS", "3600")
-    monkeypatch.setenv("INFRACRAWL_RECOVERY_MESSAGE", "startup recovery")
-
+def test_recovery_restart_mode_schedules_restart_for_configs_with_incomplete():
     provider = DummyConfigProvider([
         DummyConfig(1, "a.yml"),
         DummyConfig(2, "b.yml"),
     ])
     crawls_repo = DummyCrawlsRepo({1: 1, 2: 0})
 
-    svc = SchedulerService(provider, start_crawl_callback=lambda *a, **k: None, crawl_registry=None, crawls_repo=crawls_repo)
+    svc = SchedulerService(
+        provider,
+        start_crawl_callback=lambda *a, **k: None,
+        crawl_registry=None,
+        crawls_repo=crawls_repo,
+        recovery_mode="restart",
+        recovery_within_seconds=3600,
+        recovery_message="startup recovery",
+    )
     sched = DummyScheduler()
     svc._sched = sched
 
@@ -96,13 +104,17 @@ def test_recovery_restart_mode_schedules_restart_for_configs_with_incomplete(mon
     assert sched.added[0]["replace_existing"] is True
 
 
-def test_recovery_off_mode_does_nothing(monkeypatch):
-    monkeypatch.setenv("INFRACRAWL_RECOVERY_MODE", "off")
-
+def test_recovery_off_mode_does_nothing():
     provider = DummyConfigProvider([DummyConfig(1, "a.yml")])
     crawls_repo = DummyCrawlsRepo({1: 1})
 
-    svc = SchedulerService(provider, start_crawl_callback=lambda *a, **k: None, crawl_registry=None, crawls_repo=crawls_repo)
+    svc = SchedulerService(
+        provider,
+        start_crawl_callback=lambda *a, **k: None,
+        crawl_registry=None,
+        crawls_repo=crawls_repo,
+        recovery_mode="off",
+    )
     svc._sched = DummyScheduler()
 
     svc._recover_incomplete_runs_on_startup()

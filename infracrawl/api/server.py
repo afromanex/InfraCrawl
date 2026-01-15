@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 import logging
 
 from infracrawl.services.config_service import ConfigService
+from infracrawl import config
 from infracrawl.api.routers import (
     create_configs_router,
     create_crawlers_router,
@@ -19,7 +20,15 @@ from infracrawl.api.auth import require_admin
 from fastapi.staticfiles import StaticFiles
 
 
-def create_app(pages_repo, links_repo, config_service: ConfigService, start_crawl_callback, crawl_registry: InMemoryCrawlRegistry = None, scheduler: SchedulerService = None):
+def create_app(
+    pages_repo,
+    links_repo,
+    config_service: ConfigService,
+    start_crawl_callback,
+    crawl_registry: InMemoryCrawlRegistry = None,
+    scheduler: SchedulerService = None,
+    crawls_repo: CrawlsRepository = None,
+):
     """Return a FastAPI app with control endpoints.
 
     - `start_crawl_callback(config)` will be scheduled as a background task when a crawl is requested.
@@ -32,15 +41,24 @@ def create_app(pages_repo, links_repo, config_service: ConfigService, start_craw
     if crawl_registry is None:
         crawl_registry = InMemoryCrawlRegistry()
 
-    # Create a single session factory for repositories and services
-    engine = make_engine()
-    session_factory = sessionmaker(bind=engine, future=True)
-
-    crawls_repo = CrawlsRepository(session_factory)
+    if crawls_repo is None:
+        # Create a single session factory for repositories and services
+        engine = make_engine()
+        session_factory = sessionmaker(bind=engine, future=True)
+        crawls_repo = CrawlsRepository(session_factory)
 
     # Create default scheduler if not provided (allows dependency injection for testing)
     if scheduler is None:
-        scheduler = SchedulerService(config_service, start_crawl_callback, crawl_registry, crawls_repo)
+        scheduler = SchedulerService(
+            config_service,
+            start_crawl_callback,
+            crawl_registry,
+            crawls_repo,
+            config_watch_interval_seconds=config.scheduler_config_watch_interval_seconds(),
+            recovery_mode=config.recovery_mode(),
+            recovery_within_seconds=config.recovery_within_seconds(),
+            recovery_message=config.recovery_message(),
+        )
 
     @asynccontextmanager
     async def _lifespan(app):

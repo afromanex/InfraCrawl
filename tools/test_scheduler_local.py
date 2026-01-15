@@ -11,6 +11,7 @@ sys.path.insert(0, ROOT)
 from infracrawl.services.config_service import ConfigService
 from infracrawl.services.crawl_registry import InMemoryCrawlRegistry
 from infracrawl.services.scheduler_service import SchedulerService
+from infracrawl import config
 from infracrawl.repository.configs import ConfigsRepository
 from sqlalchemy.orm import sessionmaker
 from infracrawl.db.engine import make_engine
@@ -33,7 +34,16 @@ def main():
     registry = InMemoryCrawlRegistry()
     from infracrawl.repository.crawls import CrawlsRepository
     crawls_repo = CrawlsRepository(session_factory)
-    sched = SchedulerService(cfg_service, dummy_crawl, registry, crawls_repo)
+    sched = SchedulerService(
+        cfg_service,
+        dummy_crawl,
+        registry,
+        crawls_repo,
+        config_watch_interval_seconds=config.scheduler_config_watch_interval_seconds(),
+        recovery_mode=config.recovery_mode(),
+        recovery_within_seconds=config.recovery_within_seconds(),
+        recovery_message=config.recovery_message(),
+    )
     sched.start()
 
     # give the scheduler a moment to add jobs
