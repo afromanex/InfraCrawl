@@ -11,16 +11,20 @@ class CrawlerConfig:
         max_depth=None,
         robots=True,
         refresh_days=None,
+        fetch_mode: str = None,
         schedule: Optional[Any] = None,
         created_at: Optional[datetime] = None,
         updated_at: Optional[datetime] = None,
     ):
+        if fetch_mode is None or (isinstance(fetch_mode, str) and fetch_mode.strip() == ""):
+            raise ValueError("fetch_mode is required")
         self.config_id = config_id
         self.config_path = config_path
         self.root_urls = root_urls or []
         self.max_depth = max_depth
         self.robots = robots
         self.refresh_days = refresh_days
+        self.fetch_mode = fetch_mode
         # `schedule` is an optional object parsed from the YAML config; it is
         # not persisted to the DB in the current implementation. Acceptable
         # forms include a cron string ("0 2 * * *"), or a dict with

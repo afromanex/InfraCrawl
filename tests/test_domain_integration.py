@@ -11,7 +11,8 @@ def test_config_domain_roundtrip():
         root_urls=["https://example.com/"],
         max_depth=1,
         robots=True,
-        refresh_days=5
+        refresh_days=5,
+        fetch_mode="http",
     )
     # Insert
     result = repo.upsert_config(config)

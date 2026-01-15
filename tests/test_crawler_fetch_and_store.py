@@ -23,7 +23,7 @@ def test_fetch_raises_logs_and_returns_none(caplog):
     http.fetch.side_effect = RuntimeError("network down")
     pages = MagicMock()
     c = make_crawler_with({"http_service": http, "pages_repo": pages})
-    context = SimpleNamespace(config=SimpleNamespace(config_id=1))
+    context = SimpleNamespace(config=SimpleNamespace(config_id=1, fetch_mode="http"))
 
     caplog.clear()
     body = c._fetch_and_store("http://example.test", context)
@@ -37,7 +37,7 @@ def test_storage_failure_logs_and_returns_none(caplog):
     pages = MagicMock()
     pages.upsert_page.side_effect = Exception("db write failed")
     c = make_crawler_with({"http_service": http, "pages_repo": pages})
-    context = SimpleNamespace(config=SimpleNamespace(config_id=2))
+    context = SimpleNamespace(config=SimpleNamespace(config_id=2, fetch_mode="http"))
 
     caplog.clear()
     body = c._fetch_and_store("http://example.test/page", context)
@@ -51,7 +51,7 @@ def test_non_200_status_is_logged_and_body_returned(caplog):
     pages = MagicMock()
     pages.upsert_page.return_value = 42
     c = make_crawler_with({"http_service": http, "pages_repo": pages})
-    context = SimpleNamespace(config=SimpleNamespace(config_id=3))
+    context = SimpleNamespace(config=SimpleNamespace(config_id=3, fetch_mode="http"))
 
     caplog.clear()
     body = c._fetch_and_store("http://example.test/fail", context)

@@ -8,6 +8,7 @@ from urllib.parse import urlparse
 
 from infracrawl.services.http_service import HttpService
 from infracrawl.services.fetcher import Fetcher, HttpServiceFetcher
+from infracrawl.services.fetcher_factory import FetcherFactory, DisabledHeadlessFetcher
 from infracrawl.services.content_review_service import ContentReviewService
 from infracrawl.services.robots_service import RobotsService
 from infracrawl.services.link_processor import LinkProcessor
@@ -42,7 +43,9 @@ class Crawler:
             if self._is_stopped(stop_event):
                 logger.info("Fetch cancelled for %s", url)
                 return None
-            response = self.fetch(url, stop_event=stop_event)
+            if context is None or getattr(context, "config", None) is None:
+                raise ValueError("context.config is required")
+            response = self.fetch(url, stop_event=stop_event, fetch_mode=context.config.fetch_mode)
         except Exception as e:
             logger.error("Fetch error for %s: %s", url, e, exc_info=True)
             return None
@@ -102,6 +105,8 @@ class Crawler:
         user_agent: Optional[str] = None,
         http_service: Optional[HttpService] = None,
         fetcher: Optional[Fetcher] = None,
+        headless_fetcher: Optional[Fetcher] = None,
+        fetcher_factory: Optional[FetcherFactory] = None,
         content_review_service: Optional[ContentReviewService] = None,
         robots_service: Optional[RobotsService] = None,
         link_processor: Optional[LinkProcessor] = None,
@@ -114,6 +119,11 @@ class Crawler:
         self.user_agent = user_agent or env.get_str_env("USER_AGENT", "InfraCrawl/0.1")
         self.http_service = http_service or HttpService(self.user_agent, http_client=requests.get)
         self.fetcher = fetcher or HttpServiceFetcher(self.http_service)
+        self.headless_fetcher = headless_fetcher
+        self.fetcher_factory = fetcher_factory or FetcherFactory(
+            http_fetcher=self.fetcher,
+            headless_fetcher=self.headless_fetcher or DisabledHeadlessFetcher(),
+        )
         self.content_review_service = content_review_service or ContentReviewService()
         self.robots_service = robots_service or RobotsService(self.http_service, self.user_agent)
         self.link_processor = link_processor or LinkProcessor(self.content_review_service, self.pages_repo, self.links_repo)
@@ -122,8 +132,9 @@ class Crawler:
 
     # TODO: Liskov Substitution risk - fetch() is overridden in tests (see test_crawler_behavior.py) without formal contract. Subclass could return incompatible type breaking _fetch_and_store. Refactor: define IHttpFetcher protocol (fetch(url) -> tuple[int, str]); accept in __init__ instead of subclassing.
     # TODO: fetch(), _allowed_by_robots(), extract_links() are unnecessary wrapper methods. Call self.http_service.fetch() directly in _fetch_and_store, inline other wrappers.
-    def fetch(self, url: str, stop_event=None):
-        return self.fetcher.fetch(url, stop_event=stop_event)
+    def fetch(self, url: str, stop_event=None, fetch_mode: str = None):
+        chosen = self.fetcher_factory.get(fetch_mode)
+        return chosen.fetch(url, stop_event=stop_event)
 
     def _allowed_by_robots(self, url: str, robots_enabled: bool) -> bool:
         return self.robots_service.allowed_by_robots(url, robots_enabled)

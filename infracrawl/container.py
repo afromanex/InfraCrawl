@@ -11,6 +11,8 @@ from infracrawl.services.crawler import Crawler
 from infracrawl.services.crawl_policy import CrawlPolicy
 from infracrawl.services.http_service import HttpService
 from infracrawl.services.fetcher import HttpServiceFetcher
+from infracrawl.services.fetcher_factory import FetcherFactory
+from infracrawl.services.headless_browser_fetcher import PlaywrightHeadlessFetcher, PlaywrightHeadlessOptions
 from infracrawl.services.robots_service import RobotsService
 from infracrawl.services.page_fetch_persist_service import PageFetchPersistService
 from infracrawl.services.link_processor import LinkProcessor
@@ -89,6 +91,21 @@ class Container(containers.DeclarativeContainer):
         HttpServiceFetcher,
         http_service=http_service,
     )
+
+    headless_fetcher = providers.Singleton(
+        PlaywrightHeadlessFetcher,
+        user_agent=config.USER_AGENT.as_(str),
+        options=providers.Factory(
+            PlaywrightHeadlessOptions,
+            timeout_ms=providers.Callable(lambda t: t * 1000, config.HTTP_TIMEOUT.as_(int)),
+        ),
+    )
+
+    fetcher_factory = providers.Singleton(
+        FetcherFactory,
+        http_fetcher=page_fetcher,
+        headless_fetcher=headless_fetcher,
+    )
     
     robots_service = providers.Singleton(
         RobotsService,
@@ -133,6 +150,8 @@ class Container(containers.DeclarativeContainer):
         user_agent=config.USER_AGENT.as_(str),
         http_service=http_service,
         fetcher=page_fetcher,
+        headless_fetcher=headless_fetcher,
+        fetcher_factory=fetcher_factory,
         content_review_service=content_review_service,
         robots_service=robots_service,
         link_processor=link_processor,

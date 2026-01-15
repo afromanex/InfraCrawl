@@ -8,3 +8,4 @@ fastapi
 uvicorn[standard]
 apscheduler==3.10.1
 dependency-injector==4.41.0
+playwright==1.49.0

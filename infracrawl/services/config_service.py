@@ -45,6 +45,11 @@ class ConfigService:
             if not isinstance(data, dict):
                 logger.warning("Config file %s does not contain a dictionary", config_path)
                 return None
+
+            fetch_mode = data.get("fetch_mode")
+            if fetch_mode is None:
+                logger.warning("Config file %s is missing required field 'fetch_mode'", config_path)
+                return None
             
             return CrawlerConfig(
                 config_id=config_id,
@@ -53,6 +58,7 @@ class ConfigService:
                 max_depth=data.get("max_depth"),
                 robots=data.get("robots", True),
                 refresh_days=data.get("refresh_days"),
+                fetch_mode=fetch_mode,
                 schedule=data.get("schedule"),
                 created_at=created_at,
                 updated_at=updated_at

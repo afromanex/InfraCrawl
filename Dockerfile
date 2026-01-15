@@ -9,6 +9,9 @@ COPY requirements-dev.txt ./
 RUN pip install --no-cache-dir -r requirements.txt && \
 	pip install --no-cache-dir -r requirements-dev.txt
 
+# Install browser binaries for Playwright headless crawling
+RUN python -m playwright install --with-deps chromium
+
 COPY . .
 
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh

@@ -25,7 +25,7 @@ def test_crawl_respects_max_depth(crawler_with_mocks):
     crawler.fetch = MagicMock(return_value=HttpResponse(200, '<html></html>'))
     crawler.extract_links = MagicMock(return_value=[])
     # Should only call ensure_page once for depth=0
-    cfg = CrawlerConfig(config_id=None, config_path='p', root_urls=['http://example.com'], max_depth=0)
+    cfg = CrawlerConfig(config_id=None, config_path='p', root_urls=['http://example.com'], max_depth=0, fetch_mode="http")
     crawler.crawl(cfg)
     assert pages_repo.ensure_page.call_count == 1
     assert crawler.fetch.call_count == 1
@@ -38,7 +38,7 @@ def test_crawl_skips_robots(crawler_with_mocks):
     crawler.crawl_policy.should_skip_due_to_robots = MagicMock(return_value=True)
     crawler.fetch = MagicMock()
     crawler.extract_links = MagicMock()
-    cfg = CrawlerConfig(config_id=None, config_path='p', root_urls=['http://example.com'], max_depth=1)
+    cfg = CrawlerConfig(config_id=None, config_path='p', root_urls=['http://example.com'], max_depth=1, fetch_mode="http")
     crawler.crawl(cfg)
     # Should not fetch if robots disallowed
     assert not crawler.fetch.called
@@ -51,7 +51,7 @@ def test_crawl_refresh_days_skips_recent(crawler_with_mocks):
     crawler.fetch = MagicMock()
     crawler.extract_links = MagicMock()
     # Simulate config with refresh_days=10
-    cfg = CrawlerConfig(config_id=123, config_path='p', root_urls=['http://example.com'], max_depth=1, robots=True, refresh_days=10)
+    cfg = CrawlerConfig(config_id=123, config_path='p', root_urls=['http://example.com'], max_depth=1, robots=True, refresh_days=10, fetch_mode="http")
     # Simulate page fetched 1 day ago
     from datetime import datetime, timedelta
     yesterday = (datetime.utcnow() - timedelta(days=1)).isoformat()
@@ -72,7 +72,7 @@ def test_crawl_inserts_links(crawler_with_mocks):
     # Patch _same_host to always True
     crawler._same_host = MagicMock(return_value=True)
     pages_repo.upsert_page.return_value = 1
-    cfg = CrawlerConfig(config_id=None, config_path='p', root_urls=['http://example.com'], max_depth=1)
+    cfg = CrawlerConfig(config_id=None, config_path='p', root_urls=['http://example.com'], max_depth=1, fetch_mode="http")
     crawler.crawl(cfg)
     # Should insert links via batch method
     assert links_repo.insert_links_batch.called

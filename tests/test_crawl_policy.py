@@ -24,7 +24,7 @@ def test_should_skip_due_to_robots_blocks_when_disallowed():
     robots_service.allowed_by_robots.return_value = False
     policy = CrawlPolicy(pages_repo, robots_service)
     
-    cfg = CrawlerConfig(config_id=1, config_path='test.yml', robots=True)
+    cfg = CrawlerConfig(config_id=1, config_path='test.yml', robots=True, fetch_mode="http")
     context = CrawlContext(cfg)
     
     assert policy.should_skip_due_to_robots('http://example.com', context)
@@ -37,7 +37,7 @@ def test_should_skip_due_to_robots_allows_when_permitted():
     robots_service.allowed_by_robots.return_value = True
     policy = CrawlPolicy(pages_repo, robots_service)
     
-    cfg = CrawlerConfig(config_id=1, config_path='test.yml', robots=True)
+    cfg = CrawlerConfig(config_id=1, config_path='test.yml', robots=True, fetch_mode="http")
     context = CrawlContext(cfg)
     
     assert not policy.should_skip_due_to_robots('http://example.com', context)
@@ -47,7 +47,7 @@ def test_should_skip_due_to_robots_returns_false_when_no_service():
     pages_repo = MagicMock()
     policy = CrawlPolicy(pages_repo, robots_service=None)
     
-    cfg = CrawlerConfig(config_id=1, config_path='test.yml', robots=True)
+    cfg = CrawlerConfig(config_id=1, config_path='test.yml', robots=True, fetch_mode="http")
     context = CrawlContext(cfg)
     
     assert not policy.should_skip_due_to_robots('http://example.com', context)
@@ -59,7 +59,7 @@ def test_should_skip_due_to_refresh_skips_recent_page():
     pages_repo.get_page_by_url.return_value = type('Page', (), {'fetched_at': yesterday})
     
     policy = CrawlPolicy(pages_repo)
-    cfg = CrawlerConfig(config_id=1, config_path='test.yml', refresh_days=7)
+    cfg = CrawlerConfig(config_id=1, config_path='test.yml', refresh_days=7, fetch_mode="http")
     context = CrawlContext(cfg)
     
     assert policy.should_skip_due_to_refresh('http://example.com', context)
@@ -71,7 +71,7 @@ def test_should_skip_due_to_refresh_fetches_old_page():
     pages_repo.get_page_by_url.return_value = type('Page', (), {'fetched_at': week_ago})
     
     policy = CrawlPolicy(pages_repo)
-    cfg = CrawlerConfig(config_id=1, config_path='test.yml', refresh_days=7)
+    cfg = CrawlerConfig(config_id=1, config_path='test.yml', refresh_days=7, fetch_mode="http")
     context = CrawlContext(cfg)
     
     assert not policy.should_skip_due_to_refresh('http://example.com', context)
@@ -81,7 +81,7 @@ def test_should_skip_due_to_refresh_returns_false_when_no_refresh_days():
     pages_repo = MagicMock()
     policy = CrawlPolicy(pages_repo)
     
-    cfg = CrawlerConfig(config_id=1, config_path='test.yml', refresh_days=None)
+    cfg = CrawlerConfig(config_id=1, config_path='test.yml', refresh_days=None, fetch_mode="http")
     context = CrawlContext(cfg)
     
     assert not policy.should_skip_due_to_refresh('http://example.com', context)
@@ -92,7 +92,7 @@ def test_should_skip_due_to_refresh_returns_false_when_page_not_found():
     pages_repo.get_page_by_url.return_value = None
     
     policy = CrawlPolicy(pages_repo)
-    cfg = CrawlerConfig(config_id=1, config_path='test.yml', refresh_days=7)
+    cfg = CrawlerConfig(config_id=1, config_path='test.yml', refresh_days=7, fetch_mode="http")
     context = CrawlContext(cfg)
     
     assert not policy.should_skip_due_to_refresh('http://example.com', context)
@@ -103,7 +103,7 @@ def test_should_skip_due_to_refresh_returns_false_when_no_fetched_at():
     pages_repo.get_page_by_url.return_value = type('Page', (), {'fetched_at': None})
     
     policy = CrawlPolicy(pages_repo)
-    cfg = CrawlerConfig(config_id=1, config_path='test.yml', refresh_days=7)
+    cfg = CrawlerConfig(config_id=1, config_path='test.yml', refresh_days=7, fetch_mode="http")
     context = CrawlContext(cfg)
     
     assert not policy.should_skip_due_to_refresh('http://example.com', context)

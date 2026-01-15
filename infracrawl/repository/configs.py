@@ -27,6 +27,7 @@ class ConfigsRepository:
                 return CrawlerConfig(
                     config_id=c.config_id,
                     config_path=c.config_path,
+                    fetch_mode="http",
                     created_at=c.created_at,
                     updated_at=c.updated_at
                 )
@@ -39,6 +40,7 @@ class ConfigsRepository:
             return CrawlerConfig(
                 config_id=c.config_id,
                 config_path=c.config_path,
+                fetch_mode="http",
                 created_at=c.created_at,
                 updated_at=c.updated_at
             )
@@ -53,6 +55,7 @@ class ConfigsRepository:
             return CrawlerConfig(
                 config_id=c.config_id,
                 config_path=c.config_path,
+                fetch_mode="http",
                 created_at=c.created_at,
                 updated_at=c.updated_at
             )
@@ -66,6 +69,7 @@ class ConfigsRepository:
             return CrawlerConfig(
                 config_id=c.config_id,
                 config_path=c.config_path,
+                fetch_mode="http",
                 created_at=c.created_at,
                 updated_at=c.updated_at
             )
@@ -77,6 +81,7 @@ class ConfigsRepository:
             return [CrawlerConfig(
                 config_id=c.config_id,
                 config_path=c.config_path,
+                fetch_mode="http",
                 created_at=c.created_at,
                 updated_at=c.updated_at
             ) for c in rows]
