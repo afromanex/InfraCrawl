@@ -1,5 +1,7 @@
 from urllib.robotparser import RobotFileParser
 
+from infracrawl.exceptions import HttpFetchError
+
 
 class RobotsFetcher:
     """Fetch robots.txt content and return a parsed RobotFileParser or None.
@@ -11,14 +13,21 @@ class RobotsFetcher:
         self.http_service = http_service
 
     def fetch(self, robots_url: str):
+        import logging
+
         try:
             response = self.http_service.fetch_robots(robots_url)
-            if response.status_code == 200 and response.text:
-                robots_parser = RobotFileParser()
-                robots_parser.parse(response.text.splitlines())
-                return robots_parser
+        except HttpFetchError:
+            logging.exception("Network error fetching robots.txt from %s", robots_url)
             return None
+
+        if response.status_code != 200 or not response.text:
+            return None
+
+        try:
+            robots_parser = RobotFileParser()
+            robots_parser.parse(response.text.splitlines())
+            return robots_parser
         except Exception:
-            import logging
-            logging.exception("Error fetching/parsing robots.txt from %s", robots_url)
+            logging.exception("Error parsing robots.txt from %s", robots_url)
             return None

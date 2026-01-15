@@ -26,21 +26,24 @@ class RobotsService:
     def allowed_by_robots(self, url: str, robots_enabled: bool) -> bool:
         if not robots_enabled:
             return True
+
+        parsed = urlparse(url)
+        if not parsed.scheme or not parsed.netloc:
+            # Fail open: invalid/relative URLs should not block crawling.
+            return True
+
+        base = f"{parsed.scheme}://{parsed.netloc}"
+        robots_parser = self.cache.get(base)
+        if robots_parser is None:
+            robots_url = urljoin(base, "/robots.txt")
+            robots_parser = self.robots_fetcher.fetch(robots_url)
+            self.cache.set(base, robots_parser)
+
+        if robots_parser is None:
+            return True
+
         try:
-            parsed = urlparse(url)
-            base = f"{parsed.scheme}://{parsed.netloc}"
-            robots_parser = self.cache.get(base)
-            if robots_parser is None:
-                robots_url = urljoin(base, "/robots.txt")
-                try:
-                    robots_parser = self.robots_fetcher.fetch(robots_url)
-                except Exception:
-                    logging.exception("Error fetching robots.txt from %s", robots_url)
-                    robots_parser = None
-                self.cache.set(base, robots_parser)
-            if robots_parser is None:
-                return True
             return robots_parser.can_fetch(self.user_agent, url)
         except Exception:
-            logging.exception("Error checking robots.txt permission for %s", url)
+            logging.exception("Error checking robots permission for %s", url)
             return True
