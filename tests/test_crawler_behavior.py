@@ -34,7 +34,6 @@ def executor_with_mocks():
         fetch_persist_service=fetch_persist_service,
         delay_seconds=0,
         fetcher_factory=fetcher_factory,
-        extract_links_fn=lambda base_url, html: content_review_service.extract_links(base_url, html),
     )
     return executor, pages_repo, links_repo, fetcher, fetcher_factory, content_review_service, crawl_policy
 

@@ -208,10 +208,6 @@ class Container(containers.DeclarativeContainer):
         fetch_persist_service=page_fetch_persist_service,
         delay_seconds=config.CRAWL_DELAY.as_(float),
         fetcher_factory=fetcher_factory,
-        extract_links_fn=providers.Callable(
-            lambda crs: crs.extract_links,
-            content_review_service,
-        ),
         visited_tracker_max_urls=config.INFRACRAWL_VISITED_MAX_URLS.as_(int),
     )
 

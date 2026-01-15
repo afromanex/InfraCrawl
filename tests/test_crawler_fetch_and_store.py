@@ -24,7 +24,6 @@ def make_executor_with(mocks=None):
         fetch_persist_service=fetch_persist_service,
         delay_seconds=0,
         fetcher_factory=fetcher_factory,
-        extract_links_fn=MagicMock(),
     )
     return executor
 

@@ -20,6 +20,5 @@ def test_crawl_executor_init_uses_injected_collaborators(mock_repos):
         fetch_persist_service=MagicMock(),
         delay_seconds=0.1,
         fetcher_factory=fetcher_factory,
-        extract_links_fn=MagicMock(),
     )
     assert executor.pages_repo is mock_repos['pages_repo']

@@ -9,12 +9,9 @@ from infracrawl.domain.http_response import HttpResponse
 from infracrawl.domain.visited_tracker import VisitedTracker
 from infracrawl.exceptions import HttpFetchError
 from infracrawl.services.fetcher_factory import FetcherFactory
+from infracrawl.services.link_processor import LinkProcessRequest
 
 logger = logging.getLogger(__name__)
-
-
-ExtractLinksFn = Callable[[str, str], list]
-
 
 class CrawlExecutor:
     """Executes a crawl given configured collaborators.
@@ -33,7 +30,6 @@ class CrawlExecutor:
         fetch_persist_service,
         delay_seconds: float,
         fetcher_factory: FetcherFactory,
-        extract_links_fn: Callable[[str, str], list],
         visited_tracker_max_urls: int = 100_000,
     ):
         self.pages_repo = pages_repo
@@ -42,7 +38,6 @@ class CrawlExecutor:
         self.fetch_persist_service = fetch_persist_service
         self.delay_seconds = delay_seconds
         self.fetcher_factory = fetcher_factory
-        self.extract_links_fn = extract_links_fn
         self.visited_tracker_max_urls = int(visited_tracker_max_urls)
 
     def _is_stopped(self, stop_event) -> bool:
@@ -127,15 +122,16 @@ class CrawlExecutor:
             if result[1]:
                 stopped = True
 
-        self.link_processor.process_links(
-            context.current_root,
-            url,
-            body,
-            from_id,
-            context,
-            depth,
+        self.link_processor.process(
+            LinkProcessRequest(
+                current_root=context.current_root,
+                base_url=url,
+                html=body,
+                from_id=from_id,
+                context=context,
+                depth=depth,
+            ),
             crawl_callback=cb,
-            extract_links_fn=self.extract_links_fn,
         )
         return (pages_crawled, stopped)
 

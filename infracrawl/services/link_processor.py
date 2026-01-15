@@ -1,4 +1,5 @@
 import logging
+from dataclasses import dataclass
 from typing import Callable, Optional
 from urllib.parse import urlparse
 
@@ -6,6 +7,17 @@ from infracrawl.services.link_persister import LinkPersister
 from infracrawl.domain.crawl_context import CrawlContext
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class LinkProcessRequest:
+    current_root: str
+    base_url: str
+    html: str
+    from_id: int
+    context: CrawlContext
+    depth: int
+
 
 class LinkProcessor:
     def __init__(self, content_review_service, link_persister: LinkPersister):
@@ -23,26 +35,18 @@ class LinkProcessor:
             # CLAUDE: Returning False treats parse errors as external links - conservative and safe.
             return False
 
-    # TODO: 8 parameters - refactor later with CrawlState object
-    # CLAUDE: Acknowledged - defer until pattern emerges
-    def process_links(self, current_root: str, base_url: str, html: str, from_id: int, context: CrawlContext, depth: int, crawl_callback: Optional[Callable[[str, int], None]] = None, extract_links_fn: Optional[Callable[[str, str], list]] = None):
-        """Extract links from `html` and persist them; schedule further crawling via `crawl_callback`.
+    def process(self, req: LinkProcessRequest, *, crawl_callback: Optional[Callable[[str, int], None]] = None) -> None:
+        """Extract links from the page, persist them, and optionally schedule crawls.
 
-        - `current_root` is the root URL for host filtering.
-        - `crawl_callback(link_url, next_depth)` is invoked for links to be crawled (if provided).
+        `crawl_callback(link_url, next_depth)` is invoked for links to be crawled.
         """
-        # TODO: Optional extract_links_fn parameter is over-engineering for testing. Tests should mock content_review_service.extract_links instead of passing function parameter.
-        # Allow caller to supply an extract_links function (useful for testing/mocking)
-        if extract_links_fn is None:
-            links = self.content_review_service.extract_links(base_url, html)
-        else:
-            links = extract_links_fn(base_url, html)
+        links = self.content_review_service.extract_links(req.base_url, req.html)
         
         # Filter to same-host links only
         same_host_links = []
         for link_url, anchor in links:
-            if not self._same_host(current_root, link_url):
-                logger.debug("Skipping (external) %s -> not same host as %s", link_url, current_root)
+            if not self._same_host(req.current_root, link_url):
+                logger.debug("Skipping (external) %s -> not same host as %s", link_url, req.current_root)
                 continue
             same_host_links.append((link_url, anchor))
         
@@ -50,9 +54,9 @@ class LinkProcessor:
             return
 
         # Persist links (batch DB work)
-        self.link_persister.persist_links(from_id=from_id, links=same_host_links)
+        self.link_persister.persist_links(from_id=req.from_id, links=same_host_links)
         
         # Schedule crawls for next depth
-        if depth - 1 >= 0 and crawl_callback is not None:
+        if req.depth - 1 >= 0 and crawl_callback is not None:
             for link_url, _ in same_host_links:
-                crawl_callback(link_url, depth - 1)
+                crawl_callback(link_url, req.depth - 1)
