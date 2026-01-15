@@ -8,6 +8,7 @@ from pydantic import BaseModel
 from infracrawl.services.config_service import ConfigService
 from infracrawl.services.crawl_registry import InMemoryCrawlRegistry
 from infracrawl.repository.crawls import CrawlsRepository
+from infracrawl.services.scheduled_crawl_job_runner import ScheduledCrawlJobRunner
 
 
 class CrawlRequest(BaseModel):
@@ -36,6 +37,13 @@ class CrawlersRouter:
         self.start_crawl_callback = start_crawl_callback
         self.crawl_registry = crawl_registry
         self.crawls_repo = crawls_repo
+
+        self._job_runner = ScheduledCrawlJobRunner(
+            config_provider=self.config_service,
+            start_crawl_callback=self.start_crawl_callback,
+            crawl_registry=self.crawl_registry,
+            crawls_repo=self.crawls_repo,
+        )
     
     def create_router(self) -> APIRouter:
         """Create and configure the FastAPI router with all endpoints."""
@@ -87,47 +95,10 @@ class CrawlersRouter:
             cfg = self.config_service.get_config(config)
         except Exception as e:
             raise HTTPException(status_code=404, detail=f"config not found: {e}")
-        
-        crawl_id = None
-        if self.crawl_registry is not None:
-            crawl_id = self.crawl_registry.start(config_name=cfg.config_path, config_id=cfg.config_id)
 
-        stop_event = self.crawl_registry.get_stop_event(crawl_id) if self.crawl_registry is not None else None
-
-        run_id = None
-        try:
-            run_id = self.crawls_repo.create_run(cfg.config_id)
-        except Exception:
-            import logging
-            logging.exception("Could not create crawl run record")
-
-        def _run_and_track(cfg, cid=None, stop_event=None, run_id=None):
-            try:
-                if stop_event is not None:
-                    self.start_crawl_callback(cfg, stop_event)
-                else:
-                    self.start_crawl_callback(cfg)
-                if cid and self.crawl_registry is not None:
-                    self.crawl_registry.finish(cid, status="finished")
-                if run_id is not None:
-                    try:
-                        self.crawls_repo.finish_run(run_id)
-                    except Exception:
-                        import logging
-                        logging.exception("Could not finish crawl run record")
-            except Exception as e:
-                if cid and self.crawl_registry is not None:
-                    self.crawl_registry.finish(cid, status="failed", error=str(e))
-                if run_id is not None:
-                    try:
-                        self.crawls_repo.finish_run(run_id, exception=str(e))
-                    except Exception:
-                        import logging
-                        logging.exception("Could not finish crawl run record (failed)")
-                raise
-
-        background_tasks.add_task(_run_and_track, cfg, crawl_id, stop_event, run_id)
-        return {"status": "started", "crawl_id": crawl_id, "run_id": run_id}
+        # Validate config synchronously, but run the crawl + tracking in the background.
+        background_tasks.add_task(self._job_runner.run_config, cfg)
+        return {"status": "started"}
     
     def list_active_crawls(self):
         if self.crawl_registry is None:

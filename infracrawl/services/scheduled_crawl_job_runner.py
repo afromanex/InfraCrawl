@@ -32,6 +32,16 @@ class ScheduledCrawlJobRunner:
             logger.warning("Scheduled config not found: %s - %s", cfg_path, e)
             return
 
+        self.run_config(cfg)
+
+    def run_config(self, cfg) -> None:
+        """Execute a crawl job for an already-loaded config object.
+
+        This is useful for API paths that validate/load config synchronously
+        and then enqueue the actual crawl work as a background task.
+        """
+
+        cfg_path = getattr(cfg, "config_path", None)
         try:
             run_id: Optional[int] = None
             try:
@@ -76,7 +86,7 @@ class ScheduledCrawlJobRunner:
                             run_id,
                         )
 
-                logger.exception("Scheduled crawl failed for %s", cfg_path)
+                logger.exception("Crawl job failed for %s", cfg_path)
 
         except Exception:
-            logger.exception("Error running scheduled job for %s", cfg_path)
+            logger.exception("Error running crawl job for %s", cfg_path)
