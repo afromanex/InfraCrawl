@@ -1,6 +1,6 @@
 from typing import Optional, List
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, sessionmaker
 
 from infracrawl.db.models import CrawlerConfig as DBCrawlerConfig
 from infracrawl.domain import CrawlerConfig
@@ -8,11 +8,11 @@ from infracrawl.db.engine import make_engine
 
 
 class ConfigsRepository:
-    def __init__(self, engine=None):
-        self.engine = engine or make_engine()
+    def __init__(self, session_factory):
+        self.session_factory = session_factory
 
     def get_session(self) -> Session:
-        return Session(self.engine)
+        return self.session_factory()
 
     def upsert_config(self, config: CrawlerConfig) -> CrawlerConfig:
         with self.get_session() as session:

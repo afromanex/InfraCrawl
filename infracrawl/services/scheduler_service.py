@@ -38,19 +38,12 @@ def _parse_schedule(schedule: Any):
 
 
 class SchedulerService:
-    # TODO: Unused parameters pages_repo and links_repo kept for "backwards compatibility" but never used. Remove them - simpler signature.
-    def __init__(self, config_provider: ConfigProvider, start_crawl_callback, crawl_registry, pages_repo=None, links_repo=None):
+    def __init__(self, config_provider: ConfigProvider, start_crawl_callback, crawl_registry, crawls_repo):
         self.config_service = config_provider
         self.start_crawl_callback = start_crawl_callback
         self.crawl_registry = crawl_registry
-        # optional repositories (backwards-compatible): some callers pass these
-        self.pages_repo = pages_repo
-        self.links_repo = links_repo
+        self.crawls_repo = crawls_repo
         self._sched: Optional[BackgroundScheduler] = None
-        # TODO: Lazy import inside __init__ is unnecessarily clever. Import CrawlsRepository at top of file like everything else.
-        # lazy-instantiate crawls repo so scheduler can record runs
-        from infracrawl.repository.crawls import CrawlsRepository
-        self.crawls_repo = CrawlsRepository()
         # config watcher interval (seconds). Can be overridden via env var
         try:
             self._config_watch_interval = int(os.getenv("INFRACRAWL_CONFIG_WATCH_INTERVAL", "60"))

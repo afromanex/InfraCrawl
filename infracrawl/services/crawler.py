@@ -93,9 +93,9 @@ class Crawler:
     # TODO: 9 optional parameters still high - consider config object later
     # TODO: All this "param or Default()" dependency injection is over-complex. Either: 1) require all dependencies (fail fast), 2) use single config object, or 3) accept defaults are fine and stop allowing overrides.
     # CLAUDE: configs_repo removed as requested. Consider builder pattern or CrawlerConfig dataclass when complexity grows.
-    def __init__(self, pages_repo: Optional[PagesRepository] = None, links_repo: Optional[LinksRepository] = None, delay: Optional[float] = None, user_agent: Optional[str] = None, http_service: Optional[HttpService] = None, content_review_service: Optional[ContentReviewService] = None, robots_service: Optional[RobotsService] = None, link_processor: Optional[LinkProcessor] = None, fetch_persist_service: Optional[PageFetchPersistService] = None, crawl_policy: Optional[CrawlPolicy] = None):
-        self.pages_repo = pages_repo or PagesRepository()
-        self.links_repo = links_repo or LinksRepository()
+    def __init__(self, pages_repo: PagesRepository, links_repo: LinksRepository, delay: Optional[float] = None, user_agent: Optional[str] = None, http_service: Optional[HttpService] = None, content_review_service: Optional[ContentReviewService] = None, robots_service: Optional[RobotsService] = None, link_processor: Optional[LinkProcessor] = None, fetch_persist_service: Optional[PageFetchPersistService] = None, crawl_policy: Optional[CrawlPolicy] = None):
+        self.pages_repo = pages_repo
+        self.links_repo = links_repo
         self.delay = delay if delay is not None else config.CRAWL_DELAY
         self.user_agent = user_agent or config.USER_AGENT
         self.http_service = http_service or HttpService(self.user_agent, http_client=requests.get)

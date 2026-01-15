@@ -12,8 +12,8 @@ logger = logging.getLogger(__name__)
 class ConfigService:
     """Manages crawler configurations, synchronizing YAML files with database."""
     
-    def __init__(self, configs_repo: Optional[ConfigsRepository] = None, configs_dir: Optional[str] = None):
-        self.configs_repo = configs_repo or ConfigsRepository()
+    def __init__(self, configs_repo: ConfigsRepository, configs_dir: Optional[str] = None):
+        self.configs_repo = configs_repo
         self.configs_dir = configs_dir or os.path.join(os.getcwd(), "configs")
     
     def _list_config_files(self) -> list[str]:

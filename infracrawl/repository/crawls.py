@@ -2,19 +2,17 @@ from typing import Optional
 from datetime import datetime
 from sqlalchemy import select
 from sqlalchemy.orm import Session
-
-from infracrawl.db.engine import make_engine
 from infracrawl.db.models import CrawlRun as DBCrawlRun
 from infracrawl.repository.configs import ConfigsRepository
 from infracrawl.domain import CrawlRun as DomainCrawlRun
 
 
 class CrawlsRepository:
-    def __init__(self, engine=None):
-        self.engine = engine or make_engine()
+    def __init__(self, session_factory):
+        self.session_factory = session_factory
 
     def get_session(self) -> Session:
-        return Session(self.engine)
+        return self.session_factory()
 
     def create_run(self, config_id: Optional[int]) -> int:
         now = datetime.utcnow()
@@ -44,7 +42,7 @@ class CrawlsRepository:
             if not r:
                 return None
         # Resolve config path if available
-        cfg_repo = ConfigsRepository(self.engine)
+        cfg_repo = ConfigsRepository(self.session_factory)
         cfg_path = None
         if r.config_id is not None:
             cfg = cfg_repo.get_config_by_id(r.config_id)
@@ -58,7 +56,7 @@ class CrawlsRepository:
             q = select(DBCrawlRun).order_by(DBCrawlRun.run_id.desc()).limit(limit)
             rows = session.execute(q).scalars().all()
         # Resolve config paths using ConfigsRepository (may return None)
-        cfg_repo = ConfigsRepository(self.engine)
+        cfg_repo = ConfigsRepository(self.session_factory)
         out = []
         for r in rows:
             cfg_path = None
@@ -103,8 +101,8 @@ class CrawlsRepository:
 
         if count:
             # best-effort cleanup of pages/links for this config
-            pages_repo = PagesRepository(self.engine)
-            links_repo = LinksRepository(self.engine)
+            pages_repo = PagesRepository(self.session_factory)
+            links_repo = LinksRepository(self.session_factory)
             try:
                 page_ids = pages_repo.get_page_ids_by_config(config_id)
                 if page_ids:

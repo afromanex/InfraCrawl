@@ -14,6 +14,7 @@ from infracrawl.services.robots_service import RobotsService
 from infracrawl.services.page_fetch_persist_service import PageFetchPersistService
 from infracrawl.services.link_processor import LinkProcessor
 from infracrawl.services.content_review_service import ContentReviewService
+from sqlalchemy.orm import sessionmaker
 
 
 class Container(containers.DeclarativeContainer):
@@ -27,18 +28,27 @@ class Container(containers.DeclarativeContainer):
         make_engine,
         database_url=config.database_url
     )
+    # Session factory bound to the engine
+    session_factory = providers.Factory(
+        sessionmaker,
+        bind=db_engine,
+        future=True
+    )
     
     # Repositories - Singleton instances
     pages_repository = providers.Singleton(
-        PagesRepository
+        PagesRepository,
+        session_factory=session_factory
     )
     
     links_repository = providers.Singleton(
-        LinksRepository
+        LinksRepository,
+        session_factory=session_factory
     )
     
     configs_repository = providers.Singleton(
-        ConfigsRepository
+        ConfigsRepository,
+        session_factory=session_factory
     )
     
     # Services - Singleton instances

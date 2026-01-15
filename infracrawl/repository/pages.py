@@ -1,7 +1,8 @@
 from typing import Optional, List
 from datetime import datetime
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.exc import IntegrityError
 
 from infracrawl.db.models import Page as DBPage
 from infracrawl.domain import Page
@@ -9,16 +10,15 @@ from infracrawl.db.engine import make_engine
 
 
 class PagesRepository:
-    """Repository for Page database operations."""
-    def __init__(self, engine=None):
-        # TODO: Creating new engine per repo instance is expensive
-        # CLAUDE: Use dependency injection - pass shared engine from main(). Implement later when scaling.
-        self.engine = engine or make_engine()
+    """Repository for Page database operations.
+
+    Requires an explicit `session_factory` (callable returning a `Session`).
+    """
+    def __init__(self, session_factory):
+        self.session_factory = session_factory
 
     def get_session(self) -> Session:
-        # TODO: Returns raw Session - no error handling for connection failures
-        # CLAUDE: SQLAlchemy Session context manager handles rollback. Connection pool retries. Current approach is fine.
-        return Session(self.engine)
+        return self.session_factory()
     
     def _to_domain(self, db_page: DBPage, full: bool = True) -> Page:
         """Convert database Page to domain Page."""
@@ -41,9 +41,17 @@ class PagesRepository:
                 return row.page_id
             p = DBPage(page_url=page_url)
             session.add(p)
-            # TODO: No handling of unique constraint violation if concurrent insert happens
-            # CLAUDE: Two crawlers inserting same URL simultaneously. Use INSERT ... ON CONFLICT or catch IntegrityError and retry query.
-            session.commit()
+            # Handle possible unique constraint races: if another worker inserted
+            # the same URL concurrently, catch IntegrityError, rollback and re-query.
+            try:
+                session.commit()
+            except IntegrityError:
+                session.rollback()
+                q = select(DBPage).where(DBPage.page_url == page_url)
+                existing = session.execute(q).scalars().first()
+                if existing:
+                    return existing.page_id
+                raise
             session.refresh(p)
             return p.page_id
     
@@ -93,8 +101,16 @@ class PagesRepository:
                 p.plain_text = page.plain_text
                 p.filtered_plain_text = page.filtered_plain_text
                 p.http_status = page.http_status
-                # Convert datetime to ISO string if needed
-                p.fetched_at = page.fetched_at.isoformat() if isinstance(page.fetched_at, datetime) else page.fetched_at
+                # Coerce ISO datetime strings (e.g. ending with 'Z') to datetime
+                if isinstance(page.fetched_at, datetime):
+                    p.fetched_at = page.fetched_at
+                elif isinstance(page.fetched_at, str):
+                    try:
+                        p.fetched_at = datetime.fromisoformat(page.fetched_at.replace('Z', '+00:00'))
+                    except ValueError:
+                        p.fetched_at = None
+                else:
+                    p.fetched_at = None
                 if page.config_id is not None:
                     p.config_id = page.config_id
                 session.add(p)
@@ -102,14 +118,22 @@ class PagesRepository:
                 session.refresh(p)
                 return self._to_domain(p)
             
-            fetched_at_str = page.fetched_at.isoformat() if isinstance(page.fetched_at, datetime) else page.fetched_at
+            if isinstance(page.fetched_at, datetime):
+                fetched_at_val = page.fetched_at
+            elif isinstance(page.fetched_at, str):
+                try:
+                    fetched_at_val = datetime.fromisoformat(page.fetched_at.replace('Z', '+00:00'))
+                except ValueError:
+                    fetched_at_val = None
+            else:
+                fetched_at_val = None
             p = DBPage(
                 page_url=page.page_url,
                 page_content=page.page_content,
                 plain_text=page.plain_text,
                 filtered_plain_text=page.filtered_plain_text,
                 http_status=page.http_status,
-                fetched_at=fetched_at_str,
+                fetched_at=fetched_at_val,
                 config_id=page.config_id
             )
             session.add(p)

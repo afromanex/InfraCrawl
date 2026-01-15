@@ -1,6 +1,6 @@
 from typing import Optional, List
 from sqlalchemy import select, or_
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, sessionmaker
 
 from infracrawl.db.models import Link as DBLink
 from infracrawl.domain import Link
@@ -8,11 +8,11 @@ from infracrawl.db.engine import make_engine
 
 
 class LinksRepository:
-    def __init__(self, engine=None):
-        self.engine = engine or make_engine()
+    def __init__(self, session_factory):
+        self.session_factory = session_factory
 
     def get_session(self) -> Session:
-        return Session(self.engine)
+        return self.session_factory()
 
     def insert_link(self, link: Link) -> Link:
         """Insert link and return with assigned link_id."""

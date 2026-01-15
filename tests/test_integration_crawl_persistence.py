@@ -1,6 +1,8 @@
 from infracrawl.services.page_fetch_persist_service import PageFetchPersistService
 from infracrawl.repository.pages import PagesRepository
 from infracrawl.domain.http_response import HttpResponse
+from sqlalchemy.orm import sessionmaker
+from infracrawl.db.engine import make_engine
 
 class StaticHttp:
     def fetch(self, url):
@@ -8,7 +10,8 @@ class StaticHttp:
 
 
 def test_crawl_persists_plain_text():
-    pages = PagesRepository()
+    session_factory = sessionmaker(bind=make_engine(), future=True)
+    pages = PagesRepository(session_factory)
     svc = PageFetchPersistService(http_service=StaticHttp(), pages_repo=pages)
     page = svc.fetch_and_persist('http://integration.test/', None)
     assert page is not None

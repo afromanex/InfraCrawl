@@ -1,8 +1,10 @@
 from infracrawl.repository.configs import ConfigsRepository
 from infracrawl.domain import CrawlerConfig
+from sqlalchemy.orm import sessionmaker
+from infracrawl.db.engine import make_engine
 
 def test_config_domain_roundtrip():
-    repo = ConfigsRepository()
+    repo = ConfigsRepository(sessionmaker(bind=make_engine(), future=True))
     config = CrawlerConfig(
         config_id=None,
         config_path="pytest-config.yml",

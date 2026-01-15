@@ -1,10 +1,16 @@
 from infracrawl.repository.links import LinksRepository
 from infracrawl.repository.pages import PagesRepository
 from infracrawl.domain import Link
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from infracrawl.db.models import Base
 
 def test_link_domain_roundtrip():
-    pages_repo = PagesRepository()
-    links_repo = LinksRepository()
+    engine = create_engine("sqlite:///:memory:", future=True)
+    Base.metadata.create_all(engine)
+    session_factory = sessionmaker(bind=engine, future=True)
+    pages_repo = PagesRepository(session_factory)
+    links_repo = LinksRepository(session_factory)
     # Insert two pages to link between
     url1 = "https://example.com/a"
     url2 = "https://example.com/b"

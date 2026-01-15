@@ -1,9 +1,15 @@
 from infracrawl.repository.pages import PagesRepository
 from infracrawl.domain.page import Page
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from infracrawl.db.models import Base
 
 
 def test_upsert_and_fetch_plain_text():
-    repo = PagesRepository()
+    engine = create_engine("sqlite:///:memory:", future=True)
+    Base.metadata.create_all(engine)
+    session_factory = sessionmaker(bind=engine, future=True)
+    repo = PagesRepository(session_factory)
     url = 'http://repo-test.local/page'
     # ensure clean
     repo.ensure_page(url)

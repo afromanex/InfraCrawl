@@ -13,6 +13,8 @@ from infracrawl.api.routers import (
 from infracrawl.services.crawl_registry import InMemoryCrawlRegistry
 from infracrawl.services.scheduler_service import SchedulerService
 from infracrawl.repository.crawls import CrawlsRepository
+from sqlalchemy.orm import sessionmaker
+from infracrawl.db.engine import make_engine
 from fastapi import Depends
 from infracrawl.api.auth import require_admin
 from fastapi.staticfiles import StaticFiles
@@ -30,11 +32,16 @@ def create_app(pages_repo, links_repo, config_service: ConfigService, start_craw
     # Create default registry if not provided (allows dependency injection for testing)
     if crawl_registry is None:
         crawl_registry = InMemoryCrawlRegistry()
-    crawls_repo = CrawlsRepository()
+
+    # Create a single session factory for repositories and services
+    engine = make_engine()
+    session_factory = sessionmaker(bind=engine, future=True)
+
+    crawls_repo = CrawlsRepository(session_factory)
 
     # Create default scheduler if not provided (allows dependency injection for testing)
     if scheduler is None:
-        scheduler = SchedulerService(config_service, start_crawl_callback, crawl_registry)
+        scheduler = SchedulerService(config_service, start_crawl_callback, crawl_registry, crawls_repo)
 
     @asynccontextmanager
     async def _lifespan(app):

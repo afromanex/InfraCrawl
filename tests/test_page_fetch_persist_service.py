@@ -1,5 +1,8 @@
 from infracrawl.services.page_fetch_persist_service import PageFetchPersistService
 from infracrawl.repository.pages import PagesRepository
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from infracrawl.db.models import Base
 
 class DummyHttp:
     def fetch(self, url):
@@ -7,7 +10,10 @@ class DummyHttp:
 
 
 def test_plain_text_extracted_and_persisted(tmp_path):
-    pages_repo = PagesRepository()
+    engine = create_engine("sqlite:///:memory:", future=True)
+    Base.metadata.create_all(engine)
+    session_factory = sessionmaker(bind=engine, future=True)
+    pages_repo = PagesRepository(session_factory)
     svc = PageFetchPersistService(http_service=DummyHttp(), pages_repo=pages_repo)
     page = svc.extract_and_persist('http://example.com', '200', '<html><body>Hi there</body></html>', '2026-01-01T00:00:00Z')
     assert page is not None
@@ -36,7 +42,10 @@ def test_filtered_plain_text_removes_boilerplate():
     </html>
     '''
     
-    pages_repo = PagesRepository()
+    engine = create_engine("sqlite:///:memory:", future=True)
+    Base.metadata.create_all(engine)
+    session_factory = sessionmaker(bind=engine, future=True)
+    pages_repo = PagesRepository(session_factory)
     svc = PageFetchPersistService(http_service=DummyHttp(), pages_repo=pages_repo)
     page = svc.extract_and_persist('http://test.com', '200', html, '2026-01-12T00:00:00Z')
     
