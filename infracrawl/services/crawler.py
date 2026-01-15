@@ -7,6 +7,7 @@ from infracrawl.utils.datetime_utils import parse_to_utc_naive
 from urllib.parse import urlparse
 
 from infracrawl.services.http_service import HttpService
+from infracrawl.services.fetcher import Fetcher, HttpServiceFetcher
 from infracrawl.services.content_review_service import ContentReviewService
 from infracrawl.services.robots_service import RobotsService
 from infracrawl.services.link_processor import LinkProcessor
@@ -41,7 +42,7 @@ class Crawler:
             if self._is_stopped(stop_event):
                 logger.info("Fetch cancelled for %s", url)
                 return None
-            response = self.fetch(url)
+            response = self.fetch(url, stop_event=stop_event)
         except Exception as e:
             logger.error("Fetch error for %s: %s", url, e, exc_info=True)
             return None
@@ -93,12 +94,26 @@ class Crawler:
     # TODO: 9 optional parameters still high - consider config object later
     # TODO: All this "param or Default()" dependency injection is over-complex. Either: 1) require all dependencies (fail fast), 2) use single config object, or 3) accept defaults are fine and stop allowing overrides.
     # CLAUDE: configs_repo removed as requested. Consider builder pattern or CrawlerConfig dataclass when complexity grows.
-    def __init__(self, pages_repo: PagesRepository, links_repo: LinksRepository, delay: Optional[float] = None, user_agent: Optional[str] = None, http_service: Optional[HttpService] = None, content_review_service: Optional[ContentReviewService] = None, robots_service: Optional[RobotsService] = None, link_processor: Optional[LinkProcessor] = None, fetch_persist_service: Optional[PageFetchPersistService] = None, crawl_policy: Optional[CrawlPolicy] = None):
+    def __init__(
+        self,
+        pages_repo: PagesRepository,
+        links_repo: LinksRepository,
+        delay: Optional[float] = None,
+        user_agent: Optional[str] = None,
+        http_service: Optional[HttpService] = None,
+        fetcher: Optional[Fetcher] = None,
+        content_review_service: Optional[ContentReviewService] = None,
+        robots_service: Optional[RobotsService] = None,
+        link_processor: Optional[LinkProcessor] = None,
+        fetch_persist_service: Optional[PageFetchPersistService] = None,
+        crawl_policy: Optional[CrawlPolicy] = None,
+    ):
         self.pages_repo = pages_repo
         self.links_repo = links_repo
         self.delay = delay if delay is not None else env.get_float_env("CRAWL_DELAY", 1.0)
         self.user_agent = user_agent or env.get_str_env("USER_AGENT", "InfraCrawl/0.1")
         self.http_service = http_service or HttpService(self.user_agent, http_client=requests.get)
+        self.fetcher = fetcher or HttpServiceFetcher(self.http_service)
         self.content_review_service = content_review_service or ContentReviewService()
         self.robots_service = robots_service or RobotsService(self.http_service, self.user_agent)
         self.link_processor = link_processor or LinkProcessor(self.content_review_service, self.pages_repo, self.links_repo)
@@ -107,8 +122,8 @@ class Crawler:
 
     # TODO: Liskov Substitution risk - fetch() is overridden in tests (see test_crawler_behavior.py) without formal contract. Subclass could return incompatible type breaking _fetch_and_store. Refactor: define IHttpFetcher protocol (fetch(url) -> tuple[int, str]); accept in __init__ instead of subclassing.
     # TODO: fetch(), _allowed_by_robots(), extract_links() are unnecessary wrapper methods. Call self.http_service.fetch() directly in _fetch_and_store, inline other wrappers.
-    def fetch(self, url: str):
-        return self.http_service.fetch(url)
+    def fetch(self, url: str, stop_event=None):
+        return self.fetcher.fetch(url, stop_event=stop_event)
 
     def _allowed_by_robots(self, url: str, robots_enabled: bool) -> bool:
         return self.robots_service.allowed_by_robots(url, robots_enabled)

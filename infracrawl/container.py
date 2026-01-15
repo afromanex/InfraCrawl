@@ -10,6 +10,7 @@ from infracrawl.services.config_service import ConfigService
 from infracrawl.services.crawler import Crawler
 from infracrawl.services.crawl_policy import CrawlPolicy
 from infracrawl.services.http_service import HttpService
+from infracrawl.services.fetcher import HttpServiceFetcher
 from infracrawl.services.robots_service import RobotsService
 from infracrawl.services.page_fetch_persist_service import PageFetchPersistService
 from infracrawl.services.link_processor import LinkProcessor
@@ -83,6 +84,11 @@ class Container(containers.DeclarativeContainer):
         http_client=providers.Object(requests.get),
         timeout=config.HTTP_TIMEOUT.as_(int)
     )
+
+    page_fetcher = providers.Singleton(
+        HttpServiceFetcher,
+        http_service=http_service,
+    )
     
     robots_service = providers.Singleton(
         RobotsService,
@@ -126,6 +132,7 @@ class Container(containers.DeclarativeContainer):
         delay=config.CRAWL_DELAY.as_(float),
         user_agent=config.USER_AGENT.as_(str),
         http_service=http_service,
+        fetcher=page_fetcher,
         content_review_service=content_review_service,
         robots_service=robots_service,
         link_processor=link_processor,
