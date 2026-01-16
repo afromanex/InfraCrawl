@@ -106,7 +106,7 @@
               // If stats endpoint fails, just show 0
               console.warn('Failed to fetch stats for ' + c.config_path + ': ' + e.message);
             }
-            html += `<tr><td>${c.config_path}</td><td>${pages}</td><td>${links}</td><td><button data-config="${c.config_path}" class="start">Start Crawl</button> <button data-config="${c.config_path}" class="remove">Remove</button></td></tr>`
+            html += `<tr><td>${c.config_path}</td><td>${pages}</td><td>${links}</td><td><button data-config="${c.config_path}" class="start">Start Crawl</button> <button data-config="${c.config_path}" class="remove">Clear Crawler Data</button></td></tr>`
           }
           html += '</table>';
           el.innerHTML = html;
