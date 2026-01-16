@@ -36,7 +36,6 @@ class _InMemoryCrawlRecordStore:
         self._records: Dict[str, CrawlRecord] = {}
         self._max_completed_records = max_completed_records
         self._completed_order = deque()
-        self._completed_set = set()
 
     def create_running(self, *, crawl_id: str, config_name: str, config_id: Optional[int], now: datetime) -> CrawlRecord:
         rec = CrawlRecord(
@@ -51,20 +50,12 @@ class _InMemoryCrawlRecordStore:
         return rec
 
     def _mark_completed_for_retention(self, crawl_id: str) -> None:
-        if self._max_completed_records == 0:
-            # Caller will evict immediately.
-            self._completed_order.append(crawl_id)
-            return
-        if crawl_id in self._completed_set:
-            return
-        self._completed_set.add(crawl_id)
         self._completed_order.append(crawl_id)
 
     def _evict_completed_overflow(self) -> List[str]:
         evicted: List[str] = []
         while len(self._completed_order) > self._max_completed_records:
             oldest = self._completed_order.popleft()
-            self._completed_set.discard(oldest)
             if oldest in self._records:
                 del self._records[oldest]
                 evicted.append(oldest)
