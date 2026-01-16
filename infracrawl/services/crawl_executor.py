@@ -31,6 +31,8 @@ class CrawlExecutor:
         delay_seconds: float,
         fetcher_factory: FetcherFactory,
         visited_tracker_max_urls: int = 100_000,
+        crawl_registry=None,
+        crawl_id: Optional[str] = None,
     ):
         self.pages_repo = pages_repo
         self.crawl_policy = crawl_policy
@@ -39,9 +41,23 @@ class CrawlExecutor:
         self.delay_seconds = delay_seconds
         self.fetcher_factory = fetcher_factory
         self.visited_tracker_max_urls = int(visited_tracker_max_urls)
+        self.crawl_registry = crawl_registry
+        self.crawl_id = crawl_id
 
     def _is_stopped(self, stop_event) -> bool:
         return stop_event is not None and getattr(stop_event, "is_set", lambda: False)()
+
+    def _update_registry_progress(self, pages_fetched: int, links_found: int = 0) -> None:
+        """Update the crawl registry with current progress."""
+        if self.crawl_registry is not None and self.crawl_id is not None:
+            try:
+                self.crawl_registry.update(
+                    self.crawl_id,
+                    pages_fetched=pages_fetched,
+                    links_found=links_found,
+                )
+            except Exception as e:
+                logger.warning("Failed to update registry progress: %s", e)
 
     def fetch_and_store(self, url: str, context: CrawlContext, stop_event=None) -> Optional[str]:
         """Fetch a URL and persist the result.
@@ -159,6 +175,9 @@ class CrawlExecutor:
             if result[1]:
                 stopped = True
                 break
+
+        # Update registry with final page count
+        self._update_registry_progress(pages_crawled)
 
         return CrawlResult(pages_crawled=pages_crawled, stopped=stopped)
 

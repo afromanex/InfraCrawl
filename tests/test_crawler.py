@@ -1,7 +1,10 @@
 import pytest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, call
 from infracrawl.services.crawl_executor import CrawlExecutor
 from infracrawl.services.fetcher_factory import FetcherFactory
+from infracrawl.domain.config import CrawlerConfig
+from infracrawl.domain.crawl_result import CrawlResult
+from infracrawl.domain.http_response import HttpResponse
 
 @pytest.fixture
 def mock_repos():
@@ -22,3 +25,69 @@ def test_crawl_executor_init_uses_injected_collaborators(mock_repos):
         fetcher_factory=fetcher_factory,
     )
     assert executor.pages_repo is mock_repos['pages_repo']
+
+
+def test_crawl_executor_updates_registry_with_page_count(mock_repos):
+    """Test that the crawler updates the crawl registry with pages_fetched count."""
+    # Setup
+    dummy_fetcher = MagicMock()
+    fetcher_factory = FetcherFactory(http_fetcher=dummy_fetcher, headless_fetcher=dummy_fetcher)
+    
+    mock_registry = MagicMock()
+    crawl_id = "test-crawl-123"
+    
+    # Mock pages_repo to return a page_id on ensure_page
+    mock_repos['pages_repo'].ensure_page.return_value = 1
+    
+    # Create a minimal config with one root URL
+    config = CrawlerConfig(
+        config_id=1,
+        config_path="test.yml",
+        root_urls=["http://example.com"],
+        max_depth=1,
+        fetch_mode="http",
+    )
+    
+    # Mock the fetcher to return a response
+    mock_response = HttpResponse(status_code=200, text="<html><body>test</body></html>")
+    dummy_fetcher.fetch.return_value = mock_response
+    
+    # Mock fetch_persist_service to return a page
+    mock_page = MagicMock()
+    mock_page.page_id = 1
+    mock_fetch_persist = MagicMock(return_value=mock_page)
+    
+    # Mock crawl policy and link processor
+    mock_crawl_policy = MagicMock()
+    mock_crawl_policy.should_skip_due_to_depth.return_value = False
+    mock_crawl_policy.should_skip_due_to_robots.return_value = False
+    mock_crawl_policy.should_skip_due_to_refresh.return_value = False
+    
+    mock_link_processor = MagicMock()
+    # Don't process any links so crawl stays simple
+    mock_link_processor.process = MagicMock()
+    
+    # Create executor with registry
+    executor = CrawlExecutor(
+        pages_repo=mock_repos['pages_repo'],
+        crawl_policy=mock_crawl_policy,
+        link_processor=mock_link_processor,
+        fetch_persist_service=mock_fetch_persist,
+        delay_seconds=0,
+        fetcher_factory=fetcher_factory,
+        crawl_registry=mock_registry,
+        crawl_id=crawl_id,
+    )
+    
+    # Execute the crawl
+    result = executor.crawl(config)
+    
+    # Verify that registry.update was called with pages_fetched > 0
+    assert mock_registry.update.called, "registry.update should have been called"
+    # Check that at least one call included pages_fetched
+    update_calls = mock_registry.update.call_args_list
+    assert len(update_calls) > 0, "registry.update should be called at least once"
+    # The final call should have pages_fetched set
+    final_call = update_calls[-1]
+    assert 'pages_fetched' in final_call[1], "registry.update should be called with pages_fetched parameter"
+    assert final_call[1]['pages_fetched'] >= 1, "pages_fetched should be at least 1"

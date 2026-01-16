@@ -113,12 +113,14 @@
           const data = resp && resp.active ? resp.active : [];
           const el = document.getElementById('active-container');
           if (!data || !data.length) { el.innerText = 'No active crawls'; return }
-          let html = '<table><tr><th>crawl_id</th><th>config</th><th>started_at</th><th>status</th><th>action</th></tr>';
+          let html = '<table><tr><th>crawl_id</th><th>config</th><th>started_at</th><th>status</th><th>pages</th><th>links</th><th>action</th></tr>';
           for (const c of data) {
             const id = c.id || c.crawl_id || '';
             const cfg = c.config_name ?? c.config_path ?? c.config_id ?? '';
             const started = c.started_at ?? c.start_timestamp ?? '';
-            html += `<tr><td>${id}</td><td>${cfg}</td><td>${started}</td><td>${c.status ?? ''}</td><td><button data-id="${id}" class="cancel">Cancel</button></td></tr>`;
+            const pages = c.pages_fetched ?? 0;
+            const links = c.links_found ?? 0;
+            html += `<tr><td>${id}</td><td>${cfg}</td><td>${started}</td><td>${c.status ?? ''}</td><td>${pages}</td><td>${links}</td><td><button data-id="${id}" class="cancel">Cancel</button></td></tr>`;
           }
           html += '</table>';
           el.innerHTML = html;

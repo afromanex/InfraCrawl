@@ -58,11 +58,34 @@ class ScheduledCrawlJobRunner:
                 stop_event = handle.stop_event
 
             try:
+                # Wrap the crawl callback to inject registry and crawl_id if available
+                # The executor will use these to update progress during crawl
+                def wrapped_crawl(config, se=None):
+                    # Store registry and crawl_id temporarily on the callback's closure
+                    # The executor will retrieve them during crawl initialization
+                    # Since start_crawl_callback is executor.crawl (bound method),
+                    # we can temporarily set attributes on the executor instance
+                    executor_instance = getattr(self.start_crawl_callback, '__self__', None)
+                    old_registry = None
+                    old_crawl_id = None
+                    try:
+                        if executor_instance is not None and hasattr(executor_instance, 'crawl_registry'):
+                            old_registry = executor_instance.crawl_registry
+                            old_crawl_id = executor_instance.crawl_id
+                            executor_instance.crawl_registry = self.crawl_registry
+                            executor_instance.crawl_id = cid
+                        return self.start_crawl_callback(config, se)
+                    finally:
+                        # Restore original values
+                        if executor_instance is not None:
+                            executor_instance.crawl_registry = old_registry
+                            executor_instance.crawl_id = old_crawl_id
+                
                 # Call crawl callback directly (may block; scheduler runs worker thread).
                 if stop_event is not None:
-                    self.start_crawl_callback(cfg, stop_event)
+                    wrapped_crawl(cfg, stop_event)
                 else:
-                    self.start_crawl_callback(cfg)
+                    wrapped_crawl(cfg)
 
                 if cid and self.crawl_registry is not None:
                     self.crawl_registry.finish(cid, status="finished")
