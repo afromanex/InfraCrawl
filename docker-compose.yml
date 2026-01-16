@@ -17,6 +17,7 @@ services:
       - PYTHONUNBUFFERED=1
       - PYTHONPATH=/app
       - INFRACRAWL_PORT=8002
+      - ADMIN_TOKEN=${ADMIN_TOKEN}
     depends_on:
       - db
     volumes:
