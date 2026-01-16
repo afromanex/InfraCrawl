@@ -1,0 +1,9 @@
+root_urls:
+  - https://ohstarkweb.myvscloud.com/webtrac/web/splash.html
+max_depth: 2
+refresh_days: 7
+robots: true
+# Fetch mode:
+# - http: direct HTTP GET
+# - headless_chromium: render HTML via headless Chromium (Playwright)
+fetch_mode: headless_chromium
