@@ -133,3 +133,24 @@ def test_upsert_deduplicates_by_config_and_content_hash():
         ).scalars().all()
     # Should be only 1 page, not 2
     assert len(existing) == 1
+
+
+class DummyHttpPdf:
+    def fetch(self, url):
+        # Simulate binary-like content with NULs and a PDF content type
+        from infracrawl.domain.http_response import HttpResponse
+        return HttpResponse(200, 'abc\x00def', 'application/pdf')
+
+
+def test_fetch_and_persist_skips_non_html():
+    engine = create_engine("sqlite:///:memory:", future=True)
+    Base.metadata.create_all(engine)
+    session_factory = sessionmaker(bind=engine, future=True)
+    pages_repo = PagesRepository(session_factory)
+    svc = PageFetchPersistService(http_service=DummyHttpPdf(), pages_repo=pages_repo)
+
+    page = svc.fetch_and_persist('http://example.com/file.pdf')
+    # Should skip persistence for non-supported content types
+    assert page is None
+    stored = pages_repo.get_page_by_url('http://example.com/file.pdf')
+    assert stored is None

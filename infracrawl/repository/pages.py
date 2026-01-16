@@ -17,6 +17,18 @@ class PagesRepository:
     def __init__(self, session_factory):
         self.session_factory = session_factory
 
+    @staticmethod
+    def _sanitize_text(val: Optional[str]) -> Optional[str]:
+        """Remove NUL (\x00) characters from text fields to satisfy DB constraints.
+
+        Postgres TEXT columns cannot contain NULs; some fetched content (e.g., PDFs
+        or binary responses misclassified as text) may include NUL bytes. Strip them
+        before persisting.
+        """
+        if isinstance(val, str):
+            return val.replace("\x00", "")
+        return val
+
     def get_session(self) -> Session:
         return self.session_factory()
     
@@ -116,9 +128,9 @@ class PagesRepository:
             if p:
                 # TODO: No optimistic locking - concurrent updates will overwrite
                 # CLAUDE: Add version column if this becomes issue. Unlikely with current single-crawler design.
-                p.page_content = page.page_content
-                p.plain_text = page.plain_text
-                p.filtered_plain_text = page.filtered_plain_text
+                p.page_content = self._sanitize_text(page.page_content)
+                p.plain_text = self._sanitize_text(page.plain_text)
+                p.filtered_plain_text = self._sanitize_text(page.filtered_plain_text)
                 p.http_status = page.http_status
                 # Coerce ISO datetime strings (e.g. ending with 'Z') to datetime
                 if isinstance(page.fetched_at, datetime):
@@ -151,9 +163,9 @@ class PagesRepository:
                 fetched_at_val = None
             p = DBPage(
                 page_url=page.page_url,
-                page_content=page.page_content,
-                plain_text=page.plain_text,
-                filtered_plain_text=page.filtered_plain_text,
+                page_content=self._sanitize_text(page.page_content),
+                plain_text=self._sanitize_text(page.plain_text),
+                filtered_plain_text=self._sanitize_text(page.filtered_plain_text),
                 http_status=page.http_status,
                 fetched_at=fetched_at_val,
                 config_id=page.config_id,

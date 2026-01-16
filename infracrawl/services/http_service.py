@@ -20,13 +20,19 @@ class HttpService:
 
     # Network/transport failures are normalized by raising HttpFetchError.
     def fetch(self, url: str) -> HttpResponse:
-        """Fetch URL and return response with status code and body text."""
+        """Fetch URL and return response with status code, body text, and Content-Type."""
         headers = {"User-Agent": self.user_agent}
         try:
             resp = self.http_client(url, headers=headers, timeout=self.timeout)
         except requests.exceptions.RequestException as e:
             raise HttpFetchError(url, e) from e
-        return HttpResponse(resp.status_code, resp.text)
+        
+        # Extract Content-Type if response has headers; let real exceptions bubble up.
+        ct = None
+        if hasattr(resp, 'headers'):
+            ct = resp.headers.get('Content-Type')
+        
+        return HttpResponse(resp.status_code, resp.text, ct)
 
     def fetch_robots(self, robots_url: str) -> HttpResponse:
         """Fetch robots.txt - delegates to fetch()."""

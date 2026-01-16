@@ -68,3 +68,34 @@ def test_upsert_preserves_datetime():
         assert dbp is not None
         assert isinstance(dbp.fetched_at, datetime)
         assert abs((dbp.fetched_at - now).total_seconds()) < 5
+
+
+def test_upsert_strips_nul_characters():
+    engine = create_engine("sqlite:///:memory:", future=True)
+    Base.metadata.create_all(engine)
+    session_factory = sessionmaker(bind=engine, future=True)
+    repo = PagesRepository(session_factory)
+
+    # Prepare domain page with NULs in text fields
+    domain = DomainPage(
+        page_id=None,
+        page_url="http://example.com/nul",
+        page_content="abc\x00def",
+        plain_text="x\x00y",
+        filtered_plain_text="z\x00",
+        http_status=200,
+        fetched_at=datetime.utcnow(),
+        config_id=None,
+    )
+
+    out = repo.upsert_page(domain)
+    assert "\x00" not in (out.page_content or "")
+    assert "\x00" not in (out.plain_text or "")
+    assert "\x00" not in (out.filtered_plain_text or "")
+
+    with repo.get_session() as s:
+        dbp = s.execute(select(DBPage).where(DBPage.page_url == "http://example.com/nul")).scalars().first()
+        assert dbp is not None
+        assert "\x00" not in (dbp.page_content or "")
+        assert "\x00" not in (dbp.plain_text or "")
+        assert "\x00" not in (dbp.filtered_plain_text or "")

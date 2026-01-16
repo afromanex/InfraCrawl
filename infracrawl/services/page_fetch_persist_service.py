@@ -60,12 +60,19 @@ class PageFetchPersistService:
         logger.exception("Invalid fetched_at type: %r", type(fetched_at))
         return None
 
-    def fetch_and_persist(self, url: str, context: Optional[CrawlContext] = None) -> DomainPage:
+    def fetch_and_persist(self, url: str, context: Optional[CrawlContext] = None) -> Optional[DomainPage]:
         """Fetch `url` and persist it, returning the domain `Page`.
 
-        Raises on storage errors.
+        If the Content-Type is not supported (non-text/HTML), log and skip persistence.
         """
         response = self.http_service.fetch(url)
+
+        ct = (getattr(response, 'content_type', None) or '').lower()
+        # Supported: text/html, application/xhtml+xml, any text/*
+        is_supported = (ct.startswith('text/') or 'text/html' in ct or 'application/xhtml+xml' in ct or ct == '')
+        if not is_supported:
+            logger.info("Content type not supported %s. Skipping %s", ct or 'unknown', url)
+            return None
 
         fetched_at = datetime.now(timezone.utc)
         config_id = self._get_config_id(url, context)
