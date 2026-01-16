@@ -3,16 +3,11 @@ from typing import Optional
 
 from fastapi import APIRouter, HTTPException, BackgroundTasks
 from starlette.responses import StreamingResponse
-from pydantic import BaseModel
 
 from infracrawl.services.config_service import ConfigService
 from infracrawl.services.crawl_registry import InMemoryCrawlRegistry
 from infracrawl.repository.crawls import CrawlsRepository
 from infracrawl.services.scheduled_crawl_job_runner import ScheduledCrawlJobRunner
-
-
-class RemoveRequest(BaseModel):
-    config: str
 
 
 def create_crawlers_router(
@@ -50,8 +45,8 @@ def create_crawlers_router(
         if config:
             try:
                 cfg = config_service.get_config(config)
-            except Exception as e:
-                raise HTTPException(status_code=404, detail=f"config not found: {e}")
+            except Exception:
+                raise HTTPException(status_code=404, detail="config not found")
             config_id = cfg.config_id
 
         pages = pages_repo.fetch_pages(full=True, limit=limit, config_id=config_id)
@@ -68,8 +63,8 @@ def create_crawlers_router(
             raise HTTPException(status_code=400, detail="missing config")
         try:
             cfg = config_service.get_config(config)
-        except Exception as e:
-            raise HTTPException(status_code=404, detail=f"config not found: {e}")
+        except Exception:
+            raise HTTPException(status_code=404, detail="config not found")
 
         # Validate config synchronously, but run the crawl + tracking in the background.
         background_tasks.add_task(job_runner.run_config, cfg)
@@ -100,15 +95,15 @@ def create_crawlers_router(
         return {"status": "cancelling", "crawl_id": crawl_id}
 
     @router.delete("/remove")
-    def remove(req: RemoveRequest):
-        config_name = req.config
+    def remove(config: str):
+        config_name = config
         if not config_name:
             raise HTTPException(status_code=400, detail="missing config")
 
         try:
             cfg = config_service.get_config(config_name)
-        except Exception as e:
-            raise HTTPException(status_code=404, detail=f"config not found: {e}")
+        except Exception:
+            raise HTTPException(status_code=404, detail="config not found")
 
         try:
             page_ids = pages_repo.get_page_ids_by_config(cfg.config_id)
@@ -117,8 +112,8 @@ def create_crawlers_router(
             if page_ids:
                 deleted_links = links_repo.delete_links_for_page_ids(page_ids)
                 deleted_pages = pages_repo.delete_pages_by_ids(page_ids)
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"error removing data: {e}")
+        except Exception:
+            raise HTTPException(status_code=500, detail="error removing data")
 
         return {
             "status": "removed",
