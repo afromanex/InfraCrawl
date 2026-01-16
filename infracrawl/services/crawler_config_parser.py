@@ -20,9 +20,22 @@ class CrawlerConfigParser:
         created_at=None,
         updated_at=None,
     ) -> Optional[CrawlerConfig]:
-        fetch_mode = data.get("fetch_mode")
+        # Only support nested format: fetch: { mode: "http", headless_chromium: { ... } }
+        # Mode-specific options go under a key matching the mode name
+        if "fetch" not in data:
+            return None
+
+        fetch_dict = data.get("fetch", {})
+        fetch_mode = fetch_dict.get("mode")
+        fetch_options = fetch_dict
+
         if fetch_mode is None:
             return None
+
+        # Extract mode-specific options from fetch_dict
+        headless_options = None
+        if fetch_mode in fetch_dict:
+            headless_options = fetch_dict.get(fetch_mode, {})
 
         return CrawlerConfig(
             config_id=config_id,
@@ -35,4 +48,6 @@ class CrawlerConfigParser:
             schedule=data.get("schedule"),
             created_at=created_at,
             updated_at=updated_at,
+            fetch_options=fetch_options,
+            headless_options=headless_options,
         )

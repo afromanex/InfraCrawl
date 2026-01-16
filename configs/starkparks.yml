@@ -15,12 +15,8 @@ root_urls:
 max_depth: 2
 refresh_days: 7
 robots: true
-# Fetch mode (optional):
-# - http: direct HTTP GET (default)
-# - headless_chromium: render HTML via headless Chromium (Playwright)
-fetch_mode: http
-# Schedule options (optional):
-# - As a cron string: "0 3 * * *" (runs daily at 03:00 UTC)
-# - As a dict: {type: "cron", hour: "3", minute: "0"}
-# - Interval form: {type: "interval", minutes: 60}
+
+fetch:
+  mode: http
+
 schedule: "0 3 * * *"

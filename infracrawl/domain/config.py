@@ -25,6 +25,8 @@ class CrawlerConfigData:
     refresh_days: Optional[int]
     fetch_mode: str
     schedule: Optional[Any] = None
+    fetch_options: Optional[dict] = None
+    headless_options: Optional[dict] = None
 
 
 class CrawlerConfig:
@@ -46,6 +48,8 @@ class CrawlerConfig:
         schedule: Optional[Any] = None,
         created_at: Optional[datetime] = None,
         updated_at: Optional[datetime] = None,
+        fetch_options: Optional[dict] = None,
+        headless_options: Optional[dict] = None,
     ):
         if fetch_mode is None or (isinstance(fetch_mode, str) and fetch_mode.strip() == ""):
             raise ValueError("fetch_mode is required")
@@ -63,6 +67,8 @@ class CrawlerConfig:
             refresh_days=refresh_days,
             fetch_mode=fetch_mode,
             schedule=schedule,
+            fetch_options=fetch_options,
+            headless_options=headless_options,
         )
 
     @property
@@ -104,6 +110,14 @@ class CrawlerConfig:
     @property
     def schedule(self) -> Optional[Any]:
         return self.data.schedule
+
+    @property
+    def fetch_options(self) -> Optional[dict]:
+        return self.data.fetch_options
+
+    @property
+    def headless_options(self) -> Optional[dict]:
+        return self.data.headless_options
 
     def __repr__(self):
         return f"<CrawlerConfig id={self.config_id} path={self.config_path} schedule={self.schedule}>"

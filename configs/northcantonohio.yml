@@ -3,9 +3,6 @@ root_urls:
 max_depth: 4
 refresh_days: 7
 robots: true
-# Fetch mode (optional):
-# - http: direct HTTP GET (default)
-# - headless_chromium: render HTML via headless Chromium (Playwright)
-fetch_mode: http
-# Optional schedule (example: daily at 03:00 UTC)
-# schedule: "0 3 * * *"
+
+fetch:
+  mode: http

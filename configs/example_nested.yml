@@ -1,0 +1,11 @@
+root_urls:
+  - https://example.com/
+max_depth: 2
+robots: true
+refresh_days: 7
+
+fetch:
+  mode: headless_chromium
+  headless_chromium:
+    wait_until: networkidle
+    timeout_ms: 15000
