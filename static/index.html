@@ -92,6 +92,8 @@
               try {
                 const res = await fetchJson(`/crawlers/crawl/${encodeURIComponent(cfg)}/start`, { method: 'POST' });
                 alert('Started: ' + JSON.stringify(res));
+                // Refresh configs to update stats after starting a crawl
+                setTimeout(loadConfigs, 1000);
               } catch (e) { alert('Error: ' + e.message) }
               ev.target.disabled = false;
             }
@@ -233,6 +235,7 @@
       loadConfigs();
       loadRuns();
       loadActiveCrawls();
+      setInterval(loadConfigs, 30000);
       setInterval(loadRuns, 15000);
       setInterval(loadActiveCrawls, 5000);
     </script>
