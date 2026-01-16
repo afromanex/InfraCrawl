@@ -5,6 +5,14 @@ If you are an AI assistant making changes in this repository, you must follow th
 ## Default Mode: Strict TDD
 When implementing a change, follow **Red → Green → Refactor**.
 
+Key principle:
+- Tests are allowed (and expected) to be **red during work**.
+- The definition of “still functioning” is that the intended behavior is captured by tests and `./test.sh` is **green at the end**.
+
+When tests fail, decide which is wrong:
+- The test is outdated (behavior intentionally changed) → update the test.
+- The code regressed (behavior unintentionally changed) → fix the code.
+
 ### Step 1 — RED (tests only)
 - Add or update tests **only** (no production code changes).
 - Run the full test suite: `./test.sh`
@@ -23,6 +31,10 @@ When implementing a change, follow **Red → Green → Refactor**.
 - Refactor for clarity/simplicity **only if needed**.
 - No behavior changes beyond the tests.
 - Run: `./test.sh` again.
+
+## Refactor vs Behavior Change
+- Refactor (no behavior change): do not change tests; keep them validating the same behavior.
+- Behavior change: update/add tests to reflect the new behavior; then update code until tests pass.
 
 ## Change Hygiene
 - Keep diffs small; change only what the tests require.
