@@ -51,10 +51,11 @@ class ScheduledCrawlJobRunner:
                 logger.exception("Could not create run record for %s", cfg_path)
 
             cid = None
+            stop_event = None
             if self.crawl_registry is not None:
-                cid = self.crawl_registry.start(config_name=cfg.config_path, config_id=cfg.config_id)
-
-            stop_event = self.crawl_registry.get_stop_event(cid) if self.crawl_registry is not None else None
+                handle = self.crawl_registry.start(config_name=cfg.config_path, config_id=cfg.config_id)
+                cid = handle.crawl_id
+                stop_event = handle.stop_event
 
             try:
                 # Call crawl callback directly (may block; scheduler runs worker thread).
