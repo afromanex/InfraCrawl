@@ -1,4 +1,4 @@
-FROM python:3.11-slim
+FROM mcr.microsoft.com/playwright/python:v1.42.0-jammy
 WORKDIR /app
 
 # Install OS packages needed for migrations (psql, pg_isready)
@@ -9,8 +9,7 @@ COPY requirements-dev.txt ./
 RUN pip install --no-cache-dir -r requirements.txt && \
 	pip install --no-cache-dir -r requirements-dev.txt
 
-# Install browser binaries for Playwright headless crawling
-RUN python -m playwright install --with-deps chromium
+# Browsers already included in base image; no extra install needed
 
 COPY . .
 
