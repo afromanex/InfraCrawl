@@ -74,3 +74,22 @@ def test_fetch_bubbles_unexpected_exceptions():
         assert False, "expected RuntimeError to bubble up"
     except RuntimeError as e:
         assert "Real bug" in str(e)
+
+
+def test_fetch_uses_custom_timeout():
+    """Verify that HttpService can be instantiated with custom timeout."""
+    mock_http_client = Mock()
+    mock_http_client.return_value.status_code = 200
+    mock_http_client.return_value.text = 'test'
+    mock_http_client.return_value.headers = {}
+    
+    # Create HttpService with 15 second timeout
+    http = HttpService(user_agent='TestAgent', http_client=mock_http_client, timeout=15)
+    
+    response = http.fetch('http://example.com')
+    
+    assert response.status_code == 200
+    # Verify the http_client was called with timeout=15
+    mock_http_client.assert_called_once()
+    call_kwargs = mock_http_client.call_args[1]
+    assert call_kwargs['timeout'] == 15

@@ -18,7 +18,6 @@ class HttpService:
         self.timeout = timeout
         self.http_client = http_client
 
-    # Network/transport failures are normalized by raising HttpFetchError.
     def fetch(self, url: str) -> HttpResponse:
         """Fetch URL and return response with status code, body text, and Content-Type."""
         headers = {"User-Agent": self.user_agent}

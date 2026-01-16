@@ -70,10 +70,11 @@ class CrawlExecutor:
                 return None
             if context is None or getattr(context, "config", None) is None:
                 raise ValueError("context.config is required")
-            response: HttpResponse = self.fetcher_factory.get(context.config.fetch_mode).fetch(
-                url,
-                stop_event=stop_event,
-            )
+            
+            response: HttpResponse = self.fetcher_factory.get(
+                context.config.fetch_mode,
+                config=context.config
+            ).fetch(url, stop_event=stop_event)
         except HttpFetchError as e:
             logger.warning("Fetch failed for %s: %s", url, e)
             return None
