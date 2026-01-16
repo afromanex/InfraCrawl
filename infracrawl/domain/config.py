@@ -26,6 +26,7 @@ class CrawlerConfigData:
     fetch_mode: str
     schedule: Optional[Any] = None
     fetch_options: Optional[dict] = None
+    http_options: Optional[dict] = None
     headless_options: Optional[dict] = None
 
 
@@ -49,6 +50,7 @@ class CrawlerConfig:
         created_at: Optional[datetime] = None,
         updated_at: Optional[datetime] = None,
         fetch_options: Optional[dict] = None,
+        http_options: Optional[dict] = None,
         headless_options: Optional[dict] = None,
     ):
         if fetch_mode is None or (isinstance(fetch_mode, str) and fetch_mode.strip() == ""):
@@ -68,6 +70,7 @@ class CrawlerConfig:
             fetch_mode=fetch_mode,
             schedule=schedule,
             fetch_options=fetch_options,
+            http_options=http_options,
             headless_options=headless_options,
         )
 
@@ -114,6 +117,10 @@ class CrawlerConfig:
     @property
     def fetch_options(self) -> Optional[dict]:
         return self.data.fetch_options
+
+    @property
+    def http_options(self) -> Optional[dict]:
+        return self.data.http_options
 
     @property
     def headless_options(self) -> Optional[dict]:

@@ -79,3 +79,22 @@ def test_nested_format_with_only_fetch_section():
     assert cfg.fetch_mode == "http"
     assert cfg.fetch_options == {"mode": "http"}
     assert cfg.headless_options is None
+
+
+def test_parse_with_http_options():
+    """Test parsing YAML with http mode-specific options."""
+    parser = CrawlerConfigParser()
+    data = {
+        "root_urls": ["https://example.com"],
+        "fetch": {
+            "mode": "http",
+            "http": {
+                "timeout_ms": 15000,
+            },
+        },
+    }
+    cfg = parser.parse(config_path="test.yml", data=data, config_id=4)
+    assert cfg is not None
+    assert cfg.fetch_mode == "http"
+    assert cfg.http_options == {"timeout_ms": 15000}
+    assert cfg.headless_options is None

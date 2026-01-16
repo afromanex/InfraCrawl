@@ -33,9 +33,14 @@ class CrawlerConfigParser:
             return None
 
         # Extract mode-specific options from fetch_dict
+        http_options = None
         headless_options = None
         if fetch_mode in fetch_dict:
-            headless_options = fetch_dict.get(fetch_mode, {})
+            mode_options = fetch_dict.get(fetch_mode, {})
+            if fetch_mode == "http":
+                http_options = mode_options
+            elif fetch_mode.startswith("headless"):
+                headless_options = mode_options
 
         return CrawlerConfig(
             config_id=config_id,
@@ -49,5 +54,6 @@ class CrawlerConfigParser:
             created_at=created_at,
             updated_at=updated_at,
             fetch_options=fetch_options,
+            http_options=http_options,
             headless_options=headless_options,
         )

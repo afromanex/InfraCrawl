@@ -18,5 +18,7 @@ robots: true
 
 fetch:
   mode: http
+  http:
+    timeout_ms: 15000
 
 schedule: "0 3 * * *"
