@@ -8,7 +8,15 @@ def create_configs_router(config_service: ConfigService):
     @router.get("/")
     def list_configs():
         configs = config_service.list_configs()
-        return [c.__dict__ for c in configs]
+        # Return a flat dict with the fields the UI expects.
+        return [
+            {
+                "config_id": getattr(c, "config_id", None),
+                "config_path": getattr(c, "config_path", None),
+                # created_at/updated_at are optional in UI; omit if unavailable
+            }
+            for c in configs
+        ]
 
     @router.get("/{name}")
     def get_config(name: str):

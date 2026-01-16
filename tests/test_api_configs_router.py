@@ -5,6 +5,7 @@ import pytest
 from fastapi import HTTPException
 
 from infracrawl.api.routers.configs import create_configs_router
+from infracrawl.domain.config import CrawlerConfig
 
 
 def _get_endpoint(router, path: str, method: str):
@@ -25,6 +26,24 @@ def test_list_configs_returns_dicts():
     endpoint = _get_endpoint(router, "/configs/", "GET")
 
     assert endpoint() == [{"config_id": 1, "config_path": "configs/x.yml"}]
+
+
+def test_list_configs_flattens_crawler_config():
+    cfg = CrawlerConfig(
+        config_id=2,
+        config_path="configs/y.yml",
+        root_urls=["https://example.org"],
+        max_depth=1,
+        robots=True,
+        refresh_days=7,
+        fetch_mode="http",
+    )
+    config_service = Mock(list_configs=Mock(return_value=[cfg]))
+
+    router = create_configs_router(config_service)
+    endpoint = _get_endpoint(router, "/configs/", "GET")
+
+    assert endpoint() == [{"config_id": 2, "config_path": "configs/y.yml"}]
 
 
 def test_get_config_returns_yaml_response():
