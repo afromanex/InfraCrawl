@@ -21,17 +21,7 @@ def main(container: Optional[Container] = None):
     if container is None:
         container = Container()
     
-    # Wire dependencies
-    container.wire(modules=[__name__])
-    
-    # Get services from container
-    pages_repo = container.pages_repository()
-    links_repo = container.links_repository()
     config_service = container.config_service()
-    crawl_executor = container.crawl_executor()
-    crawl_registry = container.crawl_registry()
-    crawls_repo = container.crawls_repository()
-    scheduler = container.scheduler_service()
     
     # Load YAML configs and upsert into DB. Remove DB configs not present on disk.
     try:
@@ -47,15 +37,7 @@ def main(container: Optional[Container] = None):
         print(f"Warning: Invalid port value '{port_env}', using default 8000")
         server_port = 8000
     
-    app = create_app(
-        pages_repo,
-        links_repo,
-        config_service,
-        crawl_executor.crawl,
-        crawl_registry=crawl_registry,
-        scheduler=scheduler,
-        crawls_repo=crawls_repo,
-    )
+    app = create_app(container)
 
     print(f"Control server (FastAPI/uvicorn) listening on 0.0.0.0:{server_port}")
     try:

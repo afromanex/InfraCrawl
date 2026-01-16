@@ -1,64 +1,33 @@
-
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
 import logging
 
-from infracrawl.services.config_service import ConfigService
-from infracrawl import config as env
+from infracrawl.container import Container
 from infracrawl.api.routers import (
     create_configs_router,
     create_crawlers_router,
     create_systems_router,
 )
-from infracrawl.services.crawl_registry import InMemoryCrawlRegistry
-from infracrawl.services.scheduler_service import SchedulerService
-from infracrawl.repository.crawls import CrawlsRepository
-from sqlalchemy.orm import sessionmaker
-from infracrawl.db.engine import make_engine
 from fastapi import Depends
 from infracrawl.api.auth import require_admin
 from fastapi.staticfiles import StaticFiles
 
 
-def create_app(
-    pages_repo,
-    links_repo,
-    config_service: ConfigService,
-    start_crawl_callback,
-    crawl_registry: InMemoryCrawlRegistry = None,
-    scheduler: SchedulerService = None,
-    crawls_repo: CrawlsRepository = None,
-):
+def create_app(container: Container) -> FastAPI:
     """Return a FastAPI app with control endpoints.
 
-    - `start_crawl_callback(config)` will be scheduled as a background task when a crawl is requested.
-    - `crawl_registry` (optional): If not provided, creates InMemoryCrawlRegistry.
-    - `scheduler` (optional): If not provided, creates SchedulerService.
+    This app is wired exclusively via the DI container (single composition root).
     """
-    # TODO: Optional parameters only used for testing. Simpler: always create defaults here, let tests mock/patch. Reduces parameter count from 6 to 4.
 
-    # Create default registry if not provided (allows dependency injection for testing)
-    if crawl_registry is None:
-        crawl_registry = InMemoryCrawlRegistry()
+    pages_repo = container.pages_repository()
+    links_repo = container.links_repository()
+    config_service = container.config_service()
+    crawl_executor = container.crawl_executor()
+    crawl_registry = container.crawl_registry()
+    crawls_repo = container.crawls_repository()
+    scheduler = container.scheduler_service()
 
-    if crawls_repo is None:
-        # Create a single session factory for repositories and services
-        engine = make_engine()
-        session_factory = sessionmaker(bind=engine, future=True)
-        crawls_repo = CrawlsRepository(session_factory)
-
-    # Create default scheduler if not provided (allows dependency injection for testing)
-    if scheduler is None:
-        scheduler = SchedulerService(
-            config_service,
-            start_crawl_callback,
-            crawl_registry,
-            crawls_repo,
-            config_watch_interval_seconds=env.get_int_env("INFRACRAWL_CONFIG_WATCH_INTERVAL", 60),
-            recovery_mode=env.get_str_env("INFRACRAWL_RECOVERY_MODE", "restart").strip().lower(),
-            recovery_within_seconds=env.get_optional_int_env("INFRACRAWL_RECOVERY_WITHIN_SECONDS"),
-            recovery_message=env.get_str_env("INFRACRAWL_RECOVERY_MESSAGE", "job found incomplete on startup"),
-        )
+    start_crawl_callback = crawl_executor.crawl
 
     @asynccontextmanager
     async def _lifespan(app):
