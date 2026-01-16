@@ -45,6 +45,13 @@ def test_read_raw_yaml_missing_returns_none(tmp_path):
     assert store.read_raw_yaml("missing.yml") is None
 
 
+def test_read_raw_yaml_invalid_utf8_returns_none(tmp_path):
+    # If a config file exists but is not valid UTF-8, treat it as unreadable.
+    (tmp_path / "bad.yml").write_bytes(b"\xff\xfe\xfa")
+    store = ConfigFileStore(configs_dir=str(tmp_path))
+    assert store.read_raw_yaml("bad.yml") is None
+
+
 def test_resolve_path_uses_configs_dir_for_relative(tmp_path):
     (tmp_path / "ok.yml").write_text("fetch_mode: http\n", encoding="utf-8")
     store = ConfigFileStore(configs_dir=str(tmp_path))

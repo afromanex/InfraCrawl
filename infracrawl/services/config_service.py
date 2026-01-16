@@ -73,8 +73,4 @@ class ConfigService:
         db_cfg = self.configs_repo.get_config(config_path)
         if not db_cfg:
             return None
-        try:
-            return self.file_store.read_raw_yaml(db_cfg.config_path)
-        except Exception as e:
-            logger.warning("Could not read config file %s: %s", db_cfg.config_path, e)
-            return None
+        return self.file_store.read_raw_yaml(db_cfg.config_path)

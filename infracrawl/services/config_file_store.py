@@ -41,5 +41,8 @@ class ConfigFileStore:
         full_path = self._resolve_path(config_path)
         if not os.path.isfile(full_path):
             return None
-        with open(full_path, "r", encoding="utf-8") as f:
-            return f.read()
+        try:
+            with open(full_path, "r", encoding="utf-8") as f:
+                return f.read()
+        except Exception:
+            return None
