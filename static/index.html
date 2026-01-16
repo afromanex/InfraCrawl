@@ -69,9 +69,19 @@
           const data = await fetchJson('/configs/');
           const el = document.getElementById('configs-container');
           if (!data.length) { el.innerText = 'No configs found'; return }
-          let html = '<table><tr><th>config_path</th><th>created_at</th><th>updated_at</th><th>actions</th></tr>';
+          let html = '<table><tr><th>config_path</th><th>pages</th><th>links</th><th>actions</th></tr>';
           for (const c of data) {
-            html += `<tr><td>${c.config_path}</td><td>${c.created_at ?? ''}</td><td>${c.updated_at ?? ''}</td><td><button data-config="${c.config_path}" class="start">Start Crawl</button></td></tr>`
+            // Fetch stats for this config
+            let pages = 0, links = 0;
+            try {
+              const stats = await fetchJson(`/crawlers/stats/${encodeURIComponent(c.config_path)}`);
+              pages = stats.pages ?? 0;
+              links = stats.links ?? 0;
+            } catch (e) {
+              // If stats endpoint fails, just show 0
+              console.warn('Failed to fetch stats for ' + c.config_path + ': ' + e.message);
+            }
+            html += `<tr><td>${c.config_path}</td><td>${pages}</td><td>${links}</td><td><button data-config="${c.config_path}" class="start">Start Crawl</button></td></tr>`
           }
           html += '</table>';
           el.innerHTML = html;

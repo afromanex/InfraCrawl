@@ -84,3 +84,12 @@ class LinksRepository:
             deleted = q.delete(synchronize_session=False)
             session.commit()
             return deleted
+
+    def count_links_for_page_ids(self, page_ids: List[int]) -> int:
+        """Count links that reference any of the provided page IDs."""
+        if not page_ids:
+            return 0
+        with self.get_session() as session:
+            q = select(DBLink).where(or_(DBLink.link_from_id.in_(page_ids), DBLink.link_to_id.in_(page_ids)))
+            count = session.execute(q).scalars().all()
+            return len(count)

@@ -141,4 +141,29 @@ def create_crawlers_router(
 
         return [r_to_dict(r) for r in runs]
 
+    @router.get("/stats/{config}")
+    def get_config_stats(config: str):
+        """Get statistics (page and link counts) for a config."""
+        if not config:
+            raise HTTPException(status_code=400, detail="missing config")
+        try:
+            cfg = config_service.get_config(config)
+        except Exception:
+            raise HTTPException(status_code=404, detail="config not found")
+
+        try:
+            page_ids = pages_repo.get_page_ids_by_config(cfg.config_id)
+            page_count = len(page_ids) if page_ids else 0
+            link_count = 0
+            if page_ids:
+                link_count = links_repo.count_links_for_page_ids(page_ids)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"error getting stats: {str(e)}")
+
+        return {
+            "config_path": config,
+            "pages": page_count,
+            "links": link_count,
+        }
+
     return router
