@@ -22,7 +22,7 @@ def create_configs_router(config_service: ConfigService):
         try:
             config_service.sync_configs_with_disk()
             return {"status": "synced"}
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"sync failed: {e}")
+        except Exception:
+            raise HTTPException(status_code=500, detail="sync failed")
 
     return router
