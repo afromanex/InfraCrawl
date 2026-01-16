@@ -29,8 +29,11 @@ class ConfigFileStore:
         full_path = self._resolve_path(config_path)
         if not os.path.isfile(full_path):
             return None
-        with open(full_path, "r", encoding="utf-8") as f:
-            data = yaml.safe_load(f)
+        try:
+            with open(full_path, "r", encoding="utf-8") as f:
+                data = yaml.safe_load(f)
+        except Exception:
+            return None
         return data if isinstance(data, dict) else None
 
     def read_raw_yaml(self, config_path: str) -> Optional[str]:

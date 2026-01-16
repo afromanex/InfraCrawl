@@ -15,12 +15,7 @@ class ConfigSyncer:
         loaded_paths: set[str] = set()
 
         for fname in self.file_store.list_config_files():
-            data = None
-            try:
-                data = self.file_store.load_yaml_dict(fname)
-            except Exception as e:
-                logger.warning("Could not load config %s: %s", fname, e)
-                continue
+            data = self.file_store.load_yaml_dict(fname)
 
             if not isinstance(data, dict):
                 logger.warning("Config file %s does not contain a dictionary", fname)

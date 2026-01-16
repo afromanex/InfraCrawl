@@ -25,6 +25,13 @@ def test_load_yaml_dict_non_dict_returns_none(tmp_path):
     assert store.load_yaml_dict("list.yml") is None
 
 
+def test_load_yaml_dict_invalid_yaml_returns_none(tmp_path):
+    # Invalid YAML should be treated as missing/invalid config, not crash.
+    (tmp_path / "bad.yml").write_text(": this is not valid yaml", encoding="utf-8")
+    store = ConfigFileStore(configs_dir=str(tmp_path))
+    assert store.load_yaml_dict("bad.yml") is None
+
+
 def test_load_yaml_dict_dict_is_returned(tmp_path):
     (tmp_path / "ok.yml").write_text("fetch_mode: http\nroot_urls: []\n", encoding="utf-8")
     store = ConfigFileStore(configs_dir=str(tmp_path))

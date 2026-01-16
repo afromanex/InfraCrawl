@@ -52,11 +52,7 @@ class ConfigService:
         if not db_cfg:
             raise ConfigNotFoundError(config_path, "not found in database")
 
-        try:
-            data = self.file_store.load_yaml_dict(db_cfg.config_path)
-        except Exception as e:
-            logger.warning("Could not load config %s: %s", db_cfg.config_path, e)
-            data = None
+        data = self.file_store.load_yaml_dict(db_cfg.config_path)
         if not isinstance(data, dict):
             raise ConfigNotFoundError(config_path, "YAML file missing or invalid")
 
