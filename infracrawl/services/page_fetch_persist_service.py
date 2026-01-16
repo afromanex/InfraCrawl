@@ -7,6 +7,7 @@ from infracrawl.services.html_text_extractor import HtmlTextExtractor, TextExtra
 from infracrawl.repository.pages import PagesRepository
 from infracrawl.domain.crawl_context import CrawlContext
 from infracrawl.domain.page import Page as DomainPage
+import hashlib
 
 logger = logging.getLogger(__name__)
 class PageFetchPersistService:
@@ -69,6 +70,8 @@ class PageFetchPersistService:
         fetched_at = datetime.now(timezone.utc)
         config_id = self._get_config_id(url, context)
         plain, filtered = self.text_extractor.extract(response.text)
+        base_for_hash = filtered or plain or (response.text or "")
+        content_hash = hashlib.sha256(base_for_hash.encode("utf-8")).hexdigest() if base_for_hash is not None else None
 
         page_obj = DomainPage(
             page_id=None,  # Will be assigned by DB
@@ -78,7 +81,8 @@ class PageFetchPersistService:
             filtered_plain_text=filtered,
             http_status=self._coerce_http_status(getattr(response, 'status_code', None) or getattr(response, 'status', None)),
             fetched_at=self._coerce_fetched_at(fetched_at),
-            config_id=config_id
+            config_id=config_id,
+            content_hash=content_hash,
         )
         page = self.pages_repo.upsert_page(page_obj)
         return page
@@ -98,6 +102,8 @@ class PageFetchPersistService:
         """
         config_id = self._get_config_id(url, context)
         plain, filtered = self.text_extractor.extract(body)
+        base_for_hash = filtered or plain or (body or "")
+        content_hash = hashlib.sha256(base_for_hash.encode("utf-8")).hexdigest() if base_for_hash is not None else None
 
         page_obj = DomainPage(
             page_id=None,  # Will be assigned by DB
@@ -107,7 +113,8 @@ class PageFetchPersistService:
             filtered_plain_text=filtered,
             http_status=self._coerce_http_status(status),
             fetched_at=self._coerce_fetched_at(fetched_at),
-            config_id=config_id
+            config_id=config_id,
+            content_hash=content_hash,
         )
         page = self.pages_repo.upsert_page(page_obj)
         return page

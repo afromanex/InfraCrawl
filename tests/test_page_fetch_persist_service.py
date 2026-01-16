@@ -3,6 +3,7 @@ from infracrawl.repository.pages import PagesRepository
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from infracrawl.db.models import Base
+import hashlib
 
 class DummyHttp:
     def fetch(self, url):
@@ -71,3 +72,27 @@ def test_filtered_plain_text_removes_boilerplate():
     assert 'Navigation Menu' not in stored.filtered_plain_text
     assert 'Sidebar content' not in stored.filtered_plain_text
     assert 'Site Footer' not in stored.filtered_plain_text
+
+
+def test_content_hash_persisted_from_filtered_plain_text():
+    html = '<html><body><h1>Hello</h1><div>World</div></body></html>'
+    engine = create_engine("sqlite:///:memory:", future=True)
+    Base.metadata.create_all(engine)
+    session_factory = sessionmaker(bind=engine, future=True)
+    pages_repo = PagesRepository(session_factory)
+    svc = PageFetchPersistService(http_service=DummyHttp(), pages_repo=pages_repo)
+
+    # Persist with provided HTML
+    svc.extract_and_persist('http://hash.test', 200, html, '2026-01-12T00:00:00Z')
+
+    # Compute expected SHA-256 of filtered text (newline-separated get_text)
+    # The HtmlTextExtractor returns filtered text with newlines between blocks.
+    # We recompute expected by reusing the stored filtered_plain_text for determinism.
+    stored = pages_repo.get_page_by_url('http://hash.test')
+    assert stored is not None
+    assert stored.filtered_plain_text is not None
+    expected = hashlib.sha256(stored.filtered_plain_text.encode('utf-8')).hexdigest()
+
+    # Repository should expose the same hash via the domain model once implemented
+    # This assertion will fail until content_hash is added to DB and domain mapping.
+    assert getattr(stored, 'content_hash', None) == expected

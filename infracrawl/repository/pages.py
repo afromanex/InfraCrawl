@@ -30,7 +30,8 @@ class PagesRepository:
             filtered_plain_text=db_page.filtered_plain_text if full else None,
             http_status=db_page.http_status,
             fetched_at=db_page.fetched_at,
-            config_id=db_page.config_id
+            config_id=db_page.config_id,
+            content_hash=db_page.content_hash,
         )
 
     def ensure_page(self, page_url: str) -> int:
@@ -113,6 +114,9 @@ class PagesRepository:
                     p.fetched_at = None
                 if page.config_id is not None:
                     p.config_id = page.config_id
+                # Update content_hash if provided
+                if getattr(page, 'content_hash', None) is not None:
+                    p.content_hash = page.content_hash
                 session.add(p)
                 session.commit()
                 session.refresh(p)
@@ -134,7 +138,8 @@ class PagesRepository:
                 filtered_plain_text=page.filtered_plain_text,
                 http_status=page.http_status,
                 fetched_at=fetched_at_val,
-                config_id=page.config_id
+                config_id=page.config_id,
+                content_hash=getattr(page, 'content_hash', None),
             )
             session.add(p)
             session.commit()
