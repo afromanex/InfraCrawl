@@ -64,6 +64,24 @@
         return r.json();
       }
 
+      function formatStartedAt(ts) {
+        if (!ts) return '';
+        try {
+          const d = new Date(ts);
+          if (isNaN(d.getTime())) return '';
+          const mm = String(d.getMonth() + 1).padStart(2, '0');
+          const dd = String(d.getDate()).padStart(2, '0');
+          const yyyy = d.getFullYear();
+          let h = d.getHours();
+          const ampm = h >= 12 ? 'pm' : 'am';
+          h = h % 12;
+          if (h === 0) h = 12;
+          const hh = String(h).padStart(2, '0');
+          const min = String(d.getMinutes()).padStart(2, '0');
+          return `${mm}/${dd}/${yyyy} ${hh}:${min} ${ampm}`;
+        } catch (e) { return '' }
+      }
+
       async function loadConfigs() {
         try {
           const data = await fetchJson('/configs/');
@@ -138,17 +156,17 @@
           const data = resp && resp.active ? resp.active : [];
           const el = document.getElementById('active-container');
           if (!data || !data.length) { el.innerText = 'No active crawls'; return }
-          let html = '<table><tr><th>crawl_id</th><th>config</th><th>started_at</th><th>status</th><th>pages</th><th>links</th><th>action</th></tr>';
+          let html = '<table><tr><th>crawl_id</th><th>config</th><th>started at</th><th>action</th></tr>';
           for (const c of data) {
             const id = c.id || c.crawl_id || '';
             const cfg = c.config_name ?? c.config_path ?? c.config_id ?? '';
             const started = c.started_at ?? c.start_timestamp ?? '';
-            const pages = c.pages_fetched ?? 0;
-            const links = c.links_found ?? 0;
-            html += `<tr><td>${id}</td><td>${cfg}</td><td>${started}</td><td>${c.status ?? ''}</td><td>${pages}</td><td>${links}</td><td><button data-id="${id}" class="cancel">Cancel</button></td></tr>`;
+            const startedStr = formatStartedAt(started);
+            html += `<tr><td>${id}</td><td>${cfg}</td><td>${startedStr}</td><td><button data-id="${id}" class="cancel">Cancel</button></td></tr>`;
           }
           html += '</table>';
           el.innerHTML = html;
+          
           for (const b of el.querySelectorAll('button.cancel')) {
             b.onclick = async (ev) => {
               const id = ev.target.getAttribute('data-id');
