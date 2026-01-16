@@ -91,7 +91,25 @@ class PagesRepository:
             return self._to_domain(p)
 
     def upsert_page(self, page: Page) -> Page:
-        """Upsert page using domain object. Accepts Page with page_id (ignored for upsert)."""
+        """Upsert page using domain object. Accepts Page with page_id (ignored for upsert).
+        
+        Deduplication: If config_id and content_hash are both present and non-empty,
+        check for an existing page with the same (config_id, content_hash) pair.
+        If found, return the existing page without creating a duplicate.
+        """
+        # Check for dedup: if config_id and content_hash both exist, look for existing
+        if (page.config_id is not None and 
+            getattr(page, 'content_hash', None) is not None):
+            with self.get_session() as session:
+                q = select(DBPage).where(
+                    (DBPage.config_id == page.config_id) &
+                    (DBPage.content_hash == page.content_hash)
+                )
+                existing = session.execute(q).scalars().first()
+                if existing:
+                    # Return the existing page without modifying or creating a new one
+                    return self._to_domain(existing)
+        
         with self.get_session() as session:
             q = select(DBPage).where(DBPage.page_url == page.page_url)
             p = session.execute(q).scalars().first()

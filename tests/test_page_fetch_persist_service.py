@@ -96,3 +96,40 @@ def test_content_hash_persisted_from_filtered_plain_text():
     # Repository should expose the same hash via the domain model once implemented
     # This assertion will fail until content_hash is added to DB and domain mapping.
     assert getattr(stored, 'content_hash', None) == expected
+
+
+def test_upsert_deduplicates_by_config_and_content_hash():
+    """Same content under same config should not create a duplicate page."""
+    engine = create_engine("sqlite:///:memory:", future=True)
+    Base.metadata.create_all(engine)
+    session_factory = sessionmaker(bind=engine, future=True)
+    pages_repo = PagesRepository(session_factory)
+    svc = PageFetchPersistService(http_service=DummyHttp(), pages_repo=pages_repo)
+
+    # Persist first URL with config_id=1
+    html = '<html><body><main>Unique Content</main></body></html>'
+    page1 = svc.extract_and_persist('http://example.com/page1', 200, html, '2026-01-12T00:00:00Z', context=None)
+    # Manually set config_id on domain object to simulate config context
+    page1.config_id = 1
+    repo_page1 = pages_repo.upsert_page(page1)
+    
+    # Persist same content under different URL but same config_id
+    page2 = svc.extract_and_persist('http://example.com/page2', 200, html, '2026-01-12T00:00:01Z', context=None)
+    page2.config_id = 1
+    repo_page2 = pages_repo.upsert_page(page2)
+    
+    # Both should have the same content_hash
+    assert repo_page1.content_hash == repo_page2.content_hash
+    
+    # Second upsert should detect the duplicate and return the existing page without creating a new entry
+    # We verify by checking if only one page exists in DB for this content_hash under config_id=1
+    from sqlalchemy import select
+    from infracrawl.db.models import Page as DBPage
+    with pages_repo.get_session() as session:
+        existing = session.execute(
+            select(DBPage).where(
+                (DBPage.content_hash == repo_page1.content_hash) & (DBPage.config_id == 1)
+            )
+        ).scalars().all()
+    # Should be only 1 page, not 2
+    assert len(existing) == 1
