@@ -94,7 +94,6 @@ class ConfiguredCrawlProvider:
     def process_links(
         self,
         page: Page,
-        crawl_from_fn: Optional[Callable[[Page], tuple[int, bool]]] = None,
     ) -> tuple[int, bool]:
         """Extract and process links from page body.
 
@@ -116,10 +115,7 @@ class ConfiguredCrawlProvider:
             self.context.set_current_depth(child_depth)
             # Create new page for the discovered link
             child_page = Page(page_url=link_url)
-            if crawl_from_fn is not None:
-                result = crawl_from_fn(child_page)
-            else:
-                result = self.crawl_from(child_page)
+            result = self.crawl_from(child_page)
             self.context.set_current_depth(prev_depth)
             pages_crawled += result[0]
             if result[1]:
