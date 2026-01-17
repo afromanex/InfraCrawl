@@ -1,4 +1,4 @@
-from typing import Any, Optional, Protocol
+from typing import Any, Optional
 import logging
 from datetime import datetime, timezone
 
@@ -8,19 +8,9 @@ from apscheduler.triggers.interval import IntervalTrigger
 
 from infracrawl.services.crawl_run_recovery import CrawlRunRecovery
 from infracrawl.services.scheduled_crawl_job_runner import ScheduledCrawlJobRunner
+from infracrawl.services.protocols import ConfigProvider
 
 logger = logging.getLogger(__name__)
-
-
-class ConfigProvider(Protocol):
-    """Minimal interface for config access - ensures Interface Segregation Principle.
-    
-    SchedulerService only needs these 3 methods, not the full ConfigService.
-    This allows easier testing with minimal mocks and reduces coupling.
-    """
-    def list_configs(self): ...
-    def get_config(self, config_path: str): ...
-    def sync_configs_with_disk(self) -> None: ...
 
 
 def _parse_schedule(schedule: Any):
@@ -73,7 +63,7 @@ class SchedulerService:
         self._recovery = CrawlRunRecovery(
             config_provider=self.config_service,
             crawls_repo=self.crawls_repo,
-            schedule_restart_fn=self._execute_scheduled_crawl,
+            within_seconds=self._recovery_within_seconds,
         )
 
     def start(self):
@@ -103,12 +93,11 @@ class SchedulerService:
         Kept as a SchedulerService method for backwards compatibility and tests,
         but delegated to CrawlRunRecovery.
         """
-        self._recovery.recover(
-            sched=self._sched,
-            mode=self._recovery_mode,
-            within_seconds=self._recovery_within_seconds,
-            message=self._recovery_message,
-        )
+        mode_norm = (self._recovery_mode or "restart").strip().lower()
+        if mode_norm in {"off", "0", "false", "none"}:
+            return
+        
+        self._recovery.recover()
 
     def shutdown(self, wait: bool = True):
         if not self._sched:

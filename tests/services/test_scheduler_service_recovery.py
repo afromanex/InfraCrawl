@@ -72,8 +72,8 @@ def test_recovery_mark_mode_marks_incomplete_runs():
     svc._recover_incomplete_runs_on_startup()
 
     assert crawls_repo.calls == [
-        (1, None, "startup recovery"),
-        (2, None, "startup recovery"),
+        (1, None, "job found incomplete on startup"),
+        (2, None, "job found incomplete on startup"),
     ]
     assert svc._sched.added == []
 
@@ -100,13 +100,12 @@ def test_recovery_restart_mode_schedules_restart_for_configs_with_incomplete():
     svc._recover_incomplete_runs_on_startup()
 
     assert crawls_repo.calls == [
-        (1, 3600, "startup recovery"),
-        (2, 3600, "startup recovery"),
+        (1, 3600, "job found incomplete on startup"),
+        (2, 3600, "job found incomplete on startup"),
     ]
 
-    assert len(sched.added) == 1
-    assert sched.added[0]["id"] == "recovery:a.yml"
-    assert sched.added[0]["replace_existing"] is True
+    # Jobs are no longer automatically scheduled; logging indicates what should be restarted
+    assert len(sched.added) == 0
 
 
 def test_recovery_off_mode_does_nothing():
@@ -152,7 +151,7 @@ def test_recovery_restart_skips_if_incomplete_runs_in_db():
 
     # Mark incomplete runs should be called (to mark old runs complete)
     assert crawls_repo.calls == [
-        (1, None, "startup recovery"),
+        (1, None, "job found incomplete on startup"),
     ]
     # But should skip scheduling restart because database already has incomplete runs
     assert sched.added == []
@@ -185,8 +184,7 @@ def test_recovery_restart_schedules_when_resume_false():
 
     # Mark incomplete runs should be called
     assert crawls_repo.calls == [
-        (1, None, "startup recovery"),
+        (1, None, "job found incomplete on startup"),
     ]
-    # Should schedule restart because resume_on_application_restart is False
-    assert len(sched.added) == 1
-    assert sched.added[0]["id"] == "recovery:a.yml"
+    # Should not schedule restart because resume_on_application_restart is False (logging indicates what to do)
+    assert len(sched.added) == 0

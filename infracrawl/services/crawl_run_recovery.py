@@ -1,8 +1,8 @@
 import logging
-from datetime import datetime, timezone
 from typing import Optional
 
-from apscheduler.triggers.date import DateTrigger
+from infracrawl.repository.crawls import CrawlsRepository
+from infracrawl.services.protocols import ConfigProvider
 
 logger = logging.getLogger(__name__)
 
@@ -16,48 +16,32 @@ class CrawlRunRecovery:
     def __init__(
         self,
         *,
-        config_provider,
-        crawls_repo,
-        schedule_restart_fn,
-    ):
+        config_provider: ConfigProvider,
+        crawls_repo: CrawlsRepository,
+        within_seconds: Optional[int],
+    ) -> None:
         self.config_provider = config_provider
         self.crawls_repo = crawls_repo
-        self.schedule_restart_fn = schedule_restart_fn
+        self.within_seconds = within_seconds
 
-    def recover(
-        self,
-        *,
-        sched,
-        mode: str,
-        within_seconds: Optional[int],
-        message: str,
-    ) -> None:
+    def recover(self) -> None:
+        """Mark incomplete crawl runs as complete."""
         if self.crawls_repo is None:
             return
-        if not sched:
-            return
 
-        mode_norm = (mode or "restart").strip().lower()
-        if mode_norm in {"off", "0", "false", "none"}:
-            return
-
-        try:
-            configs = self.config_provider.list_configs()
-        except Exception:
-            logger.exception("Could not list configs for recovery")
-            return
+        configs = self.config_provider.list_configs()
 
         for db_cfg in configs:
-            cfg_id = getattr(db_cfg, "config_id", None)
-            cfg_path = getattr(db_cfg, "config_path", None)
+            cfg_id: Optional[int] = getattr(db_cfg, "config_id", None)
+            cfg_path: Optional[str] = getattr(db_cfg, "config_path", None)
             if cfg_id is None or not cfg_path:
                 continue
 
             try:
-                count = self.crawls_repo.mark_incomplete_runs(
+                count: int = self.crawls_repo.mark_incomplete_runs(
                     cfg_id,
-                    within_seconds=within_seconds,
-                    message=message,
+                    within_seconds=self.within_seconds,
+                    message="job found incomplete on startup",
                 )
             except Exception:
                 logger.exception("Failed marking incomplete runs for config %s", cfg_path)
@@ -68,25 +52,16 @@ class CrawlRunRecovery:
 
             logger.info("Recovered %s incomplete run(s) for %s", count, cfg_path)
 
-            if mode_norm == "restart":
-                # Check config's resume_on_application_restart setting
-                resume = getattr(db_cfg, "resume_on_application_restart", False)
-                if resume:
-                    # Skip scheduling if there are already incomplete (running) runs for this config
-                    try:
-                        if self.crawls_repo.has_incomplete_runs(cfg_id, within_seconds=within_seconds):
-                            logger.info("Skipping recovery restart for %s (resume_on_application_restart enabled, incomplete runs exist)", cfg_path)
-                            continue
-                    except Exception:
-                        logger.exception("Error checking incomplete runs for %s", cfg_path)
+            # Check config's resume_on_application_restart setting
+            resume: bool = getattr(db_cfg, "resume_on_application_restart", False)
+            if resume:
+                # Skip restart logging if there are already incomplete (running) runs for this config
                 try:
-                    job_id = f"recovery:{cfg_path}"
-                    sched.add_job(
-                        lambda p=cfg_path: self.schedule_restart_fn(p),
-                        trigger=DateTrigger(run_date=datetime.now(timezone.utc)),
-                        id=job_id,
-                        replace_existing=True,
-                    )
-                    logger.info("Scheduled recovery restart for %s", cfg_path)
+                    if self.crawls_repo.has_incomplete_runs(cfg_id, within_seconds=self.within_seconds):
+                        logger.info("Skipping recovery restart for %s (resume_on_application_restart enabled, incomplete runs exist)", cfg_path)
+                        continue
                 except Exception:
-                    logger.exception("Failed scheduling recovery restart for %s", cfg_path)
+                    logger.exception("Error checking incomplete runs for %s", cfg_path)
+            
+            # Log that job needs to be restarted (actual restart mechanism to be implemented)
+            logger.warning("Job for config %s (id=%s) should be restarted. Restart mechanism still needs to be implemented.", cfg_path, cfg_id)
