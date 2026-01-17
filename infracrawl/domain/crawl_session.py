@@ -40,6 +40,8 @@ class CrawlSession:
         self.visited_tracker = visited_tracker if visited_tracker is not None else VisitedTracker()
         # Track pages fetched within the current crawl
         self.pages_crawled: int = 0
+        # Track internal stop signal during link traversal
+        self._internal_stopped: bool = False
 
     def start_tracking(self) -> None:
         """Begin registry tracking if registry is configured.
@@ -115,4 +117,12 @@ class CrawlSession:
     def restore_depth(self, depth: Optional[int]) -> None:
         """Restore depth to previous value after crawling a child."""
         self.current_depth = depth
+
+    def should_stop(self) -> bool:
+        """Check if crawling should stop (either external or internal signal)."""
+        return (self.stop_event is not None and self.stop_event.is_set()) or self._internal_stopped
+
+    def mark_stopped(self) -> None:
+        """Mark that crawling should stop (internal signal)."""
+        self._internal_stopped = True
 

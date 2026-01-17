@@ -99,11 +99,10 @@ class ConfiguredCrawlProvider:
         Returns (pages_crawled, stopped) tuple for child pages.
         """
         pages_crawled = 0
-        stopped = False
 
         def cb(child_page):
-            nonlocal pages_crawled, stopped
-            if stopped:
+            nonlocal pages_crawled
+            if self.context.should_stop():
                 return
             prev_depth = self.context.current_depth
             if not self.context.can_crawl_child():
@@ -112,10 +111,10 @@ class ConfiguredCrawlProvider:
             self.context.restore_depth(prev_depth)
             pages_crawled += result[0]
             if result[1]:
-                stopped = True
+                self.context.mark_stopped()
 
         self.link_processor.process(page, self.context, crawl_callback=cb)
-        return (pages_crawled, stopped)
+        return (pages_crawled, self.context.should_stop())
 
     def crawl_from(self, page: Page) -> tuple[int, bool]:
         """Crawl a single page and its children.
