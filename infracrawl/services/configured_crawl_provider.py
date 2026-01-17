@@ -100,7 +100,7 @@ class ConfiguredCrawlProvider:
         child_depth = depth - 1 if depth is not None else None
         crawl_depth_reached = child_depth is not None and child_depth < 0
         if crawl_depth_reached:
-            return self.context.is_stopped()
+            return False  # Max depth reached, not a stop signal
         
         def crawl_child_page(child_page):
             # Check if already stopped
