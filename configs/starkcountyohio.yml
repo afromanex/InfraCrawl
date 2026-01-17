@@ -3,6 +3,7 @@ root_urls:
 max_depth: 4
 refresh_days: 7
 robots: false
+resume_on_application_restart: true
 
 fetch:
   mode: headless_chromium

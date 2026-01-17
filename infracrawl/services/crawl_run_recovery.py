@@ -58,6 +58,7 @@ class CrawlRunRecovery:
             try:
                 full_cfg = self.config_provider.get_config(cfg_path)
                 resume = bool(getattr(full_cfg, "resume_on_application_restart", False))
+                logger.info("Resume flag for %s: %s", cfg_path, resume)
             except Exception:
                 logger.exception("Recovery: could not load full config for %s to check resume flag", cfg_path)
                 resume = False
@@ -66,6 +67,7 @@ class CrawlRunRecovery:
                 # Skip restart if there are already incomplete (running) runs for this config
                 try:
                     has_incomplete = self.crawls_repo.has_incomplete_runs(cfg_id, within_seconds=self.within_seconds)
+                    logger.info("Has incomplete runs for %s (id=%s): %s", cfg_path, cfg_id, has_incomplete)
                     if has_incomplete:
                         logger.info(
                             "Skipping recovery restart for %s (resume_on_application_restart enabled, incomplete runs exist)",
@@ -77,6 +79,7 @@ class CrawlRunRecovery:
 
                 # If a resume callback is provided (wired by the scheduler/container), invoke it
                 resume_cb = getattr(self, "_resume_callback", None)
+                logger.info("Resume callback available for %s: %s", cfg_path, callable(resume_cb))
                 if callable(resume_cb):
                     try:
                         logger.info(
@@ -88,6 +91,8 @@ class CrawlRunRecovery:
                         continue
                     except Exception:
                         logger.exception("Error invoking resume callback for %s", cfg_path)
+            else:
+                logger.info("Resume disabled for %s, will mark as complete only", cfg_path)
 
             # Fallback: Log that job should be restarted if no callback available
             logger.warning(
