@@ -44,9 +44,8 @@ class CrawlExecutor:
         for root_url in roots:
             # Create page object for root URL
             page = Page(page_url=root_url)
-            result = provider.crawl_from(page)
-            if result[1]:
-                stopped = True
+            stopped = provider.crawl_from(page)
+            if stopped:
                 break
 
         # Update registry with final page count via session

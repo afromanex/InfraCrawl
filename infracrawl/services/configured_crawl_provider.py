@@ -93,35 +93,31 @@ class ConfiguredCrawlProvider:
     def process_links(
         self,
         page: Page,
-    ) -> tuple[int, bool]:
+    ) -> bool:
         """Extract and process links from page body.
 
-        Returns (pages_crawled, stopped) tuple for child pages.
+        Returns stopped status.
         """
-        pages_crawled = 0
-
         def cb(child_page):
-            nonlocal pages_crawled
             if self.context.should_stop():
                 return
             prev_depth = self.context.current_depth
             if not self.context.can_crawl_child():
                 return
-            result = self.crawl_from(child_page)
+            stopped = self.crawl_from(child_page)
             self.context.restore_depth(prev_depth)
-            pages_crawled += result[0]
-            if result[1]:
+            if stopped:
                 self.context.mark_stopped()
 
         self.link_processor.process(page, self.context, crawl_callback=cb)
-        return (pages_crawled, self.context.should_stop())
+        return self.context.should_stop()
 
-    def crawl_from(self, page: Page) -> tuple[int, bool]:
+    def crawl_from(self, page: Page) -> bool:
         """Crawl a single page and its children.
 
         The page object is enriched as we go (page_id, page_content).
         Sets up root and depth context for this crawl.
-        Returns (pages_crawled, stopped) tuple.
+        Returns stopped status.
         """
         url = page.page_url
         
@@ -132,7 +128,7 @@ class ConfiguredCrawlProvider:
         depth = self.context.current_depth
         if self.context.is_visited(url):
             logger.debug("Skipping (visited) %s", url)
-            return (0, False)
+            return False
         self.context.mark_visited(url)
 
         # Enrich page with database record
@@ -140,31 +136,24 @@ class ConfiguredCrawlProvider:
 
         if self.is_stopped(self.context.stop_event):
             logger.info("Crawl cancelled during traversal of %s", url)
-            return (0, True)
+            return True
 
         if depth is not None and self.crawl_policy.should_skip_due_to_depth(depth):
-            return (0, False)
+            return False
         if self.crawl_policy.should_skip_due_to_robots(url, self.context):
-            return (0, False)
+            return False
         if self.crawl_policy.should_skip_due_to_refresh(url, self.context):
-            return (0, False)
+            return False
 
         # Fetch and enrich page with content
         body = self.fetch_and_store(url, self.context.stop_event)
         if body is None:
-            return (0, False)
+            return False
 
         page.page_content = body
         self.context.increment_pages_crawled(1)
-        pages_crawled = 1
-        stopped = False
 
         time.sleep(self.context.config.delay_seconds)
-        child_result = self.process_links(page)
-        if child_result[0]:
-            self.context.increment_pages_crawled(child_result[0])
-        pages_crawled += child_result[0]
-        if child_result[1]:
-            stopped = True
+        stopped = self.process_links(page)
 
-        return (pages_crawled, stopped)
+        return stopped
