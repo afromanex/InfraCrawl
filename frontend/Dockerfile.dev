@@ -2,9 +2,15 @@ FROM node:18-alpine
 
 WORKDIR /app
 
-COPY package*.json ./
+# Copy package files
+COPY package.json ./
 
-RUN npm ci
+# Install Angular CLI globally and dependencies
+RUN npm install -g @angular/cli@17 && \
+    npm install
+
+# Copy config files
+COPY angular.json tsconfig.json tailwind.config.js postcss.config.js proxy.conf.json ./
 
 EXPOSE 4200
 
