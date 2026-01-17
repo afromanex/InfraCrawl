@@ -80,7 +80,19 @@ class SchedulerService:
         self._sched.start()
         logger.info("Scheduler started")
         self.load_and_schedule_all()
-        self._recover_incomplete_runs_on_startup()
+        
+        # Schedule recovery as a one-time background job to avoid blocking startup
+        try:
+            self._sched.add_job(
+                self._recover_incomplete_runs_on_startup,
+                trigger='date',  # run once immediately
+                id="startup_recovery",
+                replace_existing=True,
+            )
+            logger.info("Scheduled startup recovery job")
+        except Exception:
+            logger.exception("Could not schedule startup recovery")
+        
         # schedule periodic config watcher to keep DB in sync with disk
         try:
             # use an interval trigger to periodically scan configs

@@ -153,7 +153,8 @@ def create_crawlers_router(
             raise HTTPException(status_code=404, detail="config not found")
 
         try:
-            page_ids = pages_repo.get_page_ids_by_config(cfg.config_id)
+            # Only count pages that have been fetched (have content)
+            page_ids = pages_repo.get_fetched_page_ids_by_config(cfg.config_id)
             page_count = len(page_ids) if page_ids else 0
             link_count = 0
             if page_ids:

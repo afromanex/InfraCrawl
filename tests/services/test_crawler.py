@@ -47,6 +47,10 @@ def test_crawl_executor_updates_registry_with_page_count(mock_repos):
     
     # Mock pages_repo to return a page_id on ensure_page
     mock_repos['pages_repo'].ensure_page.return_value = 1
+    # Mock get_unvisited_urls_by_config to return empty list (no pre-existing discovered pages)
+    mock_repos['pages_repo'].get_unvisited_urls_by_config.return_value = []
+    # Mock get_undiscovered_urls_by_depth to return empty list (for iterative depth-based crawling)
+    mock_repos['pages_repo'].get_undiscovered_urls_by_depth.return_value = []
     
     # Create a minimal config with one root URL
     config = CrawlerConfig(

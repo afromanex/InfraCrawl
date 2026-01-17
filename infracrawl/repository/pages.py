@@ -1,6 +1,6 @@
 from typing import Optional, List
 from datetime import datetime
-from sqlalchemy import select
+from sqlalchemy import select, delete
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.exc import IntegrityError
 
@@ -44,6 +44,7 @@ class PagesRepository:
             fetched_at=db_page.fetched_at,
             config_id=db_page.config_id,
             content_hash=db_page.content_hash,
+            discovered_depth=db_page.discovered_depth,
         )
 
     def ensure_page(self, page) -> None:
@@ -59,7 +60,11 @@ class PagesRepository:
             if row:
                 page.page_id = row.page_id
                 return
-            p = DBPage(page_url=page_url)
+            p = DBPage(
+                page_url=page_url,
+                config_id=page.config_id if hasattr(page, 'config_id') else None,
+                discovered_depth=page.discovered_depth if hasattr(page, 'discovered_depth') else None
+            )
             session.add(p)
             # Handle possible unique constraint races: if another worker inserted
             # the same URL concurrently, catch IntegrityError, rollback and re-query.
@@ -76,13 +81,18 @@ class PagesRepository:
             session.refresh(p)
             page.page_id = p.page_id
     
-    def ensure_pages_batch(self, page_urls: List[str]) -> dict[str, int]:
+    def ensure_pages_batch(self, page_urls: List[str], discovered_depth: Optional[int] = None, config_id: Optional[int] = None) -> dict[str, int]:
         """Ensure multiple pages exist and return mapping of URL -> page_id.
         
         Batch operation to reduce N+1 queries. Returns dict mapping each URL to its page_id.
+        Sets discovered_depth and config_id on newly created pages if provided.
         """
         if not page_urls:
             return {}
+        
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info("ensure_pages_batch: urls=%d, discovered_depth=%s, config_id=%s", len(page_urls), discovered_depth, config_id)
         
         with self.get_session() as session:
             # Find existing pages
@@ -93,7 +103,8 @@ class PagesRepository:
             # Insert missing pages
             missing_urls = set(page_urls) - set(url_to_id.keys())
             if missing_urls:
-                new_pages = [DBPage(page_url=url) for url in missing_urls]
+                logger.info("Creating %d new pages with discovered_depth=%s, config_id=%s", len(missing_urls), discovered_depth, config_id)
+                new_pages = [DBPage(page_url=url, discovered_depth=discovered_depth, config_id=config_id) for url in missing_urls]
                 session.add_all(new_pages)
                 session.commit()
                 for p in new_pages:
@@ -211,25 +222,101 @@ class PagesRepository:
             rows = session.execute(q).scalars().all()
             return rows
 
-    def get_visited_urls_by_config(self, config_id: int) -> List[str]:
-        """Get all page URLs that have been visited for a given config.
+    def get_fetched_page_ids_by_config(self, config_id: int) -> List[int]:
+        """Get page IDs for a config that have been fetched (have content).
         
         Args:
             config_id: The crawler config ID
             
         Returns:
-            List of page URLs that have been crawled
+            List of page IDs that have page_content (not NULL)
         """
         with self.get_session() as session:
-            q = select(DBPage.page_url).where(DBPage.config_id == config_id)
+            q = select(DBPage.page_id).where(
+                (DBPage.config_id == config_id) &
+                (DBPage.page_content.is_not(None))
+            )
+            rows = session.execute(q).scalars().all()
+            return rows
+
+    def get_visited_urls_by_config(self, config_id: int) -> List[str]:
+        """Get all page URLs that have been visited for a given config.
+        
+        Only returns pages that have content (were actually fetched), not pages
+        that were only discovered but never crawled.
+        
+        Args:
+            config_id: The crawler config ID
+            
+        Returns:
+            List of page URLs that have been crawled (have content)
+        """
+        with self.get_session() as session:
+            q = select(DBPage.page_url).where(
+                DBPage.config_id == config_id,
+                DBPage.page_content.isnot(None)
+            )
+            rows = session.execute(q).scalars().all()
+            return list(rows)
+    
+    def get_unvisited_urls_by_config(self, config_id: int) -> List[str]:
+        """Get all page URLs that exist but have no content (unvisited) for a config.
+        
+        These are pages that were discovered (inserted into DB) but not yet fetched.
+        Useful for resuming crawls that were interrupted mid-discovery.
+        
+        Args:
+            config_id: The crawler config ID
+            
+        Returns:
+            List of page URLs with no page_content
+        """
+        with self.get_session() as session:
+            q = select(DBPage.page_url).where(
+                (DBPage.config_id == config_id) &
+                (DBPage.page_content.is_(None))
+            )
             rows = session.execute(q).scalars().all()
             return list(rows)
 
-    def delete_pages_by_ids(self, ids: List[int]) -> int:
-        if not ids:
-            return 0
+    def get_undiscovered_urls_by_depth(self, config_id: int, discovered_depth: int, limit: int = 1000) -> List[str]:
+        """Get page URLs at a specific depth that haven't been fetched yet.
+        
+        Used for iterative depth-based crawling: fetch all pages at depth N,
+        then all at depth N+1, etc.
+        
+        Args:
+            config_id: The crawler config ID
+            discovered_depth: The depth level to query
+            limit: Maximum pages to return
+            
+        Returns:
+            List of page URLs at the given depth with no page_content
+        """
         with self.get_session() as session:
-            q = session.query(DBPage).filter(DBPage.page_id.in_(ids))
-            deleted = q.delete(synchronize_session=False)
+            q = select(DBPage.page_url).where(
+                (DBPage.config_id == config_id) &
+                (DBPage.discovered_depth == discovered_depth) &
+                (DBPage.page_content.is_(None))
+            ).limit(limit)
+            rows = session.execute(q).scalars().all()
+            return list(rows)
+
+    def delete_pages_by_ids(self, page_ids: List[int]) -> int:
+        """Delete pages by their IDs.
+        
+        Args:
+            page_ids: List of page IDs to delete
+            
+        Returns:
+            Number of pages deleted
+        """
+        if not page_ids:
+            return 0
+            
+        with self.get_session() as session:
+            stmt = delete(DBPage).where(DBPage.page_id.in_(page_ids))
+            result = session.execute(stmt)
             session.commit()
-            return deleted
+            return result.rowcount
+

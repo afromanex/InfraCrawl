@@ -20,6 +20,7 @@ class Page(Base):
     http_status = Column(Integer, nullable=True)
     fetched_at = Column(DateTime(timezone=True), nullable=True)
     config_id = Column(Integer, nullable=True)
+    discovered_depth = Column(Integer, nullable=True)  # Depth at which this page was discovered
 
 
 class Link(Base):

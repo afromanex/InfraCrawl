@@ -26,9 +26,13 @@ class LinkProcessor:
             return False
 
     def process(self, page: Page, context: CrawlSession, *, crawl_child_page: Optional[Callable[[Page], None]] = None) -> None:
-        """Extract links from the page, persist them, and optionally schedule crawls.
+        """Extract links from the page and persist them.
 
-        `crawl_child_page(page)` is invoked for links to be crawled.
+        Links are stored in the database with NULL content (discovered but not yet fetched).
+        They are stored at depth+1 relative to the current page.
+        They will be crawled in subsequent iterations at the next depth level.
+        
+        Note: crawl_child_page callback is ignored in iterative crawling mode.
         """
         links = self.content_review_service.extract_links(page.page_url, page.page_content)
         
@@ -41,13 +45,18 @@ class LinkProcessor:
             same_host_links.append((link_url, anchor))
         
         if not same_host_links:
+            logger.debug("No same-host links found on %s", page.page_url)
             return
 
-        # Persist links (batch DB work)
-        self.link_persister.persist_links(from_id=page.page_id, links=same_host_links)
-        
-        # Schedule crawls for discovered links
-        if crawl_child_page is not None:
-            for link_url, _ in same_host_links:
-                child_page = Page(page_url=link_url)
-                crawl_child_page(child_page)
+        # Persist links (batch DB work) - these will be discovered but not yet fetched
+        # Pass depth so discovered pages can be marked at next depth level
+        self.link_persister.persist_links(
+            from_id=page.page_id, 
+            links=same_host_links,
+            from_depth=page.discovered_depth,
+            config_id=page.config_id
+        )
+        logger.info("Persisted %d links from %s at depth %s (will be crawled at depth %s)", 
+                   len(same_host_links), page.page_url, page.discovered_depth, (page.discovered_depth + 1) if page.discovered_depth is not None else "?")
+
+

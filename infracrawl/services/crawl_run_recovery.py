@@ -31,6 +31,7 @@ class CrawlRunRecovery:
 
         logger.info("Recovery: scanning configs for incomplete runs")
         configs = self.config_provider.list_configs()
+        logger.info("Recovery: found %d configs to check", len(configs))
 
         for db_cfg in configs:
             cfg_id: Optional[int] = getattr(db_cfg, "config_id", None)
@@ -49,9 +50,10 @@ class CrawlRunRecovery:
                 continue
 
             if count <= 0:
+                logger.debug("Recovery: no incomplete runs for config %s (id=%s)", cfg_path, cfg_id)
                 continue
 
-            logger.info("Recovered %s incomplete run(s) for %s", count, cfg_path)
+            logger.info("Recovery: marked %d incomplete run(s) for %s", count, cfg_path)
 
             # Always load full config to check resume flag (may have been updated since DB last synced)
             resume: bool = False

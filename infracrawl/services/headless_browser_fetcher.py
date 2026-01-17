@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import Optional
 
@@ -27,8 +29,10 @@ class PlaywrightHeadlessFetcher:
     def __init__(self, *, user_agent: str, options: Optional[PlaywrightHeadlessOptions] = None):
         self._user_agent = user_agent
         self._options = options or PlaywrightHeadlessOptions()
+        self._executor = ThreadPoolExecutor(max_workers=3, thread_name_prefix="playwright")
 
-    def fetch(self, url: str, stop_event=None) -> HttpResponse:
+    def _fetch_sync(self, url: str, stop_event) -> HttpResponse:
+        """Internal synchronous fetch implementation."""
         if stop_event is not None and getattr(stop_event, "is_set", lambda: False)():
             raise RuntimeError("Fetch cancelled")
 
@@ -58,3 +62,16 @@ class PlaywrightHeadlessFetcher:
                     browser.close()
                 except Exception:
                     pass
+
+    def fetch(self, url: str, stop_event=None) -> HttpResponse:
+        """Fetch a URL using Playwright in a thread to avoid asyncio loop conflicts."""
+        try:
+            # Check if we're in an asyncio event loop
+            loop = asyncio.get_running_loop()
+            # We're in an asyncio context, run in thread pool
+            import concurrent.futures
+            future = self._executor.submit(self._fetch_sync, url, stop_event)
+            return future.result()
+        except RuntimeError:
+            # Not in an asyncio loop, call directly
+            return self._fetch_sync(url, stop_event)

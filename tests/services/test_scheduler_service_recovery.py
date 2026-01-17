@@ -143,7 +143,7 @@ def test_recovery_logs_startup_and_per_config(caplog):
 
     assert "Checking for jobs to restart" in scheduler_logs
     assert "Recovery: scanning configs for incomplete runs" in recovery_logs
-    assert "Recovered 1 incomplete run(s) for a.yml" in recovery_logs
+    assert "Recovery: marked 1 incomplete run(s) for a.yml" in recovery_logs
     # Since resume flag is False, expect fallback restart guidance log
     assert "Job for config a.yml (id=1) should be restarted" in recovery_logs
 

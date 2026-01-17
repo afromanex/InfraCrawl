@@ -1,9 +1,12 @@
 """Factory for rebuilding CrawlSession instances from incomplete crawls."""
 from typing import Optional
+import logging
 from infracrawl.domain import CrawlSession
 from infracrawl.domain.config import CrawlerConfig
 from infracrawl.domain.visited_tracker import VisitedTracker
 from infracrawl.repository.pages import PagesRepository
+
+logger = logging.getLogger(__name__)
 
 
 class CrawlSessionResumeFactory:
@@ -47,11 +50,19 @@ class CrawlSessionResumeFactory:
         visited_urls = []
         if config.config_id is not None:
             visited_urls = self.pages_repo.get_visited_urls_by_config(config.config_id)
+            logger.info("Resume factory: loaded %d visited URLs for config %s (ID: %s)", 
+                       len(visited_urls), config.config_path, config.config_id)
+            if visited_urls:
+                logger.debug("Visited URLs: %s", visited_urls[:5])  # Log first 5 for brevity
+        else:
+            logger.warning("Resume factory: config_id is None, cannot load visited URLs")
         
         # Create visited tracker and pre-populate with previous URLs
         visited_tracker = VisitedTracker(max_size=self.visited_tracker_max_urls)
         for url in visited_urls:
             visited_tracker.mark(url)
+        
+        logger.info("Resume factory: pre-populated visited tracker with %d URLs", len(visited_urls))
         
         # Create session with pre-populated tracker
         session = CrawlSession(

@@ -23,9 +23,9 @@ def test_get_config_stats_returns_page_and_link_counts():
     # Mock config_service.get_config to return the test config
     mock_config_service.get_config.return_value = config
     
-    # Mock pages_repo to return page IDs
+    # Mock pages_repo to return fetched page IDs (only pages with content)
     page_ids = [1, 2, 3]  # 3 pages
-    mock_pages_repo.get_page_ids_by_config.return_value = page_ids
+    mock_pages_repo.get_fetched_page_ids_by_config.return_value = page_ids
     
     # Mock links_repo to return link count
     mock_links_repo.count_links_for_page_ids.return_value = 5  # 5 links
@@ -60,5 +60,5 @@ def test_get_config_stats_returns_page_and_link_counts():
     
     # Verify that the repos were called correctly
     mock_config_service.get_config.assert_called_once_with("test.yml")
-    mock_pages_repo.get_page_ids_by_config.assert_called_once_with(1)
+    mock_pages_repo.get_fetched_page_ids_by_config.assert_called_once_with(1)
     mock_links_repo.count_links_for_page_ids.assert_called_once_with(page_ids)
