@@ -1,12 +1,12 @@
 import { NgModule } from '@angular/core';
 import { RouterModule, Routes } from '@angular/router';
-import { ActiveJobsComponent } from './active/active-jobs.component';
+import { JobsComponent } from './jobs.component';
 import { JobHistoryComponent } from './history/job-history.component';
 
 const routes: Routes = [
   {
     path: 'active',
-    component: ActiveJobsComponent,
+    component: JobsComponent,
   },
   {
     path: 'history',
@@ -20,6 +20,6 @@ const routes: Routes = [
 ];
 
 @NgModule({
-  imports: [RouterModule.forChild(routes), ActiveJobsComponent, JobHistoryComponent],
+  imports: [RouterModule.forChild(routes), JobsComponent, JobHistoryComponent],
 })
 export class JobsModule {}

@@ -1,13 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import {
-  LoginResponse,
-  User,
-  CrawlerConfig,
-  CrawlRun,
-  CrawlStats,
-} from '../models';
+import { LoginResponse, User, CrawlerConfig, CrawlRun } from '../models';
 
 @Injectable({
   providedIn: 'root',
@@ -30,18 +24,17 @@ export class APIService {
 
   // Configs
   getConfigs(): Observable<CrawlerConfig[]> {
-    return this.http.get<CrawlerConfig[]>(`${this.baseUrl}/crawlers/configs`);
+    return this.http.get<CrawlerConfig[]>(`${this.baseUrl}/configs/`);
   }
 
-  getConfig(configId: number): Observable<CrawlerConfig> {
-    return this.http.get<CrawlerConfig>(
-      `${this.baseUrl}/crawlers/configs/${configId}`
-    );
+  getConfig(configPath: string): Observable<string> {
+    return this.http.get(`${this.baseUrl}/configs/${encodeURIComponent(configPath)}`,
+      { responseType: 'text' });
   }
 
   // Jobs
-  getActiveJobs(): Observable<CrawlRun[]> {
-    return this.http.get<CrawlRun[]>(`${this.baseUrl}/crawlers/active`);
+  getActiveJobs(): Observable<any> {
+    return this.http.get<any>(`${this.baseUrl}/crawlers/active`);
   }
 
   getJobRuns(
@@ -65,6 +58,10 @@ export class APIService {
     return this.http.post(`${this.baseUrl}/crawlers/${configId}/stop`, {});
   }
 
+  cancelCrawl(crawlId: string): Observable<any> {
+    return this.http.post(`${this.baseUrl}/crawlers/cancel/${crawlId}`, {});
+  }
+
   resumeCrawl(configId: number): Observable<any> {
     return this.http.post(`${this.baseUrl}/crawlers/${configId}/resume`, {});
   }
@@ -74,9 +71,9 @@ export class APIService {
   }
 
   // Stats
-  getJobStats(configId: number): Observable<CrawlStats> {
-    return this.http.get<CrawlStats>(
-      `${this.baseUrl}/crawlers/stats/${configId}`
+  getJobStats(configPath: string): Observable<{ config_path: string; pages: number; links: number }> {
+    return this.http.get<{ config_path: string; pages: number; links: number }>(
+      `${this.baseUrl}/crawlers/stats/${encodeURIComponent(configPath)}`
     );
   }
 }

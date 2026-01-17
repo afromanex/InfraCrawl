@@ -39,6 +39,20 @@ export interface CrawlRun {
   current_depth?: number;
 }
 
+export interface ActiveCrawlRecord {
+  id: string;
+  config_name: string;
+  config_id: number | null;
+  status: string;
+  started_at: string;
+  last_seen: string;
+  finished_at: string | null;
+  pages_fetched: number;
+  links_found: number;
+  current_url: string | null;
+  error: string | null;
+}
+
 export interface CrawlStats {
   run_id: number;
   config_id: number;
