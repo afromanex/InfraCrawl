@@ -95,6 +95,16 @@ class ScheduledCrawlJobRunner:
         crawl continues where it left off.
         """
         cfg_path = getattr(cfg, "config_path", None)
+        try:
+            # Always load full config from provider to ensure we have root_urls,
+            # depth, and other YAML-backed fields (recovery passes a DB row summary).
+            if cfg_path:
+                cfg = self.config_provider.get_config(cfg_path)
+            else:
+                logger.warning("Resume called without config_path; cannot load full config")
+        except Exception as e:
+            logger.warning("Resume: config not found: %s - %s", cfg_path, e)
+            return
         logger.info("Starting resumed crawl job for %s", cfg_path)
         try:
             run_id: Optional[int] = None
