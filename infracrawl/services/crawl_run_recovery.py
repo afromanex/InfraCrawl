@@ -55,13 +55,29 @@ class CrawlRunRecovery:
             # Check config's resume_on_application_restart setting
             resume: bool = getattr(db_cfg, "resume_on_application_restart", False)
             if resume:
-                # Skip restart logging if there are already incomplete (running) runs for this config
+                # Skip restart if there are already incomplete (running) runs for this config
                 try:
                     if self.crawls_repo.has_incomplete_runs(cfg_id, within_seconds=self.within_seconds):
-                        logger.info("Skipping recovery restart for %s (resume_on_application_restart enabled, incomplete runs exist)", cfg_path)
+                        logger.info(
+                            "Skipping recovery restart for %s (resume_on_application_restart enabled, incomplete runs exist)",
+                            cfg_path,
+                        )
                         continue
                 except Exception:
                     logger.exception("Error checking incomplete runs for %s", cfg_path)
-            
-            # Log that job needs to be restarted (actual restart mechanism to be implemented)
-            logger.warning("Job for config %s (id=%s) should be restarted. Restart mechanism still needs to be implemented.", cfg_path, cfg_id)
+
+                # If a resume callback is provided (wired by the scheduler/container), invoke it
+                resume_cb = getattr(self, "_resume_callback", None)
+                if callable(resume_cb):
+                    try:
+                        resume_cb(db_cfg)
+                        continue
+                    except Exception:
+                        logger.exception("Error invoking resume callback for %s", cfg_path)
+
+            # Fallback: Log that job should be restarted if no callback available
+            logger.warning(
+                "Job for config %s (id=%s) should be restarted. Restart mechanism still needs to be implemented.",
+                cfg_path,
+                cfg_id,
+            )
