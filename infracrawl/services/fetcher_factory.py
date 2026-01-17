@@ -17,10 +17,10 @@ class FetcherFactory:
     http_fetcher: Fetcher
     headless_fetcher: Fetcher
 
-    def get(self, fetch_mode: str, config=None) -> Fetcher:
-        if fetch_mode is None or (isinstance(fetch_mode, str) and fetch_mode.strip() == ""):
-            raise ValueError("fetch_mode is required")
-        mode = fetch_mode.strip().lower()
+    def get(self, config) -> Fetcher:
+        if config is None or config.fetch_mode is None:
+            raise ValueError("config with fetch_mode is required")
+        mode = config.fetch_mode.strip().lower()
         if mode == "http":
             # Return configured HTTP fetcher if options provided
             if config and hasattr(config, 'http_options') and config.http_options:
@@ -51,4 +51,4 @@ class FetcherFactory:
                 )
                 return PlaywrightHeadlessFetcher(user_agent=base_user_agent, options=configured_options)
             return self.headless_fetcher
-        raise ValueError(f"Unknown fetch_mode: {fetch_mode!r}")
+        raise ValueError(f"Unknown fetch_mode: {config.fetch_mode!r}")

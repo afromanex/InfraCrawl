@@ -36,7 +36,7 @@ class ConfiguredCrawlProviderFactory:
             Configured provider ready to execute the crawl
         """
         config = session.config
-        fetcher = self.fetcher_factory.get(config.fetch_mode, config=config)
+        fetcher = self.fetcher_factory.get(config)
         return ConfiguredCrawlProvider(
             fetcher=fetcher,
             context=session,
