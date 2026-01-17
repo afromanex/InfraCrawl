@@ -39,7 +39,7 @@ class ConfiguredCrawlProvider:
     def fetch(self, url: str, stop_event=None):
         return self.fetcher.fetch(url, stop_event=stop_event)
 
-    def fetch_and_store(self, page: Page) -> bool:
+    def fetch_and_persist(self, page: Page) -> bool:
         """Fetch a URL, persist the page, and mutate page in-place.
         
         Mutates: page.page_content, page.plain_text, page.filtered_plain_text, 
@@ -60,6 +60,10 @@ class ConfiguredCrawlProvider:
             return False
         except Exception as e:
             logger.error("Fetch error for %s: %s", url, e, exc_info=True)
+            return False
+
+        # Skip unsupported content types
+        if not self.fetch_persist_service.should_persist(response, url):
             return False
 
         # Mutate page with fetch results
@@ -157,7 +161,7 @@ class ConfiguredCrawlProvider:
             return False
 
         # Fetch and enrich page with content
-        success = self.fetch_and_store(page)
+        success = self.fetch_and_persist(page)
         if not success:
             return False
 
