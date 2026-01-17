@@ -4,7 +4,7 @@ import threading
 from typing import Dict, Optional
 
 
-class _InMemoryCrawlCancellationManager:
+class CancellationManager:
     def __init__(self, *, event_factory=threading.Event):
         self._event_factory = event_factory
         self._cancel_events: Dict[str, threading.Event] = {}

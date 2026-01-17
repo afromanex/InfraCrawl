@@ -6,9 +6,9 @@ from dataclasses import asdict
 from datetime import datetime
 from typing import Dict, List, Optional
 
-from .cancellation import _InMemoryCrawlCancellationManager
+from .cancellation import CancellationManager
 from .models import CrawlHandle, CrawlRecord
-from .store import _InMemoryCrawlRecordStore
+from .store import CrawlRecordStore
 
 
 class InMemoryCrawlRegistry:
@@ -21,8 +21,8 @@ class InMemoryCrawlRegistry:
 
     def __init__(self, *, max_completed_records: int = 1000):
         self._lock = threading.Lock()
-        self._records = _InMemoryCrawlRecordStore(max_completed_records=max_completed_records)
-        self._cancellation = _InMemoryCrawlCancellationManager()
+        self._records = CrawlRecordStore(max_completed_records=max_completed_records)
+        self._cancellation = CancellationManager()
 
     def start(self, config_name: str, config_id: Optional[int] = None) -> CrawlHandle:
         with self._lock:

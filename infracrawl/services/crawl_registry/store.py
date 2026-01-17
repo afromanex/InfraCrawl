@@ -7,7 +7,7 @@ from typing import Dict, List, Optional
 from .models import CrawlRecord
 
 
-class _InMemoryCrawlRecordStore:
+class CrawlRecordStore:
     def __init__(self, *, max_completed_records: int):
         if max_completed_records < 0:
             raise ValueError("max_completed_records must be >= 0")
