@@ -1,0 +1,104 @@
+<div class="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+  <div class="max-w-md w-full space-y-8">
+    <div>
+      <h2 class="mt-6 text-center text-3xl font-extrabold text-gray-900">
+        InfraCrawl
+      </h2>
+      <p class="mt-2 text-center text-sm text-gray-600">
+        Web Crawler Management System
+      </p>
+    </div>
+
+    <form [formGroup]="form" (ngSubmit)="onSubmit()" class="mt-8 space-y-6">
+      <div class="rounded-md shadow-sm -space-y-px">
+        <!-- Email Input -->
+        <div>
+          <label for="email" class="sr-only">Email address</label>
+          <input
+            id="email"
+            formControlName="email"
+            type="email"
+            autocomplete="email"
+            placeholder="Email address"
+            class="input-field"
+          />
+          <div
+            *ngIf="
+              form.get('email')?.invalid && form.get('email')?.touched
+            "
+            class="text-red-500 text-sm mt-1"
+          >
+            Please enter a valid email
+          </div>
+        </div>
+
+        <!-- Password Input -->
+        <div class="mt-4">
+          <label for="password" class="sr-only">Password</label>
+          <input
+            id="password"
+            formControlName="password"
+            type="password"
+            autocomplete="current-password"
+            placeholder="Password"
+            class="input-field"
+          />
+          <div
+            *ngIf="
+              form.get('password')?.invalid && form.get('password')?.touched
+            "
+            class="text-red-500 text-sm mt-1"
+          >
+            Password must be at least 6 characters
+          </div>
+        </div>
+      </div>
+
+      <!-- Error Message -->
+      <div *ngIf="error" class="rounded-md bg-red-50 p-4">
+        <p class="text-sm font-medium text-red-800">{{ error }}</p>
+      </div>
+
+      <!-- Submit Button -->
+      <div>
+        <button
+          type="submit"
+          [disabled]="form.invalid || loading"
+          class="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white btn-primary disabled:opacity-50"
+        >
+          <span *ngIf="!loading">Sign in</span>
+          <span *ngIf="loading" class="flex items-center">
+            <svg
+              class="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+            >
+              <circle
+                class="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                stroke-width="4"
+              ></circle>
+              <path
+                class="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+              ></path>
+            </svg>
+            Signing in...
+          </span>
+        </button>
+      </div>
+    </form>
+
+    <!-- Demo Credentials (for development) -->
+    <div class="rounded-md bg-blue-50 p-4">
+      <p class="text-sm text-blue-800 font-medium">Demo Credentials</p>
+      <p class="text-sm text-blue-700 mt-1">Email: demo@example.com</p>
+      <p class="text-sm text-blue-700">Password: password</p>
+    </div>
+  </div>
+</div>
