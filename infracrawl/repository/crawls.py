@@ -115,6 +115,25 @@ class CrawlsRepository:
 
         return count
 
+    def has_incomplete_runs(self, config_id: int, within_seconds: Optional[int] = None) -> bool:
+        """Check if there are incomplete (still-running) crawl runs for a config.
+
+        Returns True if any incomplete runs found, False otherwise.
+        """
+        from datetime import timedelta
+
+        now = datetime.utcnow()
+        cutoff = None
+        if within_seconds is not None:
+            cutoff = now - timedelta(seconds=within_seconds)
+
+        with self.get_session() as session:
+            q = select(DBCrawlRun).where(DBCrawlRun.config_id == config_id, DBCrawlRun.end_timestamp.is_(None))
+            if cutoff is not None:
+                q = q.where(DBCrawlRun.start_timestamp >= cutoff)
+            result = session.execute(q).scalars().first()
+            return result is not None
+
     def mark_incomplete_runs(self, config_id: int, within_seconds: Optional[int] = None, message: Optional[str] = None) -> int:
         """Mark recent incomplete runs for a config as finished.
 

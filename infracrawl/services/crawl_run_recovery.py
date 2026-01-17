@@ -69,6 +69,16 @@ class CrawlRunRecovery:
             logger.info("Recovered %s incomplete run(s) for %s", count, cfg_path)
 
             if mode_norm == "restart":
+                # Check config's resume_on_application_restart setting
+                resume = getattr(db_cfg, "resume_on_application_restart", False)
+                if resume:
+                    # Skip scheduling if there are already incomplete (running) runs for this config
+                    try:
+                        if self.crawls_repo.has_incomplete_runs(cfg_id, within_seconds=within_seconds):
+                            logger.info("Skipping recovery restart for %s (resume_on_application_restart enabled, incomplete runs exist)", cfg_path)
+                            continue
+                    except Exception:
+                        logger.exception("Error checking incomplete runs for %s", cfg_path)
                 try:
                     job_id = f"recovery:{cfg_path}"
                     sched.add_job(

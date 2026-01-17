@@ -57,4 +57,5 @@ class CrawlerConfigParser:
             http_options=http_options,
             headless_options=headless_options,
             delay_seconds=data.get("delay_seconds", 1.0),
+            resume_on_application_restart=data.get("resume_on_application_restart", False),
         )
