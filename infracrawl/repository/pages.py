@@ -211,6 +211,20 @@ class PagesRepository:
             rows = session.execute(q).scalars().all()
             return rows
 
+    def get_visited_urls_by_config(self, config_id: int) -> List[str]:
+        """Get all page URLs that have been visited for a given config.
+        
+        Args:
+            config_id: The crawler config ID
+            
+        Returns:
+            List of page URLs that have been crawled
+        """
+        with self.get_session() as session:
+            q = select(DBPage.page_url).where(DBPage.config_id == config_id)
+            rows = session.execute(q).scalars().all()
+            return list(rows)
+
     def delete_pages_by_ids(self, ids: List[int]) -> int:
         if not ids:
             return 0

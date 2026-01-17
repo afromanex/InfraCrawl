@@ -39,13 +39,20 @@ class CrawlExecutor:
         provider = self.provider_factory.build(session)
         logger.info("Crawl started for config %s", session.config.config_id)
 
-        stopped = False
+        was_cancelled = False
         roots = session.config.root_urls or []
         for root_url in roots:
             # Create page object for root URL
             page = Page(page_url=root_url)
-            stopped = provider.crawl_from(page, session.config.max_depth)
-            if stopped:
+            
+            # If this is a resumed crawl (visited tracker already populated),
+            # use crawl_children_from to skip re-fetching but still process children
+            if session.visited_tracker.is_visited(root_url):
+                was_cancelled = provider.crawl_children_from(page, session.config.max_depth)
+            else:
+                was_cancelled = provider.crawl_from(page, session.config.max_depth)
+            
+            if was_cancelled:
                 break
 
         # Update registry with final page count via session
@@ -56,7 +63,7 @@ class CrawlExecutor:
             "Crawl completed for config %s: pages=%s stopped=%s",
             session.config.config_id,
             provider.context,
-            stopped,
+            was_cancelled,
         )
 
-        return CrawlResult(pages_crawled=provider.context.pages_crawled, stopped=stopped)
+        return CrawlResult(pages_crawled=provider.context.pages_crawled, stopped=was_cancelled)

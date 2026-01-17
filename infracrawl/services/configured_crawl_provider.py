@@ -119,6 +119,56 @@ class ConfiguredCrawlProvider:
         self.link_processor.process(page, self.context, crawl_child_page=crawl_child_page)
         return self.context.is_stopped()
 
+    def _should_fetch_page(self, page: Page, depth: Optional[int]) -> tuple[bool, str]:
+        """Determine if a page should be fetched.
+        
+        Returns:
+            (should_fetch, reason) tuple where reason explains why not to fetch
+        """
+        url = page.page_url
+        
+        if self.context.is_visited(page):
+            return False, "already visited"
+        
+        if depth is not None and depth < 0:
+            return False, "max depth reached"
+        
+        if self.crawl_policy.should_skip_due_to_robots(url, self.context):
+            return False, "blocked by robots.txt"
+        
+        if self.crawl_policy.should_skip_due_to_refresh(url, self.context):
+            return False, "refresh policy"
+        
+        return True, ""
+
+    def fetch_page(self, page: Page) -> bool:
+        """Fetch and persist a single page.
+        
+        Args:
+            page: Page to fetch (will be enriched with content)
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        url = page.page_url
+        
+        # Enrich page with database record
+        self.pages_repo.ensure_page(page)
+        
+        if self.context.is_stopped():
+            logger.info("Fetch cancelled for %s", url)
+            return False
+        
+        # Fetch and persist
+        success = self.fetch_and_persist(page)
+        if not success:
+            return False
+        
+        self.context.increment_pages_crawled(1)
+        time.sleep(self.context.config.delay_seconds)
+        
+        return True
+
     def crawl_from(self, page: Page, depth: Optional[int]) -> bool:
         """Crawl a single page and its children.
 
@@ -130,41 +180,61 @@ class ConfiguredCrawlProvider:
             depth: Current depth budget (None for unlimited)
             
         Returns:
-            stopped status.
+            True if crawl was cancelled, False otherwise.
         """
         url = page.page_url
         
         # Set current page for link extraction
         self.context.set_current_page(page)
         
-        if self.context.is_visited(page):
-            logger.debug("Skipping (visited) %s", url)
+        # Check if we should fetch this page
+        should_fetch, reason = self._should_fetch_page(page, depth)
+        if not should_fetch:
+            logger.debug("Skipping (%s) %s", reason, url)
             return False
+        
         self.context.mark_visited(page)
-
-        # Enrich page with database record
+        
+        # Fetch the page
+        if not self.fetch_page(page):
+            return False
+        
+        # Process links and recurse
+        was_cancelled = self.process_links(page, depth)
+        
+        return was_cancelled
+    
+    def crawl_children_from(self, page: Page, depth: Optional[int]) -> bool:
+        """Process children of an already-fetched page.
+        
+        Used for resuming crawls where the page was already fetched but we need
+        to continue crawling its children.
+        
+        Args:
+            page: Page that was already fetched
+            depth: Current depth budget (None for unlimited)
+            
+        Returns:
+            True if crawl was cancelled, False otherwise
+        """
+        url = page.page_url
+        
+        # Set current page for link extraction
+        self.context.set_current_page(page)
+        
+        # Mark as visited to prevent re-crawling
+        self.context.mark_visited(page)
+        
+        # Ensure page exists in DB (should already exist for resume case)
         self.pages_repo.ensure_page(page)
-
+        
         if self.context.is_stopped():
             logger.info("Crawl cancelled during traversal of %s", url)
             return True
+        
+        logger.debug("Processing children of already-visited %s", url)
+        
+        # Process links without fetching
+        was_cancelled = self.process_links(page, depth)
 
-        if depth is not None and depth < 0:
-            logger.debug("Skipping (max depth reached) %s", url)
-            return False
-        if self.crawl_policy.should_skip_due_to_robots(url, self.context):
-            return False
-        if self.crawl_policy.should_skip_due_to_refresh(url, self.context):
-            return False
-
-        # Fetch and enrich page with content
-        success = self.fetch_and_persist(page)
-        if not success:
-            return False
-
-        self.context.increment_pages_crawled(1)
-
-        time.sleep(self.context.config.delay_seconds)
-        stopped = self.process_links(page, depth)
-
-        return stopped
+        return was_cancelled
