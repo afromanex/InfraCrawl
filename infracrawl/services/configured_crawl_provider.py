@@ -36,9 +36,6 @@ class ConfiguredCrawlProvider:
         self.link_processor = link_processor
         self.fetch_persist_service = fetch_persist_service
 
-    def fetch(self, url: str, stop_event=None):
-        return self.fetcher.fetch(url, stop_event=stop_event)
-
     def fetch_and_persist(self, page: Page) -> bool:
         """Fetch a URL, persist the page, and mutate page in-place.
         
@@ -54,7 +51,7 @@ class ConfiguredCrawlProvider:
             if self.context.config is None:
                 raise ValueError("context.config is required")
             
-            response: HttpResponse = self.fetch(url, stop_event=self.context.stop_event)
+            response: HttpResponse = self.fetcher.fetch(url, stop_event=self.context.stop_event)
         except HttpFetchError as e:
             logger.warning("Fetch failed for %s: %s", url, e)
             return False
