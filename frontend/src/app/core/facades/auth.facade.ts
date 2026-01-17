@@ -39,13 +39,32 @@ export class AuthFacade {
   }
 
   login(password: string): void {
-    this.authService.login(password);
     const state = this.authStateSubject.value;
     this.authStateSubject.next({
       ...state,
-      isAuthenticated: true,
-      loading: false,
+      loading: true,
       error: null,
+    });
+
+    this.authService.login(password).subscribe({
+      next: () => {
+        const newState = this.authStateSubject.value;
+        this.authStateSubject.next({
+          ...newState,
+          isAuthenticated: true,
+          loading: false,
+          error: null,
+        });
+      },
+      error: (err: any) => {
+        const newState = this.authStateSubject.value;
+        this.authStateSubject.next({
+          ...newState,
+          isAuthenticated: false,
+          loading: false,
+          error: err?.error?.detail || 'Login failed',
+        });
+      },
     });
   }
 

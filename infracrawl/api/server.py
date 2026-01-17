@@ -7,6 +7,7 @@ from infracrawl.api.routers import (
     create_configs_router,
     create_crawlers_router,
     create_systems_router,
+    create_auth_router,
 )
 from fastapi import Depends
 from infracrawl.api.auth import require_admin
@@ -47,6 +48,7 @@ def create_app(container: Container) -> FastAPI:
     app = FastAPI(title="InfraCrawl Control API", lifespan=_lifespan)
 
     app.include_router(create_systems_router())
+    app.include_router(create_auth_router())
     # Protect configuration and crawler control endpoints with admin token.
     app.include_router(create_configs_router(config_service), dependencies=[Depends(require_admin)])
     app.include_router(create_crawlers_router(pages_repo, links_repo, config_service, session_factory, start_crawl_callback, crawl_registry, crawls_repo), dependencies=[Depends(require_admin)])

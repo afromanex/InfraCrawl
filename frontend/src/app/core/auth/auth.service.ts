@@ -1,6 +1,8 @@
 import { Injectable } from '@angular/core';
-import { BehaviorSubject } from 'rxjs';
-import { User } from '../models';
+import { BehaviorSubject, Observable } from 'rxjs';
+import { tap } from 'rxjs/operators';
+import { LoginResponse, User } from '../models';
+import { APIService } from '../api/api.service';
 
 @Injectable({
   providedIn: 'root',
@@ -15,11 +17,15 @@ export class AuthService {
   );
   public isAuthenticated$ = this.isAuthenticatedSubject.asObservable();
 
-  constructor() {}
+  constructor(private api: APIService) {}
 
-  login(password: string): void {
-    this.setToken(password);
-    this.isAuthenticatedSubject.next(true);
+  login(password: string): Observable<LoginResponse> {
+    return this.api.login(password).pipe(
+      tap((response: LoginResponse) => {
+        this.setToken(response.access_token);
+        this.isAuthenticatedSubject.next(true);
+      })
+    );
   }
 
   logout(): void {
