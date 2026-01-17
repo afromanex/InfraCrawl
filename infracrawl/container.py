@@ -9,6 +9,7 @@ from infracrawl.repository.configs import ConfigsRepository
 from infracrawl.services.config_service import ConfigService
 from infracrawl.services.crawl_policy import CrawlPolicy
 from infracrawl.services.crawl_session_factory import CrawlSessionFactory
+from infracrawl.services.crawl_session_resume_factory import CrawlSessionResumeFactory
 from infracrawl.services.http_service import HttpService
 from infracrawl.services.fetcher import HttpServiceFetcher
 from infracrawl.services.fetcher_factory import FetcherFactory
@@ -203,6 +204,13 @@ class Container(containers.DeclarativeContainer):
         visited_tracker_max_urls=config.INFRACRAWL_VISITED_MAX_URLS.as_(int),
     )
 
+    crawl_session_resume_factory = providers.Singleton(
+        CrawlSessionResumeFactory,
+        pages_repo=pages_repository,
+        registry=crawl_registry,
+        visited_tracker_max_urls=config.INFRACRAWL_VISITED_MAX_URLS.as_(int),
+    )
+
     configured_crawl_provider_factory = providers.Singleton(
         ConfiguredCrawlProviderFactory,
         fetcher_factory=fetcher_factory,
@@ -227,6 +235,7 @@ class Container(containers.DeclarativeContainer):
         SchedulerService,
         config_provider=config_service,
         session_factory=crawl_session_factory,
+        resume_session_factory=crawl_session_resume_factory,
         start_crawl_callback=crawl_executor.provided.crawl,
         crawls_repo=crawls_repository,
         config_watch_interval_seconds=config.INFRACRAWL_CONFIG_WATCH_INTERVAL.as_(int),

@@ -39,6 +39,7 @@ class SchedulerService:
         start_crawl_callback,
         crawls_repo,
         *,
+        resume_session_factory=None,
         config_watch_interval_seconds: int = 60,
         recovery_mode: str = "restart",
         recovery_within_seconds: Optional[int] = None,
@@ -57,6 +58,7 @@ class SchedulerService:
         self._job_runner = ScheduledCrawlJobRunner(
             config_provider=self.config_service,
             session_factory=self.session_factory,
+            resume_session_factory=resume_session_factory,
             start_crawl_callback=self.start_crawl_callback,
             crawls_repo=self.crawls_repo,
         )
@@ -65,6 +67,11 @@ class SchedulerService:
             crawls_repo=self.crawls_repo,
             within_seconds=self._recovery_within_seconds,
         )
+        # Wire resume callback so recovery can trigger an actual resumed job
+        try:
+            self._recovery._resume_callback = lambda cfg: self._job_runner.run_config_resume(cfg)  # type: ignore[attr-defined]
+        except Exception:
+            logger.exception("Failed wiring resume callback into recovery")
 
     def start(self):
         if self._sched is not None:
