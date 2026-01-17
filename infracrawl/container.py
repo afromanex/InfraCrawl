@@ -210,7 +210,6 @@ class Container(containers.DeclarativeContainer):
         crawl_policy=crawl_policy,
         link_processor=link_processor,
         fetch_persist_service=page_fetch_persist_service,
-        delay_seconds=config.CRAWL_DELAY.as_(float),
     )
     
     config_service = providers.Singleton(

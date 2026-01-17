@@ -17,14 +17,12 @@ class ConfiguredCrawlProviderFactory:
         crawl_policy,
         link_processor,
         fetch_persist_service,
-        delay_seconds: float,
     ):
         self.fetcher_factory = fetcher_factory
         self.pages_repo = pages_repo
         self.crawl_policy = crawl_policy
         self.link_processor = link_processor
         self.fetch_persist_service = fetch_persist_service
-        self.delay_seconds = delay_seconds
 
     def build(self, session: CrawlSession) -> ConfiguredCrawlProvider:
         """Build a provider for the given session.
@@ -44,5 +42,4 @@ class ConfiguredCrawlProviderFactory:
             crawl_policy=self.crawl_policy,
             link_processor=self.link_processor,
             fetch_persist_service=self.fetch_persist_service,
-            delay_seconds=self.delay_seconds,
         )

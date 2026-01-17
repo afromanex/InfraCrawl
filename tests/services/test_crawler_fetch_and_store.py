@@ -27,7 +27,6 @@ def make_executor_with(mocks=None):
         crawl_policy=crawl_policy,
         link_processor=link_processor,
         fetch_persist_service=fetch_persist_service,
-        delay_seconds=0,
     )
 
     executor = CrawlExecutor(
@@ -43,6 +42,7 @@ def make_config(config_id: int) -> CrawlerConfig:
         root_urls=['http://example.test'],
         max_depth=0,
         fetch_mode="http",
+        delay_seconds=0,
     )
 
 

@@ -24,7 +24,6 @@ def test_crawl_executor_init_uses_injected_collaborators(mock_repos):
         crawl_policy=MagicMock(),
         link_processor=MagicMock(),
         fetch_persist_service=MagicMock(),
-        delay_seconds=0.1,
     )
     executor = CrawlExecutor(
         provider_factory=provider_factory,
@@ -55,6 +54,7 @@ def test_crawl_executor_updates_registry_with_page_count(mock_repos):
         root_urls=["http://example.com"],
         max_depth=1,
         fetch_mode="http",
+        delay_seconds=0,
     )
     
     # Mock the fetcher to return a response
@@ -82,7 +82,6 @@ def test_crawl_executor_updates_registry_with_page_count(mock_repos):
         crawl_policy=mock_crawl_policy,
         link_processor=mock_link_processor,
         fetch_persist_service=mock_fetch_persist,
-        delay_seconds=0,
     )
     
     # Create executor (no registry wired)

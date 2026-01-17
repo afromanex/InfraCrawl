@@ -29,7 +29,6 @@ class ConfiguredCrawlProvider:
         crawl_policy,
         link_processor,
         fetch_persist_service,
-        delay_seconds: float,
     ):
         self.fetcher = fetcher
         self.context = context
@@ -37,7 +36,6 @@ class ConfiguredCrawlProvider:
         self.crawl_policy = crawl_policy
         self.link_processor = link_processor
         self.fetch_persist_service = fetch_persist_service
-        self.delay_seconds = delay_seconds
 
     def fetch(self, url: str, stop_event=None):
         return self.fetcher.fetch(url, stop_event=stop_event)
@@ -183,7 +181,7 @@ class ConfiguredCrawlProvider:
         pages_crawled = 1
         stopped = False
 
-        time.sleep(self.delay_seconds)
+        time.sleep(self.context.config.delay_seconds)
         child_result = self.process_links(page)
         if child_result[0]:
             self.context.increment_pages_crawled(child_result[0])

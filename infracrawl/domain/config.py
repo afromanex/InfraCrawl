@@ -28,6 +28,7 @@ class CrawlerConfigData:
     fetch_options: Optional[dict] = None
     http_options: Optional[dict] = None
     headless_options: Optional[dict] = None
+    delay_seconds: float = 1.0
 
 
 class CrawlerConfig:
@@ -52,6 +53,7 @@ class CrawlerConfig:
         fetch_options: Optional[dict] = None,
         http_options: Optional[dict] = None,
         headless_options: Optional[dict] = None,
+        delay_seconds: float = 1.0,
     ):
         if fetch_mode is None or (isinstance(fetch_mode, str) and fetch_mode.strip() == ""):
             raise ValueError("fetch_mode is required")
@@ -72,6 +74,7 @@ class CrawlerConfig:
             fetch_options=fetch_options,
             http_options=http_options,
             headless_options=headless_options,
+            delay_seconds=delay_seconds,
         )
 
     @property
@@ -125,6 +128,10 @@ class CrawlerConfig:
     @property
     def headless_options(self) -> Optional[dict]:
         return self.data.headless_options
+
+    @property
+    def delay_seconds(self) -> float:
+        return self.data.delay_seconds
 
     def __repr__(self):
         return f"<CrawlerConfig id={self.config_id} path={self.config_path} schedule={self.schedule}>"

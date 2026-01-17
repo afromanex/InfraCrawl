@@ -37,7 +37,6 @@ def executor_with_mocks():
         crawl_policy=crawl_policy,
         link_processor=link_processor,
         fetch_persist_service=fetch_persist_service,
-        delay_seconds=0,
     )
 
     executor = CrawlExecutor(
@@ -54,7 +53,7 @@ def test_crawl_respects_max_depth(executor_with_mocks):
     fetcher.fetch = MagicMock(return_value=HttpResponse(200, '<html></html>'))
     content_review_service.extract_links = MagicMock(return_value=[])
     # Should only call ensure_page once for depth=0
-    cfg = CrawlerConfig(config_id=None, config_path='p', root_urls=['http://example.com'], max_depth=0, fetch_mode="http")
+    cfg = CrawlerConfig(config_id=None, config_path='p', root_urls=['http://example.com'], max_depth=0, fetch_mode="http", delay_seconds=0)
     session = CrawlSession(cfg)
     executor.crawl(session)
     assert pages_repo.ensure_page.call_count == 1
@@ -68,7 +67,7 @@ def test_crawl_skips_robots(executor_with_mocks):
     crawl_policy.should_skip_due_to_robots = MagicMock(return_value=True)
     fetcher.fetch = MagicMock()
     content_review_service.extract_links = MagicMock()
-    cfg = CrawlerConfig(config_id=None, config_path='p', root_urls=['http://example.com'], max_depth=1, fetch_mode="http")
+    cfg = CrawlerConfig(config_id=None, config_path='p', root_urls=['http://example.com'], max_depth=1, fetch_mode="http", delay_seconds=0)
     session = CrawlSession(cfg)
     executor.crawl(session)
     # Should not fetch if robots disallowed
@@ -82,7 +81,7 @@ def test_crawl_refresh_days_skips_recent(executor_with_mocks):
     fetcher.fetch = MagicMock()
     content_review_service.extract_links = MagicMock()
     # Simulate config with refresh_days=10
-    cfg = CrawlerConfig(config_id=123, config_path='p', root_urls=['http://example.com'], max_depth=1, robots=True, refresh_days=10, fetch_mode="http")
+    cfg = CrawlerConfig(config_id=123, config_path='p', root_urls=['http://example.com'], max_depth=1, robots=True, refresh_days=10, fetch_mode="http", delay_seconds=0)
     session = CrawlSession(cfg)
     executor.crawl(session)
     # Should not fetch if fetched less than refresh_days ago
@@ -98,7 +97,7 @@ def test_crawl_inserts_links(executor_with_mocks):
     links_repo.insert_links_batch = MagicMock()
     # Patch _same_host to always True on the link_processor that the provider will use
     provider_factory.link_processor._same_host = MagicMock(return_value=True)
-    cfg = CrawlerConfig(config_id=None, config_path='p', root_urls=['http://example.com'], max_depth=1, fetch_mode="http")
+    cfg = CrawlerConfig(config_id=None, config_path='p', root_urls=['http://example.com'], max_depth=1, fetch_mode="http", delay_seconds=0)
     session = CrawlSession(cfg)
     executor.crawl(session)
     # Should insert links via batch method

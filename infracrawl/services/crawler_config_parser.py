@@ -56,4 +56,5 @@ class CrawlerConfigParser:
             fetch_options=fetch_options,
             http_options=http_options,
             headless_options=headless_options,
+            delay_seconds=data.get("delay_seconds", 1.0),
         )
