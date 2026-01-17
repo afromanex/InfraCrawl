@@ -29,7 +29,7 @@ def executor_with_mocks():
     crawl_policy.should_skip_due_to_refresh.return_value = False
 
     fetch_persist_service = MagicMock()
-    fetch_persist_service.extract_and_persist.return_value = type("Page", (), {"page_id": 1})()
+    fetch_persist_service.extract_and_persist.return_value = True
 
     provider_factory = ConfiguredCrawlProviderFactory(
         fetcher_factory=fetcher_factory,

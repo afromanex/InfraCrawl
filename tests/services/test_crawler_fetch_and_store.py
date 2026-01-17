@@ -79,14 +79,15 @@ def test_storage_failure_logs_and_returns_none(caplog):
     page = Page(page_url="http://example.test/page")
     success = provider.fetch_and_store(page)
     assert success is False
-    assert any("Storage error" in r.message or "Storage error" in r.getMessage() for r in caplog.records)
+    assert any("Failed to" in r.message or "Failed to" in r.getMessage() for r in caplog.records)
 
 
 def test_non_200_status_is_logged_and_body_returned(caplog):
     http = MagicMock()
     http.fetch.return_value = HttpResponse(500, "server error")
     pages = MagicMock()
-    pages.upsert_page.return_value = 42
+    mock_page = Page(page_url="http://example.test/fail", page_id=42)
+    pages.upsert_page.return_value = mock_page
     executor, provider_factory = make_executor_with({"http_service": http, "pages_repo": pages})
     cfg = make_config(3)
     session = CrawlSession(cfg)

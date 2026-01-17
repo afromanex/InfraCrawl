@@ -1,5 +1,6 @@
 from infracrawl.services.page_fetch_persist_service import PageFetchPersistService
 from infracrawl.repository.pages import PagesRepository
+from infracrawl.domain.page import Page
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from infracrawl.db.models import Base
@@ -16,9 +17,13 @@ def test_plain_text_extracted_and_persisted(tmp_path):
     session_factory = sessionmaker(bind=engine, future=True)
     pages_repo = PagesRepository(session_factory)
     svc = PageFetchPersistService(http_service=DummyHttp(), pages_repo=pages_repo)
-    page = svc.extract_and_persist('http://example.com', 200, '<html><body>Hi there</body></html>', '2026-01-01T00:00:00Z')
-    assert page is not None
-    # fetched page should have plain_text populated
+    page = Page(page_url='http://example.com', page_content='<html><body>Hi there</body></html>', http_status=200)
+    success = svc.extract_and_persist(page)
+    assert success is True
+    assert page.page_id is not None
+    assert page.plain_text is not None
+    assert 'Hi there' in page.plain_text
+    # Verify it was persisted
     stored = pages_repo.get_page_by_url('http://example.com')
     assert stored is not None
     assert stored.plain_text is not None
@@ -48,7 +53,9 @@ def test_filtered_plain_text_removes_boilerplate():
     session_factory = sessionmaker(bind=engine, future=True)
     pages_repo = PagesRepository(session_factory)
     svc = PageFetchPersistService(http_service=DummyHttp(), pages_repo=pages_repo)
-    page = svc.extract_and_persist('http://test.com', 200, html, '2026-01-12T00:00:00Z')
+    page = Page(page_url='http://test.com', page_content=html, http_status=200)
+    success = svc.extract_and_persist(page)
+    assert success is True
     
     stored = pages_repo.get_page_by_url('http://test.com')
     assert stored is not None
@@ -83,7 +90,9 @@ def test_content_hash_persisted_from_filtered_plain_text():
     svc = PageFetchPersistService(http_service=DummyHttp(), pages_repo=pages_repo)
 
     # Persist with provided HTML
-    svc.extract_and_persist('http://hash.test', 200, html, '2026-01-12T00:00:00Z')
+    page = Page(page_url='http://hash.test', page_content=html, http_status=200)
+    success = svc.extract_and_persist(page)
+    assert success is True
 
     # Compute expected SHA-256 of filtered text (newline-separated get_text)
     # The HtmlTextExtractor returns filtered text with newlines between blocks.
@@ -108,15 +117,17 @@ def test_upsert_deduplicates_by_config_and_content_hash():
 
     # Persist first URL with config_id=1
     html = '<html><body><main>Unique Content</main></body></html>'
-    page1 = svc.extract_and_persist('http://example.com/page1', 200, html, '2026-01-12T00:00:00Z', context=None)
-    # Manually set config_id on domain object to simulate config context
-    page1.config_id = 1
-    repo_page1 = pages_repo.upsert_page(page1)
+    page1 = Page(page_url='http://example.com/page1', page_content=html, http_status=200, config_id=1)
+    success1 = svc.extract_and_persist(page1)
+    assert success1 is True
     
     # Persist same content under different URL but same config_id
-    page2 = svc.extract_and_persist('http://example.com/page2', 200, html, '2026-01-12T00:00:01Z', context=None)
-    page2.config_id = 1
-    repo_page2 = pages_repo.upsert_page(page2)
+    page2 = Page(page_url='http://example.com/page2', page_content=html, http_status=200, config_id=1)
+    success2 = svc.extract_and_persist(page2)
+    assert success2 is True
+    
+    repo_page1 = page1
+    repo_page2 = page2
     
     # Both should have the same content_hash
     assert repo_page1.content_hash == repo_page2.content_hash

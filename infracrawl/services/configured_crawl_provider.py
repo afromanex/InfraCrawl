@@ -40,9 +40,11 @@ class ConfiguredCrawlProvider:
         return self.fetcher.fetch(url, stop_event=stop_event)
 
     def fetch_and_store(self, page: Page) -> bool:
-        """Fetch a URL, persist the page, and mutate page.page_content in-place.
+        """Fetch a URL, persist the page, and mutate page in-place.
         
-        Returns True on success, False on failure.
+        Mutates: page.page_content, page.plain_text, page.filtered_plain_text, 
+                 page.content_hash, page.page_id, page.http_status, page.fetched_at
+        Returns: True on success, False on failure
         """
         url = page.page_url
         try:
@@ -60,33 +62,28 @@ class ConfiguredCrawlProvider:
             logger.error("Fetch error for %s: %s", url, e, exc_info=True)
             return False
 
-        fetched_at = datetime.utcnow().isoformat()
-        try:
-            returned_page = self.fetch_persist_service.extract_and_persist(
-                url,
-                response.status_code,
-                response.text,
-                fetched_at,
-                context=self.context,
-            )
-            logger.info(
-                "Fetched %s -> status %s, page_id=%s",
-                url,
-                response.status_code,
-                getattr(returned_page, "page_id", None),
-            )
-        except Exception as e:
-            logger.error("Storage error while saving %s: %s", url, e, exc_info=True)
+        # Mutate page with fetch results
+        page.page_content = response.text
+        page.http_status = response.status_code
+        page.fetched_at = datetime.utcnow()
+        page.config_id = self.context.config.config_id
+
+        # Extract text and persist (mutates page with plain_text, filtered_plain_text, content_hash, page_id)
+        success = self.fetch_persist_service.extract_and_persist(page)
+        if not success:
+            logger.error("Failed to extract and persist %s", url)
             return False
 
-        try:
-            sc = int(response.status_code)
-            if sc < 200 or sc >= 300:
-                logger.warning("Non-success status for %s: %s", url, response.status_code)
-        except Exception:
-            logger.exception("Error parsing status code for %s: %s", url, response.status_code)
+        logger.info(
+            "Fetched %s -> status %s, page_id=%s",
+            url,
+            page.http_status,
+            page.page_id,
+        )
 
-        page.page_content = response.text
+        if page.http_status < 200 or page.http_status >= 300:
+            logger.warning("Non-success status for %s: %s", url, page.http_status)
+
         return True
 
     def process_links(

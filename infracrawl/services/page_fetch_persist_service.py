@@ -96,32 +96,35 @@ class PageFetchPersistService:
 
     def extract_and_persist(
         self,
-        url: str,
-        status: int | str | None,
-        body: Optional[str],
-        fetched_at: datetime | str | None,
-        context: Optional[CrawlSession] = None,
-    ) -> DomainPage:
-        """Extract text from fetched page body and persist it, returning the domain `Page`.
+        page: DomainPage,
+    ) -> bool:
+        """Extract text from page content, persist it, and mutate page in-place.
         
-        Note: This method does NOT fetch the page - it expects the body to be provided.
-        Use fetch_and_persist() if you need to fetch the page first.
+        Mutates: page.plain_text, page.filtered_plain_text, page.content_hash, page.page_id, page.fetched_at
+        Returns: True on success, False on failure
         """
-        config_id = self._get_config_id(url, context)
-        plain, filtered = self.text_extractor.extract(body)
-        base_for_hash = filtered or plain or (body or "")
+        if page.page_content is None:
+            logger.warning("Cannot extract from page with no content: %s", page.page_url)
+            return False
+            
+        config_id = page.config_id or self._get_config_id(page.page_url, None)
+        plain, filtered = self.text_extractor.extract(page.page_content)
+        base_for_hash = filtered or plain or (page.page_content or "")
         content_hash = hashlib.sha256(base_for_hash.encode("utf-8")).hexdigest() if base_for_hash is not None else None
 
-        page_obj = DomainPage(
-            page_id=None,  # Will be assigned by DB
-            page_url=url,
-            page_content=body,
-            plain_text=plain,
-            filtered_plain_text=filtered,
-            http_status=self._coerce_http_status(status),
-            fetched_at=self._coerce_fetched_at(fetched_at),
-            config_id=config_id,
-            content_hash=content_hash,
-        )
-        page = self.pages_repo.upsert_page(page_obj)
-        return page
+        # Mutate page with extracted data
+        page.plain_text = plain
+        page.filtered_plain_text = filtered
+        page.content_hash = content_hash
+        page.config_id = config_id
+        if page.fetched_at is None:
+            page.fetched_at = datetime.now(timezone.utc)
+        
+        # Persist and get page_id
+        try:
+            persisted_page = self.pages_repo.upsert_page(page)
+            page.page_id = persisted_page.page_id
+            return True
+        except Exception as e:
+            logger.error("Failed to persist page %s: %s", page.page_url, e, exc_info=True)
+            return False
