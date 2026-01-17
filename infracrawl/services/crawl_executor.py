@@ -23,9 +23,6 @@ class CrawlExecutor:
     ):
         self.provider_factory = provider_factory
 
-    def _is_stopped(self, stop_event) -> bool:
-        return stop_event is not None and getattr(stop_event, "is_set", lambda: False)()
-
     def crawl(self, session: CrawlSession) -> CrawlResult:
         """Execute a crawl for the given session.
         
@@ -47,10 +44,6 @@ class CrawlExecutor:
         stopped = False
         roots = getattr(config, "root_urls", []) or []
         for root_url in roots:
-            if self._is_stopped(session.stop_event):
-                logger.info("Crawl cancelled before starting root %s", root_url)
-                stopped = True
-                break
             # Create page object for root URL
             page = Page(page_url=root_url)
             result = provider.crawl_from(page)
