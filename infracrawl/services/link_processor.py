@@ -4,7 +4,7 @@ from typing import Callable, Optional
 from urllib.parse import urlparse
 
 from infracrawl.services.link_persister import LinkPersister
-from infracrawl.domain.crawl_context import CrawlContext
+from infracrawl.domain.crawl_session import CrawlSession
 
 logger = logging.getLogger(__name__)
 
@@ -15,7 +15,7 @@ class LinkProcessRequest:
     base_url: str
     html: str
     from_id: int
-    context: CrawlContext
+    context: CrawlSession
     depth: int
 
 

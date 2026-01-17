@@ -1,21 +1,33 @@
+import threading
 from typing import Optional
 from infracrawl.domain.config import CrawlerConfig
 from infracrawl.domain.visited_tracker import VisitedTracker
 
 
-class CrawlContext:
+class CrawlSession:
     """
-    Crawl execution context that holds configuration and tracks crawl state.
+    Full lifecycle tracking for a single crawl execution.
     
-    Note: Still manages 2 responsibilities - config holder and current_root iteration.
-    Further refactoring could split this, but the improvement-to-effort ratio is low.
+    Represents a crawl session from start to finish, including configuration,
+    execution state, progress tracking, and cancellation mechanisms.
     """
     
-    def __init__(self, config: Optional[CrawlerConfig] = None, visited_tracker: Optional[VisitedTracker] = None):
-        # store the full config; roots and max_depth come from here
+    def __init__(
+        self,
+        config: Optional[CrawlerConfig] = None,
+        visited_tracker: Optional[VisitedTracker] = None,
+        crawl_id: Optional[str] = None,
+        stop_event: Optional[threading.Event] = None,
+    ):
+        # Identity & tracking
+        self.crawl_id = crawl_id
+        self.stop_event = stop_event
+        
+        # Configuration
         self.config = config
         self.max_depth = config.max_depth if config else None
-        # current_root is set when iterating multiple root URLs
+        
+        # Execution state - current_root is set when iterating multiple root URLs
         self.current_root: Optional[str] = None
         # track the current depth budget for the active traversal path
         self.current_depth: Optional[int] = None

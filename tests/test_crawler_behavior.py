@@ -7,7 +7,7 @@ from infracrawl.services.configured_crawl_provider import ConfiguredCrawlProvide
 from types import SimpleNamespace
 
 from infracrawl.domain.config import CrawlerConfig
-from infracrawl.domain.crawl_context import CrawlContext
+from infracrawl.domain.crawl_session import CrawlSession
 from infracrawl.domain.http_response import HttpResponse
 
 
@@ -38,7 +38,6 @@ def executor_with_mocks():
         link_processor=link_processor,
         fetch_persist_service=fetch_persist_service,
         delay_seconds=0,
-        visited_tracker_max_urls=100_000,
     )
 
     executor = CrawlExecutor(
@@ -56,7 +55,8 @@ def test_crawl_respects_max_depth(executor_with_mocks):
     content_review_service.extract_links = MagicMock(return_value=[])
     # Should only call ensure_page once for depth=0
     cfg = CrawlerConfig(config_id=None, config_path='p', root_urls=['http://example.com'], max_depth=0, fetch_mode="http")
-    executor.crawl(cfg)
+    session = CrawlSession(cfg)
+    executor.crawl(session)
     assert pages_repo.ensure_page.call_count == 1
     assert fetcher.fetch.call_count == 1
 
@@ -69,7 +69,8 @@ def test_crawl_skips_robots(executor_with_mocks):
     fetcher.fetch = MagicMock()
     content_review_service.extract_links = MagicMock()
     cfg = CrawlerConfig(config_id=None, config_path='p', root_urls=['http://example.com'], max_depth=1, fetch_mode="http")
-    executor.crawl(cfg)
+    session = CrawlSession(cfg)
+    executor.crawl(session)
     # Should not fetch if robots disallowed
     assert not fetcher.fetch.called
 
@@ -82,7 +83,8 @@ def test_crawl_refresh_days_skips_recent(executor_with_mocks):
     content_review_service.extract_links = MagicMock()
     # Simulate config with refresh_days=10
     cfg = CrawlerConfig(config_id=123, config_path='p', root_urls=['http://example.com'], max_depth=1, robots=True, refresh_days=10, fetch_mode="http")
-    executor.crawl(cfg)
+    session = CrawlSession(cfg)
+    executor.crawl(session)
     # Should not fetch if fetched less than refresh_days ago
     assert not fetcher.fetch.called
 
@@ -97,6 +99,7 @@ def test_crawl_inserts_links(executor_with_mocks):
     # Patch _same_host to always True on the link_processor that the provider will use
     provider_factory.link_processor._same_host = MagicMock(return_value=True)
     cfg = CrawlerConfig(config_id=None, config_path='p', root_urls=['http://example.com'], max_depth=1, fetch_mode="http")
-    executor.crawl(cfg)
+    session = CrawlSession(cfg)
+    executor.crawl(session)
     # Should insert links via batch method
     assert links_repo.insert_links_batch.called

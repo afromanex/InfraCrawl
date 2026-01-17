@@ -6,6 +6,7 @@ from infracrawl.services.configured_crawl_provider import ConfiguredCrawlProvide
 from infracrawl.domain.config import CrawlerConfig
 from infracrawl.domain.crawl_result import CrawlResult
 from infracrawl.domain.http_response import HttpResponse
+from infracrawl.domain import CrawlSession
 
 @pytest.fixture
 def mock_repos():
@@ -24,7 +25,6 @@ def test_crawl_executor_init_uses_injected_collaborators(mock_repos):
         link_processor=MagicMock(),
         fetch_persist_service=MagicMock(),
         delay_seconds=0.1,
-        visited_tracker_max_urls=100_000,
     )
     executor = CrawlExecutor(
         provider_factory=provider_factory,
@@ -79,7 +79,6 @@ def test_crawl_executor_updates_registry_with_page_count(mock_repos):
         link_processor=mock_link_processor,
         fetch_persist_service=mock_fetch_persist,
         delay_seconds=0,
-        visited_tracker_max_urls=100_000,
     )
     
     # Create executor with registry
@@ -88,8 +87,11 @@ def test_crawl_executor_updates_registry_with_page_count(mock_repos):
         crawl_registry=mock_registry,
     )
     
+    # Create session with crawl_id (simulating what the job runner would do)
+    session = CrawlSession(config, crawl_id=crawl_id)
+    
     # Execute the crawl
-    result = executor.crawl(config, crawl_id=crawl_id)
+    result = executor.crawl(session)
     
     # Verify that registry.update was called with pages_fetched > 0
     assert mock_registry.update.called, "registry.update should have been called"

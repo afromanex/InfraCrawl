@@ -7,6 +7,7 @@ from infracrawl.services.configured_crawl_provider import ConfiguredCrawlProvide
 from infracrawl.services.page_fetch_persist_service import PageFetchPersistService
 from infracrawl.domain.config import CrawlerConfig
 from infracrawl.domain.http_response import HttpResponse
+from infracrawl.domain import CrawlSession
 
 
 def make_executor_with(mocks=None):
@@ -27,7 +28,6 @@ def make_executor_with(mocks=None):
         link_processor=link_processor,
         fetch_persist_service=fetch_persist_service,
         delay_seconds=0,
-        visited_tracker_max_urls=100_000,
     )
 
     executor = CrawlExecutor(
@@ -52,7 +52,8 @@ def test_fetch_raises_logs_and_returns_none(caplog):
     pages = MagicMock()
     executor, provider_factory = make_executor_with({"http_service": http, "pages_repo": pages})
     cfg = make_config(1)
-    provider = provider_factory.build(cfg)
+    session = CrawlSession(cfg)
+    provider = provider_factory.build(session)
     context = provider.context
 
     caplog.clear()
@@ -68,7 +69,8 @@ def test_storage_failure_logs_and_returns_none(caplog):
     pages.upsert_page.side_effect = Exception("db write failed")
     executor, provider_factory = make_executor_with({"http_service": http, "pages_repo": pages})
     cfg = make_config(2)
-    provider = provider_factory.build(cfg)
+    session = CrawlSession(cfg)
+    provider = provider_factory.build(session)
     context = provider.context
 
     caplog.clear()
@@ -84,7 +86,8 @@ def test_non_200_status_is_logged_and_body_returned(caplog):
     pages.upsert_page.return_value = 42
     executor, provider_factory = make_executor_with({"http_service": http, "pages_repo": pages})
     cfg = make_config(3)
-    provider = provider_factory.build(cfg)
+    session = CrawlSession(cfg)
+    provider = provider_factory.build(session)
     context = provider.context
 
     caplog.clear()

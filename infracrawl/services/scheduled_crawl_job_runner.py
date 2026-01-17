@@ -8,18 +8,20 @@ class ScheduledCrawlJobRunner:
     """Runs a crawl for a given config path and tracks it in the registry + DB.
 
     This extracts the "execute a scheduled crawl" responsibility out of
-    SchedulerService.
+    SchedulerService. Uses a CrawlSessionFactory to create tracked sessions.
     """
 
     def __init__(
         self,
         *,
         config_provider,
+        session_factory,
         start_crawl_callback,
         crawl_registry,
         crawls_repo,
     ):
         self.config_provider = config_provider
+        self.session_factory = session_factory
         self.start_crawl_callback = start_crawl_callback
         self.crawl_registry = crawl_registry
         self.crawls_repo = crawls_repo
@@ -50,26 +52,16 @@ class ScheduledCrawlJobRunner:
             except Exception:
                 logger.exception("Could not create run record for %s", cfg_path)
 
-            cid = None
-            stop_event = None
-            if self.crawl_registry is not None:
-                handle = self.crawl_registry.start(config_name=cfg.config_path, config_id=cfg.config_id)
-                cid = handle.crawl_id
-                stop_event = handle.stop_event
+            # Create session via factory (handles registry.start() if registry exists)
+            session = self.session_factory.create(cfg)
 
             try:
-                # Wrap the crawl callback to inject crawl_id
-                def wrapped_crawl(config, se=None):
-                    return self.start_crawl_callback(config, se, crawl_id=cid)
-                
-                # Call crawl callback directly (may block; scheduler runs worker thread).
-                if stop_event is not None:
-                    wrapped_crawl(cfg, stop_event)
-                else:
-                    wrapped_crawl(cfg)
+                # Call crawl callback with session (may block; scheduler runs worker thread).
+                self.start_crawl_callback(session)
 
-                if cid and self.crawl_registry is not None:
-                    self.crawl_registry.finish(cid, status="finished")
+                # Finish registry tracking if session was tracked
+                if session.crawl_id and self.crawl_registry is not None:
+                    self.crawl_registry.finish(session.crawl_id, status="finished")
 
                 if run_id is not None and self.crawls_repo is not None:
                     try:
@@ -78,8 +70,9 @@ class ScheduledCrawlJobRunner:
                         logger.exception("Could not finish run record for %s run=%s", cfg_path, run_id)
 
             except Exception as e:
-                if cid and self.crawl_registry is not None:
-                    self.crawl_registry.finish(cid, status="failed", error=str(e))
+                # Finish registry tracking with failure status
+                if session.crawl_id and self.crawl_registry is not None:
+                    self.crawl_registry.finish(session.crawl_id, status="failed", error=str(e))
 
                 if run_id is not None and self.crawls_repo is not None:
                     try:

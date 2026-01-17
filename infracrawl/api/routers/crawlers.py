@@ -14,6 +14,7 @@ def create_crawlers_router(
     pages_repo,
     links_repo,
     config_service: ConfigService,
+    session_factory,
     start_crawl_callback,
     crawl_registry: Optional[InMemoryCrawlRegistry],
     crawls_repo: CrawlsRepository,
@@ -22,6 +23,7 @@ def create_crawlers_router(
 
     job_runner = ScheduledCrawlJobRunner(
         config_provider=config_service,
+        session_factory=session_factory,
         start_crawl_callback=start_crawl_callback,
         crawl_registry=crawl_registry,
         crawls_repo=crawls_repo,

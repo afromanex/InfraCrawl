@@ -22,6 +22,7 @@ def create_app(container: Container) -> FastAPI:
     pages_repo = container.pages_repository()
     links_repo = container.links_repository()
     config_service = container.config_service()
+    session_factory = container.crawl_session_factory()
     crawl_executor = container.crawl_executor()
     crawl_registry = container.crawl_registry()
     crawls_repo = container.crawls_repository()
@@ -48,7 +49,7 @@ def create_app(container: Container) -> FastAPI:
     app.include_router(create_systems_router())
     # Protect configuration and crawler control endpoints with admin token.
     app.include_router(create_configs_router(config_service), dependencies=[Depends(require_admin)])
-    app.include_router(create_crawlers_router(pages_repo, links_repo, config_service, start_crawl_callback, crawl_registry, crawls_repo), dependencies=[Depends(require_admin)])
+    app.include_router(create_crawlers_router(pages_repo, links_repo, config_service, session_factory, start_crawl_callback, crawl_registry, crawls_repo), dependencies=[Depends(require_admin)])
 
     # Serve minimal UI
     app.mount("/ui", StaticFiles(directory="static", html=True), name="ui")

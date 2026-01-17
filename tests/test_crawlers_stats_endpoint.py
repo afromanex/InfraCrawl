@@ -35,6 +35,7 @@ def test_get_config_stats_returns_page_and_link_counts():
         pages_repo=mock_pages_repo,
         links_repo=mock_links_repo,
         config_service=mock_config_service,
+        session_factory=MagicMock(),
         start_crawl_callback=MagicMock(),
         crawl_registry=None,
         crawls_repo=MagicMock(),

@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Optional
-from infracrawl.domain.crawl_context import CrawlContext
+from infracrawl.domain.crawl_session import CrawlSession
 from infracrawl.repository.pages import PagesRepository
 from infracrawl.utils.datetime_utils import parse_to_utc_naive
 import logging
@@ -25,7 +25,7 @@ class CrawlPolicy:
             return True
         return False
     
-    def should_skip_due_to_robots(self, url: str, context: CrawlContext) -> bool:
+    def should_skip_due_to_robots(self, url: str, context: CrawlSession) -> bool:
         """Check if URL should be skipped due to robots.txt restrictions."""
         if self.robots_service is None:
             return False
@@ -39,7 +39,7 @@ class CrawlPolicy:
             return True
         return False
     
-    def should_skip_due_to_refresh(self, url: str, context: CrawlContext) -> bool:
+    def should_skip_due_to_refresh(self, url: str, context: CrawlSession) -> bool:
         """Check if URL should be skipped due to recent fetch (within refresh_days)."""
         cfg_refresh_days = None
         if context and context.config is not None:

@@ -45,6 +45,7 @@ class SchedulerService:
     def __init__(
         self,
         config_provider: ConfigProvider,
+        session_factory,
         start_crawl_callback,
         crawl_registry,
         crawls_repo,
@@ -55,6 +56,7 @@ class SchedulerService:
         recovery_message: str = "job found incomplete on startup",
     ):
         self.config_service = config_provider
+        self.session_factory = session_factory
         self.start_crawl_callback = start_crawl_callback
         self.crawl_registry = crawl_registry
         self.crawls_repo = crawls_repo
@@ -66,6 +68,7 @@ class SchedulerService:
 
         self._job_runner = ScheduledCrawlJobRunner(
             config_provider=self.config_service,
+            session_factory=self.session_factory,
             start_crawl_callback=self.start_crawl_callback,
             crawl_registry=self.crawl_registry,
             crawls_repo=self.crawls_repo,

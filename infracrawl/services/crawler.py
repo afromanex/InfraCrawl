@@ -1,5 +1,5 @@
 from infracrawl.services.crawl_executor import CrawlExecutor
-from infracrawl.domain.config import CrawlerConfig
+from infracrawl.domain import CrawlSession
 from infracrawl.domain.crawl_result import CrawlResult
 
 class Crawler:
@@ -12,5 +12,6 @@ class Crawler:
     def __init__(self, executor: CrawlExecutor):
         self._executor = executor
 
-    def crawl(self, config: CrawlerConfig, stop_event=None) -> CrawlResult:
-        return self._executor.crawl(config, stop_event)
+    def crawl(self, session: CrawlSession) -> CrawlResult:
+        """Execute a crawl for the given session."""
+        return self._executor.crawl(session)

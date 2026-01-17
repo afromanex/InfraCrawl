@@ -29,7 +29,7 @@ def test_export_404_without_leaking_exception():
     crawls_repo = Mock()
 
     router = create_crawlers_router(
-        pages_repo, links_repo, config_service, Mock(), crawl_registry, crawls_repo
+        pages_repo, links_repo, config_service, Mock(), Mock(), crawl_registry, crawls_repo
     )
     endpoint = _get_endpoint(router, "/crawlers/export", "GET")
 
@@ -51,7 +51,7 @@ def test_crawl_404_without_leaking_exception():
     crawls_repo = Mock()
 
     router = create_crawlers_router(
-        pages_repo, links_repo, config_service, Mock(), crawl_registry, crawls_repo
+        pages_repo, links_repo, config_service, Mock(), Mock(), crawl_registry, crawls_repo
     )
     endpoint = _get_endpoint(router, "/crawlers/crawl/{config}/start", "POST")
 
@@ -73,7 +73,7 @@ def test_remove_404_without_leaking_exception():
     crawls_repo = Mock()
 
     router = create_crawlers_router(
-        pages_repo, links_repo, config_service, Mock(), crawl_registry, crawls_repo
+        pages_repo, links_repo, config_service, Mock(), Mock(), crawl_registry, crawls_repo
     )
     endpoint = _get_endpoint(router, "/crawlers/remove", "DELETE")
 
@@ -96,7 +96,7 @@ def test_remove_500_without_leaking_exception():
     crawls_repo = Mock()
 
     router = create_crawlers_router(
-        pages_repo, links_repo, config_service, Mock(), crawl_registry, crawls_repo
+        pages_repo, links_repo, config_service, Mock(), Mock(), crawl_registry, crawls_repo
     )
     endpoint = _get_endpoint(router, "/crawlers/remove", "DELETE")
 
@@ -118,7 +118,7 @@ def test_list_runs_500_without_leaking_exception():
     crawls_repo = Mock(list_runs=Mock(side_effect=_boom))
 
     router = create_crawlers_router(
-        pages_repo, links_repo, config_service, Mock(), crawl_registry, crawls_repo
+        pages_repo, links_repo, config_service, Mock(), Mock(), crawl_registry, crawls_repo
     )
     endpoint = _get_endpoint(router, "/crawlers/runs", "GET")
 

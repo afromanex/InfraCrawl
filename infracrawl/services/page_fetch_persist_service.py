@@ -5,7 +5,7 @@ from typing import Optional
 from infracrawl.services.http_service import HttpService
 from infracrawl.services.html_text_extractor import HtmlTextExtractor, TextExtractor
 from infracrawl.repository.pages import PagesRepository
-from infracrawl.domain.crawl_context import CrawlContext
+from infracrawl.domain.crawl_session import CrawlSession
 from infracrawl.domain.page import Page as DomainPage
 import hashlib
 
@@ -27,7 +27,7 @@ class PageFetchPersistService:
         self.pages_repo = pages_repo
         self.text_extractor = text_extractor or HtmlTextExtractor()
 
-    def _get_config_id(self, url: str, context: Optional[CrawlContext]) -> Optional[int]:
+    def _get_config_id(self, url: str, context: Optional[CrawlSession]) -> Optional[int]:
         if context is None or getattr(context, 'config', None) is None:
             return None
         try:
@@ -60,7 +60,7 @@ class PageFetchPersistService:
         logger.exception("Invalid fetched_at type: %r", type(fetched_at))
         return None
 
-    def fetch_and_persist(self, url: str, context: Optional[CrawlContext] = None) -> Optional[DomainPage]:
+    def fetch_and_persist(self, url: str, context: Optional[CrawlSession] = None) -> Optional[DomainPage]:
         """Fetch `url` and persist it, returning the domain `Page`.
 
         If the Content-Type is not supported (non-text/HTML), log and skip persistence.
@@ -100,7 +100,7 @@ class PageFetchPersistService:
         status: int | str | None,
         body: Optional[str],
         fetched_at: datetime | str | None,
-        context: Optional[CrawlContext] = None,
+        context: Optional[CrawlSession] = None,
     ) -> DomainPage:
         """Extract text from fetched page body and persist it, returning the domain `Page`.
         

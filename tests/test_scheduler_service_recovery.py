@@ -55,6 +55,7 @@ def test_recovery_mark_mode_marks_incomplete_runs():
 
     svc = SchedulerService(
         provider,
+        None,  # session_factory
         start_crawl_callback=lambda *a, **k: None,
         crawl_registry=None,
         crawls_repo=crawls_repo,
@@ -82,6 +83,7 @@ def test_recovery_restart_mode_schedules_restart_for_configs_with_incomplete():
 
     svc = SchedulerService(
         provider,
+        None,  # session_factory
         start_crawl_callback=lambda *a, **k: None,
         crawl_registry=None,
         crawls_repo=crawls_repo,
@@ -110,6 +112,7 @@ def test_recovery_off_mode_does_nothing():
 
     svc = SchedulerService(
         provider,
+        None,  # session_factory
         start_crawl_callback=lambda *a, **k: None,
         crawl_registry=None,
         crawls_repo=crawls_repo,

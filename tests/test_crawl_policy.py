@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 from unittest.mock import MagicMock
 from infracrawl.services.crawl_policy import CrawlPolicy
-from infracrawl.domain.crawl_context import CrawlContext
+from infracrawl.domain.crawl_session import CrawlSession
 from infracrawl.domain.config import CrawlerConfig
 
 
@@ -25,7 +25,7 @@ def test_should_skip_due_to_robots_blocks_when_disallowed():
     policy = CrawlPolicy(pages_repo, robots_service)
     
     cfg = CrawlerConfig(config_id=1, config_path='test.yml', robots=True, fetch_mode="http")
-    context = CrawlContext(cfg)
+    context = CrawlSession(cfg)
     
     assert policy.should_skip_due_to_robots('http://example.com', context)
     robots_service.allowed_by_robots.assert_called_once_with('http://example.com', True)
@@ -38,7 +38,7 @@ def test_should_skip_due_to_robots_allows_when_permitted():
     policy = CrawlPolicy(pages_repo, robots_service)
     
     cfg = CrawlerConfig(config_id=1, config_path='test.yml', robots=True, fetch_mode="http")
-    context = CrawlContext(cfg)
+    context = CrawlSession(cfg)
     
     assert not policy.should_skip_due_to_robots('http://example.com', context)
 
@@ -48,7 +48,7 @@ def test_should_skip_due_to_robots_returns_false_when_no_service():
     policy = CrawlPolicy(pages_repo, robots_service=None)
     
     cfg = CrawlerConfig(config_id=1, config_path='test.yml', robots=True, fetch_mode="http")
-    context = CrawlContext(cfg)
+    context = CrawlSession(cfg)
     
     assert not policy.should_skip_due_to_robots('http://example.com', context)
 
@@ -60,7 +60,7 @@ def test_should_skip_due_to_refresh_skips_recent_page():
     
     policy = CrawlPolicy(pages_repo)
     cfg = CrawlerConfig(config_id=1, config_path='test.yml', refresh_days=7, fetch_mode="http")
-    context = CrawlContext(cfg)
+    context = CrawlSession(cfg)
     
     assert policy.should_skip_due_to_refresh('http://example.com', context)
 
@@ -72,7 +72,7 @@ def test_should_skip_due_to_refresh_fetches_old_page():
     
     policy = CrawlPolicy(pages_repo)
     cfg = CrawlerConfig(config_id=1, config_path='test.yml', refresh_days=7, fetch_mode="http")
-    context = CrawlContext(cfg)
+    context = CrawlSession(cfg)
     
     assert not policy.should_skip_due_to_refresh('http://example.com', context)
 
@@ -82,7 +82,7 @@ def test_should_skip_due_to_refresh_returns_false_when_no_refresh_days():
     policy = CrawlPolicy(pages_repo)
     
     cfg = CrawlerConfig(config_id=1, config_path='test.yml', refresh_days=None, fetch_mode="http")
-    context = CrawlContext(cfg)
+    context = CrawlSession(cfg)
     
     assert not policy.should_skip_due_to_refresh('http://example.com', context)
 
@@ -93,7 +93,7 @@ def test_should_skip_due_to_refresh_returns_false_when_page_not_found():
     
     policy = CrawlPolicy(pages_repo)
     cfg = CrawlerConfig(config_id=1, config_path='test.yml', refresh_days=7, fetch_mode="http")
-    context = CrawlContext(cfg)
+    context = CrawlSession(cfg)
     
     assert not policy.should_skip_due_to_refresh('http://example.com', context)
 
@@ -104,6 +104,6 @@ def test_should_skip_due_to_refresh_returns_false_when_no_fetched_at():
     
     policy = CrawlPolicy(pages_repo)
     cfg = CrawlerConfig(config_id=1, config_path='test.yml', refresh_days=7, fetch_mode="http")
-    context = CrawlContext(cfg)
+    context = CrawlSession(cfg)
     
     assert not policy.should_skip_due_to_refresh('http://example.com', context)

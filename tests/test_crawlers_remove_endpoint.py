@@ -36,6 +36,7 @@ def test_remove_endpoint_deletes_pages_and_links_for_config():
         pages_repo=mock_pages_repo,
         links_repo=mock_links_repo,
         config_service=mock_config_service,
+        session_factory=MagicMock(),
         start_crawl_callback=MagicMock(),
         crawl_registry=None,
         crawls_repo=MagicMock(),
