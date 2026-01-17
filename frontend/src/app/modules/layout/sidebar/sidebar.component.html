@@ -1,20 +1,10 @@
-<!-- Mobile Sidebar Overlay -->
-<div
-  *ngIf="open"
-  class="fixed inset-0 bg-gray-600 bg-opacity-75 z-40"
-  (click)="onLinkClick()"
-></div>
-
 <!-- Sidebar -->
-<div
-  [class]="'fixed inset-y-0 left-0 z-50 w-64 bg-white overflow-y-auto transform transition-transform duration-200 ease-in-out ' + (open ? 'translate-x-0' : '-translate-x-full')"
->
+<div class="fixed inset-y-0 left-0 w-64 bg-white border-r border-gray-200 overflow-y-auto">
   <nav class="flex-1 px-2 py-4 space-y-1">
     <a
       *ngFor="let item of menuItems"
       [routerLink]="item.route"
       routerLinkActive="bg-primary-100 text-primary-600"
-      (click)="onLinkClick()"
       class="group flex items-center px-2 py-2 text-base font-medium rounded-md text-gray-600 hover:bg-gray-50 hover:text-gray-900"
     >
       <svg

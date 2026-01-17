@@ -10,30 +10,9 @@
     </div>
 
     <form [formGroup]="form" (ngSubmit)="onSubmit()" class="mt-8 space-y-6">
-      <div class="rounded-md shadow-sm -space-y-px">
-        <!-- Email Input -->
-        <div>
-          <label for="email" class="sr-only">Email address</label>
-          <input
-            id="email"
-            formControlName="email"
-            type="email"
-            autocomplete="email"
-            placeholder="Email address"
-            class="input-field"
-          />
-          <div
-            *ngIf="
-              form.get('email')?.invalid && form.get('email')?.touched
-            "
-            class="text-red-500 text-sm mt-1"
-          >
-            Please enter a valid email
-          </div>
-        </div>
-
+      <div class="rounded-md shadow-sm">
         <!-- Password Input -->
-        <div class="mt-4">
+        <div>
           <label for="password" class="sr-only">Password</label>
           <input
             id="password"
@@ -49,7 +28,7 @@
             "
             class="text-red-500 text-sm mt-1"
           >
-            Password must be at least 6 characters
+            Password is required
           </div>
         </div>
       </div>
@@ -96,9 +75,8 @@
 
     <!-- Demo Credentials (for development) -->
     <div class="rounded-md bg-blue-50 p-4">
-      <p class="text-sm text-blue-800 font-medium">Demo Credentials</p>
-      <p class="text-sm text-blue-700 mt-1">Email: demo@example.com</p>
-      <p class="text-sm text-blue-700">Password: password</p>
+      <p class="text-sm text-blue-800 font-medium">Demo Access</p>
+      <p class="text-sm text-blue-700 mt-1">Enter any password to access the system</p>
     </div>
   </div>
 </div>

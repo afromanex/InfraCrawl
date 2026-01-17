@@ -1,4 +1,4 @@
-import { Component, Output, EventEmitter } from '@angular/core';
+import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { AuthFacade } from '../../../core/facades/auth.facade';
@@ -11,15 +11,11 @@ import { AuthFacade } from '../../../core/facades/auth.facade';
   styleUrls: ['./navbar.component.css'],
 })
 export class NavbarComponent {
-  @Output() toggleSidebar = new EventEmitter<void>();
-
-  currentUser$ = this.authFacade.currentUser$;
+  currentUser$;
   userMenuOpen = false;
 
-  constructor(private authFacade: AuthFacade) {}
-
-  onToggleSidebar(): void {
-    this.toggleSidebar.emit();
+  constructor(private authFacade: AuthFacade) {
+    this.currentUser$ = this.authFacade.currentUser$;
   }
 
   toggleUserMenu(): void {

@@ -1,4 +1,4 @@
-import { Component, Input, Output, EventEmitter } from '@angular/core';
+import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 
@@ -10,9 +10,6 @@ import { RouterModule } from '@angular/router';
   styleUrls: ['./sidebar.component.css'],
 })
 export class SidebarComponent {
-  @Input() open = false;
-  @Output() close = new EventEmitter<void>();
-
   menuItems = [
     { label: 'Dashboard', route: '/dashboard', icon: 'dashboard' },
     { label: 'Configurations', route: '/configs', icon: 'settings' },
@@ -20,8 +17,4 @@ export class SidebarComponent {
     { label: 'Job History', route: '/jobs/history', icon: 'history' },
     { label: 'Admin', route: '/admin', icon: 'admin_panel_settings' },
   ];
-
-  onLinkClick(): void {
-    this.close.emit();
-  }
 }

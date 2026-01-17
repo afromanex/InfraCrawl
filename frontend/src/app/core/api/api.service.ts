@@ -2,13 +2,12 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import {
-  LoginRequest,
   LoginResponse,
   User,
   CrawlerConfig,
   CrawlRun,
   CrawlStats,
-} from './models';
+} from '../models';
 
 @Injectable({
   providedIn: 'root',

@@ -1,11 +1,11 @@
 <div class="flex h-screen bg-gray-100">
   <!-- Sidebar -->
-  <app-sidebar [open]="sidebarOpen" (close)="closeSidebar()"></app-sidebar>
+  <app-sidebar></app-sidebar>
 
   <!-- Main Content -->
   <div class="flex-1 flex flex-col overflow-hidden">
     <!-- Navbar -->
-    <app-navbar (toggleSidebar)="toggleSidebar()"></app-navbar>
+    <app-navbar></app-navbar>
 
     <!-- Page Content -->
     <main class="flex-1 overflow-y-auto">

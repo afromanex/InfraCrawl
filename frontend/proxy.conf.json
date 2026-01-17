@@ -1,7 +1,8 @@
 {
-  "/api/*": {
+  "/api": {
     "target": "http://app:8002",
     "secure": false,
-    "changeOrigin": true
+    "changeOrigin": true,
+    "logLevel": "debug"
   }
 }
