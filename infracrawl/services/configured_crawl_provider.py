@@ -7,6 +7,7 @@ from typing import Callable, Optional
 
 from infracrawl.domain.crawl_session import CrawlSession
 from infracrawl.domain.http_response import HttpResponse
+from infracrawl.domain.page import Page
 from infracrawl.exceptions import HttpFetchError
 from infracrawl.services.fetcher import Fetcher
 from infracrawl.services.link_processor import LinkProcessRequest
@@ -94,10 +95,8 @@ class ConfiguredCrawlProvider:
 
     def process_links(
         self,
-        url: str,
-        body: str,
-        from_id: int,
-        crawl_from_fn: Optional[Callable[[str, int, object], tuple[int, bool]]] = None,
+        page: Page,
+        crawl_from_fn: Optional[Callable[[Page, object], tuple[int, bool]]] = None,
         stop_event=None,
     ) -> tuple[int, bool]:
         """Extract and process links from page body.
@@ -118,10 +117,12 @@ class ConfiguredCrawlProvider:
                 return
             prev_depth = self.context.current_depth
             self.context.set_current_depth(child_depth)
+            # Create new page for the discovered link
+            child_page = Page(page_url=link_url)
             if crawl_from_fn is not None:
-                result = crawl_from_fn(link_url, next_depth, stop_event)
+                result = crawl_from_fn(child_page, stop_event)
             else:
-                result = self.crawl_from(link_url, stop_event)
+                result = self.crawl_from(child_page, stop_event)
             self.context.set_current_depth(prev_depth)
             pages_crawled += result[0]
             if result[1]:
@@ -130,9 +131,9 @@ class ConfiguredCrawlProvider:
         self.link_processor.process(
             LinkProcessRequest(
                 current_root=self.context.current_root,
-                base_url=url,
-                html=body,
-                from_id=from_id,
+                base_url=page.page_url,
+                html=page.page_content,
+                from_id=page.page_id,
                 context=self.context,
                 depth=parent_depth,
             ),
@@ -140,18 +141,21 @@ class ConfiguredCrawlProvider:
         )
         return (pages_crawled, stopped)
 
-    def crawl_from(self, url: str, stop_event=None) -> tuple[int, bool]:
-        """Crawl a single URL and its children.
+    def crawl_from(self, page: Page, stop_event=None) -> tuple[int, bool]:
+        """Crawl a single page and its children.
 
+        The page object is enriched as we go (page_id, page_content).
         Returns (pages_crawled, stopped) tuple.
         """
+        url = page.page_url
         depth = self.context.current_depth
         if self.context.is_visited(url):
             logger.debug("Skipping (visited) %s", url)
             return (0, False)
         self.context.mark_visited(url)
 
-        from_id = self.pages_repo.ensure_page(url)
+        # Enrich page with database record
+        page.page_id = self.pages_repo.ensure_page(url)
 
         if self.is_stopped(stop_event):
             logger.info("Crawl cancelled during traversal of %s", url)
@@ -164,16 +168,18 @@ class ConfiguredCrawlProvider:
         if self.crawl_policy.should_skip_due_to_refresh(url, self.context):
             return (0, False)
 
+        # Fetch and enrich page with content
         body = self.fetch_and_store(url, stop_event)
         if body is None:
             return (0, False)
 
+        page.page_content = body
         self.context.increment_pages_crawled(1)
         pages_crawled = 1
         stopped = False
 
         time.sleep(self.delay_seconds)
-        child_result = self.process_links(url, body, from_id, None, stop_event)
+        child_result = self.process_links(page, None, stop_event)
         if child_result[0]:
             self.context.increment_pages_crawled(child_result[0])
         pages_crawled += child_result[0]

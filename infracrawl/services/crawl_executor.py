@@ -1,6 +1,7 @@
 import logging
 
 from infracrawl.domain import CrawlSession
+from infracrawl.domain.page import Page
 from infracrawl.domain.crawl_result import CrawlResult
 from infracrawl.services.configured_crawl_provider_factory import ConfiguredCrawlProviderFactory
 
@@ -52,7 +53,9 @@ class CrawlExecutor:
                 break
             context.set_root(root_url)
             context.set_current_depth(context.max_depth)
-            result = provider.crawl_from(root_url, session.stop_event)
+            # Create page object for root URL
+            page = Page(page_url=root_url)
+            result = provider.crawl_from(page, session.stop_event)
             if result[1]:
                 stopped = True
                 break
