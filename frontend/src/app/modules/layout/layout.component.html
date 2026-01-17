@@ -1,13 +1,11 @@
-<div class="flex h-screen bg-gray-100">
-  <!-- Sidebar -->
-  <app-sidebar></app-sidebar>
+<div class="min-h-screen flex flex-col bg-gray-100">
+  <!-- Top Navbar -->
+  <app-navbar></app-navbar>
 
-  <!-- Main Content -->
-  <div class="flex-1 flex flex-col overflow-hidden">
-    <!-- Navbar -->
-    <app-navbar></app-navbar>
+  <!-- Content with left sidebar -->
+  <div class="flex flex-1 overflow-hidden">
+    <app-sidebar></app-sidebar>
 
-    <!-- Page Content -->
     <main class="flex-1 overflow-y-auto">
       <div class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <router-outlet></router-outlet>
