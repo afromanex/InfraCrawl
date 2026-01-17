@@ -13,7 +13,7 @@ from infracrawl.services.http_service import HttpService
 from infracrawl.services.fetcher import HttpServiceFetcher
 from infracrawl.services.fetcher_factory import FetcherFactory
 from infracrawl.services.headless_browser_fetcher import PlaywrightHeadlessFetcher, PlaywrightHeadlessOptions
-from infracrawl.services.configured_crawl_provider import ConfiguredCrawlProviderFactory
+from infracrawl.services.configured_crawl_provider_factory import ConfiguredCrawlProviderFactory
 from infracrawl.services.robots_service import RobotsService
 from infracrawl.services.robots_cache import RobotsCache
 from infracrawl.services.page_fetch_persist_service import PageFetchPersistService

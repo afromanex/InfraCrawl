@@ -2,7 +2,7 @@ import logging
 
 from infracrawl.domain import CrawlSession
 from infracrawl.domain.crawl_result import CrawlResult
-from infracrawl.services.configured_crawl_provider import ConfiguredCrawlProviderFactory
+from infracrawl.services.configured_crawl_provider_factory import ConfiguredCrawlProviderFactory
 
 logger = logging.getLogger(__name__)
 

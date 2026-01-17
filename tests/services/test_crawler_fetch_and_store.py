@@ -3,7 +3,7 @@ from unittest.mock import MagicMock
 from infracrawl.services.crawl_executor import CrawlExecutor
 from infracrawl.services.fetcher import HttpServiceFetcher
 from infracrawl.services.fetcher_factory import FetcherFactory
-from infracrawl.services.configured_crawl_provider import ConfiguredCrawlProviderFactory
+from infracrawl.services.configured_crawl_provider_factory import ConfiguredCrawlProviderFactory
 from infracrawl.services.page_fetch_persist_service import PageFetchPersistService
 from infracrawl.domain.config import CrawlerConfig
 from infracrawl.domain.http_response import HttpResponse

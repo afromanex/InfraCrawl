@@ -3,7 +3,7 @@ from unittest.mock import MagicMock
 from infracrawl.services.crawl_executor import CrawlExecutor
 from infracrawl.services.link_processor import LinkProcessor
 from infracrawl.services.link_persister import LinkPersister
-from infracrawl.services.configured_crawl_provider import ConfiguredCrawlProviderFactory
+from infracrawl.services.configured_crawl_provider_factory import ConfiguredCrawlProviderFactory
 from types import SimpleNamespace
 
 from infracrawl.domain.config import CrawlerConfig

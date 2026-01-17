@@ -2,7 +2,7 @@ import pytest
 from unittest.mock import MagicMock, call
 from infracrawl.services.crawl_executor import CrawlExecutor
 from infracrawl.services.fetcher_factory import FetcherFactory
-from infracrawl.services.configured_crawl_provider import ConfiguredCrawlProviderFactory
+from infracrawl.services.configured_crawl_provider_factory import ConfiguredCrawlProviderFactory
 from infracrawl.domain.config import CrawlerConfig
 from infracrawl.domain.crawl_result import CrawlResult
 from infracrawl.domain.http_response import HttpResponse
