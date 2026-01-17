@@ -51,11 +51,9 @@ class CrawlExecutor:
                 logger.info("Crawl cancelled before starting root %s", root_url)
                 stopped = True
                 break
-            context.set_root(root_url)
-            context.set_current_depth(context.max_depth)
             # Create page object for root URL
             page = Page(page_url=root_url)
-            result = provider.crawl_from(page, session.stop_event)
+            result = provider.crawl_from(page)
             if result[1]:
                 stopped = True
                 break

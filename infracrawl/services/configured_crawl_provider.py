@@ -96,8 +96,7 @@ class ConfiguredCrawlProvider:
     def process_links(
         self,
         page: Page,
-        crawl_from_fn: Optional[Callable[[Page, object], tuple[int, bool]]] = None,
-        stop_event=None,
+        crawl_from_fn: Optional[Callable[[Page], tuple[int, bool]]] = None,
     ) -> tuple[int, bool]:
         """Extract and process links from page body.
 
@@ -120,9 +119,9 @@ class ConfiguredCrawlProvider:
             # Create new page for the discovered link
             child_page = Page(page_url=link_url)
             if crawl_from_fn is not None:
-                result = crawl_from_fn(child_page, stop_event)
+                result = crawl_from_fn(child_page)
             else:
-                result = self.crawl_from(child_page, stop_event)
+                result = self.crawl_from(child_page)
             self.context.set_current_depth(prev_depth)
             pages_crawled += result[0]
             if result[1]:
@@ -141,13 +140,19 @@ class ConfiguredCrawlProvider:
         )
         return (pages_crawled, stopped)
 
-    def crawl_from(self, page: Page, stop_event=None) -> tuple[int, bool]:
+    def crawl_from(self, page: Page) -> tuple[int, bool]:
         """Crawl a single page and its children.
 
         The page object is enriched as we go (page_id, page_content).
+        Sets up root and depth context for this crawl.
         Returns (pages_crawled, stopped) tuple.
         """
         url = page.page_url
+        
+        # Set up context for this root traversal
+        self.context.set_root(url)
+        self.context.set_current_depth(self.context.max_depth)
+        
         depth = self.context.current_depth
         if self.context.is_visited(url):
             logger.debug("Skipping (visited) %s", url)
@@ -157,7 +162,7 @@ class ConfiguredCrawlProvider:
         # Enrich page with database record
         page.page_id = self.pages_repo.ensure_page(url)
 
-        if self.is_stopped(stop_event):
+        if self.is_stopped(self.context.stop_event):
             logger.info("Crawl cancelled during traversal of %s", url)
             return (0, True)
 
@@ -169,7 +174,7 @@ class ConfiguredCrawlProvider:
             return (0, False)
 
         # Fetch and enrich page with content
-        body = self.fetch_and_store(url, stop_event)
+        body = self.fetch_and_store(url, self.context.stop_event)
         if body is None:
             return (0, False)
 
@@ -179,7 +184,7 @@ class ConfiguredCrawlProvider:
         stopped = False
 
         time.sleep(self.delay_seconds)
-        child_result = self.process_links(page, None, stop_event)
+        child_result = self.process_links(page)
         if child_result[0]:
             self.context.increment_pages_crawled(child_result[0])
         pages_crawled += child_result[0]
