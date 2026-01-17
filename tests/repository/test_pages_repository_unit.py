@@ -7,7 +7,10 @@ import pytest
 
 from infracrawl.db.models import Base, Page as DBPage
 from infracrawl.repository.pages import PagesRepository
-from infracrawl.domain import Page as DomainPage
+from infracrawl.domain.page import Page as DomainPage
+
+# Use DomainPage as Page to match new mutation pattern
+Page = DomainPage
 
 
 def test_ensure_page_handles_integrity_race(tmp_path):
@@ -22,7 +25,9 @@ def test_ensure_page_handles_integrity_race(tmp_path):
     results = []
 
     def worker():
-        pid = repo.ensure_page(url)
+        page = Page(page_url=url)
+        repo.ensure_page(page)
+        pid = page.page_id
         results.append(pid)
 
     import threading

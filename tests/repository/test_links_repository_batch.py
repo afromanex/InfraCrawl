@@ -4,6 +4,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from infracrawl.db.models import Base
 from infracrawl.domain.link import Link
+from infracrawl.domain.page import Page
 
 
 def test_insert_links_batch_with_empty_list():
@@ -20,9 +21,15 @@ def test_insert_links_batch_inserts_multiple_links():
     Base.metadata.create_all(engine)
     session_factory = sessionmaker(bind=engine, future=True)
     pages_repo = PagesRepository(session_factory)
-    from_id = pages_repo.ensure_page("http://example.com/batch-from")
-    to_id1 = pages_repo.ensure_page("http://example.com/batch-to1")
-    to_id2 = pages_repo.ensure_page("http://example.com/batch-to2")
+    from_page = Page(page_url="http://example.com/batch-from")
+    to_page1 = Page(page_url="http://example.com/batch-to1")
+    to_page2 = Page(page_url="http://example.com/batch-to2")
+    pages_repo.ensure_page(from_page)
+    pages_repo.ensure_page(to_page1)
+    pages_repo.ensure_page(to_page2)
+    from_id = from_page.page_id
+    to_id1 = to_page1.page_id
+    to_id2 = to_page2.page_id
     
     repo = LinksRepository(session_factory)
     links = [

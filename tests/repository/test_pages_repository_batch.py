@@ -1,4 +1,5 @@
 from infracrawl.repository.pages import PagesRepository
+from infracrawl.domain.page import Page
 from sqlalchemy.orm import sessionmaker
 from infracrawl.db.engine import make_engine
 
@@ -22,7 +23,9 @@ def test_ensure_pages_batch_returns_existing_page_ids():
     repo = PagesRepository(sessionmaker(bind=make_engine(), future=True))
     url = "http://example.com/batch-existing"
     # Create page first
-    existing_id = repo.ensure_page(url)
+    existing_page = Page(page_url=url)
+    repo.ensure_page(existing_page)
+    existing_id = existing_page.page_id
     # Batch should return same ID
     result = repo.ensure_pages_batch([url])
     assert result[url] == existing_id
@@ -32,7 +35,9 @@ def test_ensure_pages_batch_mixes_new_and_existing():
     repo = PagesRepository(sessionmaker(bind=make_engine(), future=True))
     existing_url = "http://example.com/batch-mix-existing"
     new_url = "http://example.com/batch-mix-new"
-    existing_id = repo.ensure_page(existing_url)
+    existing_page = Page(page_url=existing_url)
+    repo.ensure_page(existing_page)
+    existing_id = existing_page.page_id
     
     result = repo.ensure_pages_batch([existing_url, new_url])
     assert result[existing_url] == existing_id

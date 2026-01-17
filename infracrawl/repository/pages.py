@@ -46,12 +46,19 @@ class PagesRepository:
             content_hash=db_page.content_hash,
         )
 
-    def ensure_page(self, page_url: str) -> int:
+    def ensure_page(self, page) -> None:
+        """Ensure page exists in database and set page.page_id.
+        
+        Args:
+            page: Page object with page_url. Will have page_id set.
+        """
+        page_url = page.page_url
         with self.get_session() as session:
             q = select(DBPage).where(DBPage.page_url == page_url)
             row = session.execute(q).scalars().first()
             if row:
-                return row.page_id
+                page.page_id = row.page_id
+                return
             p = DBPage(page_url=page_url)
             session.add(p)
             # Handle possible unique constraint races: if another worker inserted
@@ -63,10 +70,11 @@ class PagesRepository:
                 q = select(DBPage).where(DBPage.page_url == page_url)
                 existing = session.execute(q).scalars().first()
                 if existing:
-                    return existing.page_id
+                    page.page_id = existing.page_id
+                    return
                 raise
             session.refresh(p)
-            return p.page_id
+            page.page_id = p.page_id
     
     def ensure_pages_batch(self, page_urls: List[str]) -> dict[str, int]:
         """Ensure multiple pages exist and return mapping of URL -> page_id.

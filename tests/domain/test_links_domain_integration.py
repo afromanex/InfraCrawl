@@ -1,6 +1,6 @@
 from infracrawl.repository.links import LinksRepository
 from infracrawl.repository.pages import PagesRepository
-from infracrawl.domain import Link
+from infracrawl.domain import Link, Page
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from infracrawl.db.models import Base
@@ -14,8 +14,12 @@ def test_link_domain_roundtrip():
     # Insert two pages to link between
     url1 = "https://example.com/a"
     url2 = "https://example.com/b"
-    page1_id = pages_repo.ensure_page(url1)
-    page2_id = pages_repo.ensure_page(url2)
+    page1 = Page(page_url=url1)
+    page2 = Page(page_url=url2)
+    pages_repo.ensure_page(page1)
+    pages_repo.ensure_page(page2)
+    page1_id = page1.page_id
+    page2_id = page2.page_id
     # Insert link
     link = Link(link_id=None, link_from_id=page1_id, link_to_id=page2_id, anchor_text="test anchor")
     links_repo.insert_link(link)

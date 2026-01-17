@@ -80,16 +80,17 @@ class CrawlSession:
     def increment_pages_crawled(self, count: int = 1) -> None:
         self.pages_crawled += int(count)
 
-    def set_root(self, root: str):
-        self.current_root = root
+    def set_current_page(self, page):
+        """Set the page currently being processed for link extraction."""
+        self.current_root = page.page_url
 
-    def mark_visited(self, url: str):
+    def mark_visited(self, page):
         """Delegate to visited tracker."""
-        self.visited_tracker.mark(url)
+        self.visited_tracker.mark(page.page_url)
 
-    def is_visited(self, url: str) -> bool:
+    def is_visited(self, page) -> bool:
         """Delegate to visited tracker."""
-        return self.visited_tracker.is_visited(url)
+        return self.visited_tracker.is_visited(page.page_url)
 
     def is_stopped(self) -> bool:
         """Check if crawling has stopped."""

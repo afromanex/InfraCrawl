@@ -8,6 +8,7 @@ from infracrawl.services.page_fetch_persist_service import PageFetchPersistServi
 from infracrawl.domain.config import CrawlerConfig
 from infracrawl.domain.http_response import HttpResponse
 from infracrawl.domain import CrawlSession
+from infracrawl.domain.page import Page
 
 
 def make_executor_with(mocks=None):
@@ -57,8 +58,9 @@ def test_fetch_raises_logs_and_returns_none(caplog):
     context = provider.context
 
     caplog.clear()
-    body = provider.fetch_and_store("http://example.test")
-    assert body is None
+    page = Page(page_url="http://example.test")
+    success = provider.fetch_and_store(page)
+    assert success is False
     assert any("Fetch error" in r.message or "Fetch error" in r.getMessage() for r in caplog.records)
 
 
@@ -74,8 +76,9 @@ def test_storage_failure_logs_and_returns_none(caplog):
     context = provider.context
 
     caplog.clear()
-    body = provider.fetch_and_store("http://example.test/page")
-    assert body is None
+    page = Page(page_url="http://example.test/page")
+    success = provider.fetch_and_store(page)
+    assert success is False
     assert any("Storage error" in r.message or "Storage error" in r.getMessage() for r in caplog.records)
 
 
@@ -91,6 +94,8 @@ def test_non_200_status_is_logged_and_body_returned(caplog):
     context = provider.context
 
     caplog.clear()
-    body = provider.fetch_and_store("http://example.test/fail")
-    assert body == "server error"
+    page = Page(page_url="http://example.test/fail")
+    success = provider.fetch_and_store(page)
+    assert success is True
+    assert page.page_content == "server error"
     assert any("Non-success status" in r.message or "Non-success status" in r.getMessage() for r in caplog.records)

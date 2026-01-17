@@ -12,7 +12,8 @@ def test_upsert_and_fetch_plain_text():
     repo = PagesRepository(session_factory)
     url = 'http://repo-test.local/page'
     # ensure clean
-    repo.ensure_page(url)
+    page = Page(page_url=url)
+    repo.ensure_page(page)
     page_obj = Page(
         page_id=None,
         page_url=url,

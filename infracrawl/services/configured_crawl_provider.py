@@ -39,29 +39,30 @@ class ConfiguredCrawlProvider:
     def fetch(self, url: str, stop_event=None):
         return self.fetcher.fetch(url, stop_event=stop_event)
 
-    def fetch_and_store(self, url: str, stop_event=None) -> Optional[str]:
-        """Fetch a URL and persist the result.
-
-        Returns the response body on success, or None on failure.
+    def fetch_and_store(self, page: Page) -> bool:
+        """Fetch a URL, persist the page, and mutate page.page_content in-place.
+        
+        Returns True on success, False on failure.
         """
+        url = page.page_url
         try:
             if self.context.is_stopped():
                 logger.info("Fetch cancelled for %s", url)
-                return None
+                return False
             if self.context.config is None:
                 raise ValueError("context.config is required")
             
-            response: HttpResponse = self.fetch(url, stop_event=stop_event)
+            response: HttpResponse = self.fetch(url, stop_event=self.context.stop_event)
         except HttpFetchError as e:
             logger.warning("Fetch failed for %s: %s", url, e)
-            return None
+            return False
         except Exception as e:
             logger.error("Fetch error for %s: %s", url, e, exc_info=True)
-            return None
+            return False
 
         fetched_at = datetime.utcnow().isoformat()
         try:
-            page = self.fetch_persist_service.extract_and_persist(
+            returned_page = self.fetch_persist_service.extract_and_persist(
                 url,
                 response.status_code,
                 response.text,
@@ -72,11 +73,11 @@ class ConfiguredCrawlProvider:
                 "Fetched %s -> status %s, page_id=%s",
                 url,
                 response.status_code,
-                getattr(page, "page_id", None),
+                getattr(returned_page, "page_id", None),
             )
         except Exception as e:
             logger.error("Storage error while saving %s: %s", url, e, exc_info=True)
-            return None
+            return False
 
         try:
             sc = int(response.status_code)
@@ -85,7 +86,8 @@ class ConfiguredCrawlProvider:
         except Exception:
             logger.exception("Error parsing status code for %s: %s", url, response.status_code)
 
-        return response.text
+        page.page_content = response.text
+        return True
 
     def process_links(
         self,
@@ -134,16 +136,16 @@ class ConfiguredCrawlProvider:
         """
         url = page.page_url
         
-        # Set up root for link extraction
-        self.context.set_root(url)
+        # Set current page for link extraction
+        self.context.set_current_page(page)
         
-        if self.context.is_visited(url):
+        if self.context.is_visited(page):
             logger.debug("Skipping (visited) %s", url)
             return False
-        self.context.mark_visited(url)
+        self.context.mark_visited(page)
 
         # Enrich page with database record
-        page.page_id = self.pages_repo.ensure_page(url)
+        self.pages_repo.ensure_page(page)
 
         if self.context.is_stopped():
             logger.info("Crawl cancelled during traversal of %s", url)
@@ -158,11 +160,10 @@ class ConfiguredCrawlProvider:
             return False
 
         # Fetch and enrich page with content
-        body = self.fetch_and_store(url, self.context.stop_event)
-        if body is None:
+        success = self.fetch_and_store(page)
+        if not success:
             return False
 
-        page.page_content = body
         self.context.increment_pages_crawled(1)
 
         time.sleep(self.context.config.delay_seconds)
