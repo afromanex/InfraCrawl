@@ -105,13 +105,14 @@ class ConfiguredCrawlProvider:
             nonlocal pages_crawled, stopped
             if stopped:
                 return
-            with self.context.child_depth_scope() as can_crawl:
-                if not can_crawl:
-                    return
-                result = self.crawl_from(child_page)
-                pages_crawled += result[0]
-                if result[1]:
-                    stopped = True
+            prev_depth = self.context.current_depth
+            if not self.context.can_crawl_child():
+                return
+            result = self.crawl_from(child_page)
+            self.context.restore_depth(prev_depth)
+            pages_crawled += result[0]
+            if result[1]:
+                stopped = True
 
         self.link_processor.process(page, self.context, crawl_callback=cb)
         return (pages_crawled, stopped)
