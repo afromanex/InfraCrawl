@@ -39,16 +39,13 @@ class ConfiguredCrawlProvider:
     def fetch(self, url: str, stop_event=None):
         return self.fetcher.fetch(url, stop_event=stop_event)
 
-    def is_stopped(self, stop_event) -> bool:
-        return stop_event is not None and stop_event.is_set()
-
     def fetch_and_store(self, url: str, stop_event=None) -> Optional[str]:
         """Fetch a URL and persist the result.
 
         Returns the response body on success, or None on failure.
         """
         try:
-            if self.is_stopped(stop_event):
+            if self.context.is_stopped():
                 logger.info("Fetch cancelled for %s", url)
                 return None
             if self.context.config is None:
@@ -99,20 +96,28 @@ class ConfiguredCrawlProvider:
 
         Returns stopped status.
         """
-        # Check if we can crawl children
+        # Calculate depth for children
         child_depth = depth - 1 if depth is not None else None
-        if depth is not None and child_depth < 0:
-            return self.context.should_stop()
+        crawl_depth_reached = child_depth is not None and child_depth < 0
+        if crawl_depth_reached:
+            return self.context.is_stopped()
         
         def crawl_child_page(child_page):
-            if self.context.should_stop():
+            # Check if already stopped
+            if self.context.is_stopped():
+                logger.debug("Skipping child (already stopped) %s", child_page.page_url)
                 return
-            stopped = self.crawl_from(child_page, child_depth)
-            if stopped:
+            
+            # Crawl the child
+            child_stopped = self.crawl_from(child_page, child_depth)
+            
+            # If this crawl detected stop, signal remaining siblings to skip
+            if child_stopped:
+                logger.debug("Stop detected during child crawl, skipping remaining siblings: %s", child_page.page_url)
                 self.context.mark_stopped()
 
         self.link_processor.process(page, self.context, crawl_child_page=crawl_child_page)
-        return self.context.should_stop()
+        return self.context.is_stopped()
 
     def crawl_from(self, page: Page, depth: Optional[int]) -> bool:
         """Crawl a single page and its children.
@@ -140,7 +145,7 @@ class ConfiguredCrawlProvider:
         # Enrich page with database record
         page.page_id = self.pages_repo.ensure_page(url)
 
-        if self.is_stopped(self.context.stop_event):
+        if self.context.is_stopped():
             logger.info("Crawl cancelled during traversal of %s", url)
             return True
 

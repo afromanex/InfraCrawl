@@ -13,7 +13,8 @@ def test_create_session_without_registry():
     
     assert session.config == config
     assert session.crawl_id is None
-    assert session.stop_event is None
+    assert session.stop_event is not None  # Always created
+    assert not session.stop_event.is_set()  # But not triggered
     assert session.visited_tracker is not None
     assert session.pages_crawled == 0
 

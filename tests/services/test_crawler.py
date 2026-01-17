@@ -1,4 +1,5 @@
 import pytest
+import threading
 from unittest.mock import MagicMock, call
 from infracrawl.services.crawl_executor import CrawlExecutor
 from infracrawl.services.fetcher_factory import FetcherFactory
@@ -41,7 +42,7 @@ def test_crawl_executor_updates_registry_with_page_count(mock_repos):
     # Mock the handle that registry.start() returns
     mock_handle = MagicMock()
     mock_handle.crawl_id = "test-crawl-123"
-    mock_handle.stop_event = None
+    mock_handle.stop_event = threading.Event()  # Always provide an event
     mock_registry.start.return_value = mock_handle
     
     # Mock pages_repo to return a page_id on ensure_page

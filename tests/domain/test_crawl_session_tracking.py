@@ -16,7 +16,7 @@ def test_session_without_registry_tracking_is_noop():
     
     # Should not have tracking IDs
     assert session.crawl_id is None
-    assert session.stop_event is None
+    assert session.stop_event is not None  # Always created locally
 
 
 def test_session_start_tracking_calls_registry_start():
