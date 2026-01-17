@@ -70,6 +70,10 @@ export class APIService {
     return this.http.delete(`${this.baseUrl}/crawlers/${configId}/data`);
   }
 
+  removeConfigData(configPath: string): Observable<any> {
+    return this.http.delete(`${this.baseUrl}/crawlers/remove?config=${encodeURIComponent(configPath)}`);
+  }
+
   // Stats
   getJobStats(configPath: string): Observable<{ config_path: string; pages: number; links: number }> {
     return this.http.get<{ config_path: string; pages: number; links: number }>(

@@ -58,14 +58,24 @@ import { CrawlerConfig } from '../../core/models';
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ cfg.config_path }}</td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ cfg.pages_count ?? '—' }}</td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ cfg.links_count ?? '—' }}</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-primary-700">
-                  <button
-                    type="button"
-                    class="hover:text-primary-900"
-                    (click)="toggleConfig(cfg.config_path)"
-                  >
-                    {{ expanded.has(cfg.config_path) ? 'Hide' : 'View' }}
-                  </button>
+                <td class="px-6 py-4 whitespace-nowrap text-sm">
+                  <div class="flex gap-2">
+                    <button
+                      type="button"
+                      class="px-3 py-1 text-sm text-primary-600 hover:text-primary-800 hover:bg-primary-50 rounded"
+                      (click)="toggleConfig(cfg.config_path)"
+                    >
+                      {{ expanded.has(cfg.config_path) ? 'Hide' : 'View' }}
+                    </button>
+                    <button
+                      type="button"
+                      class="px-3 py-1 text-sm text-white bg-red-600 hover:bg-red-700 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                      (click)="clearConfigData(cfg.config_path)"
+                      [disabled]="clearingConfigs.has(cfg.config_path)"
+                    >
+                      {{ clearingConfigs.has(cfg.config_path) ? 'Clearing...' : 'Clear Data' }}
+                    </button>
+                  </div>
                 </td>
               </tr>
               <tr *ngIf="expanded.has(cfg.config_path)">
@@ -97,6 +107,7 @@ export class ConfigsComponent implements OnInit, OnDestroy {
   statsError: string | null = null;
   statsLoading = false;
   expanded = new Set<string>();
+  clearingConfigs = new Set<string>();
   configContent = new Map<string, string>();
   configContentLoading = new Set<string>();
   configContentError = new Map<string, string>();
@@ -193,6 +204,27 @@ export class ConfigsComponent implements OnInit, OnDestroy {
             err?.error?.detail || 'Failed to load config file'
           );
           this.configContentLoading.delete(configPath);
+        },
+      });
+  }
+
+  clearConfigData(configPath: string): void {
+    if (!confirm(`Clear all crawler data for ${configPath}? This cannot be undone.`)) {
+      return;
+    }
+
+    this.clearingConfigs.add(configPath);
+    this.api
+      .removeConfigData(configPath)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: () => {
+          this.clearingConfigs.delete(configPath);
+          this.fetchConfigs(); // Refresh to update stats
+        },
+        error: (err: any) => {
+          this.clearingConfigs.delete(configPath);
+          this.error = err?.error?.detail || 'Failed to clear config data';
         },
       });
   }

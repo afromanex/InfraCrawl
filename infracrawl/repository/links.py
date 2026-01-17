@@ -93,3 +93,27 @@ class LinksRepository:
             q = select(DBLink).where(or_(DBLink.link_from_id.in_(page_ids), DBLink.link_to_id.in_(page_ids)))
             count = session.execute(q).scalars().all()
             return len(count)
+    def get_all_page_ids_referenced_by_pages(self, page_ids: List[int]) -> List[int]:
+        """Get all page IDs that are referenced by the given page IDs (i.e., reachable pages).
+        
+        Returns both the original page_ids plus any page_ids that appear as link targets
+        or sources from those pages.
+        """
+        if not page_ids:
+            return []
+        
+        with self.get_session() as session:
+            # Find all links where the source is in page_ids
+            q = select(DBLink).where(or_(
+                DBLink.link_from_id.in_(page_ids),
+                DBLink.link_to_id.in_(page_ids)
+            ))
+            links = session.execute(q).scalars().all()
+            
+            # Collect all page IDs that appear in these links
+            referenced_ids = set(page_ids)
+            for link in links:
+                referenced_ids.add(link.link_from_id)
+                referenced_ids.add(link.link_to_id)
+            
+            return list(referenced_ids)

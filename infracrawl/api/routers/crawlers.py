@@ -107,12 +107,17 @@ def create_crawlers_router(
             raise HTTPException(status_code=404, detail="config not found")
 
         try:
+            # Get all pages belonging to this config
             page_ids = pages_repo.get_page_ids_by_config(cfg.config_id)
             deleted_links = 0
             deleted_pages = 0
             if page_ids:
-                deleted_links = links_repo.delete_links_for_page_ids(page_ids)
-                deleted_pages = pages_repo.delete_pages_by_ids(page_ids)
+                # Get all pages referenced by these pages (including the config's pages)
+                all_page_ids = links_repo.get_all_page_ids_referenced_by_pages(page_ids)
+                # Delete all links referencing any of these pages
+                deleted_links = links_repo.delete_links_for_page_ids(all_page_ids)
+                # Delete all pages referenced by the config's pages
+                deleted_pages = pages_repo.delete_pages_by_ids(all_page_ids)
         except Exception:
             raise HTTPException(status_code=500, detail="error removing data")
 

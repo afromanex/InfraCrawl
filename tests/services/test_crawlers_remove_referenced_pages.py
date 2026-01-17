@@ -39,8 +39,8 @@ def test_remove_endpoint_deletes_all_referenced_pages():
     mock_pages_repo.get_page_ids_by_config.return_value = config_page_ids
     
     # Pages referenced by config pages (including pages with no config_id)
-    # Simulating that delete_links_for_page_ids returns all pages (config's + referenced)
     all_page_ids = [1, 2, 3, 4, 5]  # Also pages 4, 5 referenced
+    mock_links_repo.get_all_page_ids_referenced_by_pages.return_value = all_page_ids
     mock_pages_repo.delete_pages_by_ids.return_value = 5  # All 5 pages deleted
     
     # Links deleted
@@ -77,8 +77,8 @@ def test_remove_endpoint_deletes_all_referenced_pages():
     # Verify repos were called correctly
     mock_config_service.get_config.assert_called_once_with("test.yml")
     mock_pages_repo.get_page_ids_by_config.assert_called_once_with(1)
-    mock_links_repo.delete_links_for_page_ids.assert_called_once_with(config_page_ids)
+    mock_links_repo.get_all_page_ids_referenced_by_pages.assert_called_once_with(config_page_ids)
+    mock_links_repo.delete_links_for_page_ids.assert_called_once_with(all_page_ids)
     # Should call delete_pages with all pages (config's + referenced)
-    call_args = mock_pages_repo.delete_pages_by_ids.call_args[0][0]
-    assert set(call_args) == set(all_page_ids), f"Should delete all pages, got {call_args}"
+    mock_pages_repo.delete_pages_by_ids.assert_called_once_with(all_page_ids)
 

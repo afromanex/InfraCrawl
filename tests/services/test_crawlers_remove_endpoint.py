@@ -24,11 +24,13 @@ def test_remove_endpoint_deletes_pages_and_links_for_config():
     mock_config_service.get_config.return_value = config
     
     # Mock pages_repo to return page IDs and delete count
-    page_ids = [1, 2, 3]  # 3 pages
+    page_ids = [1, 2, 3]  # 3 pages from config
     mock_pages_repo.get_page_ids_by_config.return_value = page_ids
     mock_pages_repo.delete_pages_by_ids.return_value = 3
     
-    # Mock links_repo to return delete count
+    # Mock links_repo methods
+    # get_all_page_ids_referenced_by_pages returns the config pages (no additional referenced pages in this case)
+    mock_links_repo.get_all_page_ids_referenced_by_pages.return_value = page_ids
     mock_links_repo.delete_links_for_page_ids.return_value = 5  # 5 links deleted
     
     # Create router
@@ -62,5 +64,6 @@ def test_remove_endpoint_deletes_pages_and_links_for_config():
     # Verify that the repos were called correctly
     mock_config_service.get_config.assert_called_once_with("test.yml")
     mock_pages_repo.get_page_ids_by_config.assert_called_once_with(1)
+    mock_links_repo.get_all_page_ids_referenced_by_pages.assert_called_once_with(page_ids)
     mock_links_repo.delete_links_for_page_ids.assert_called_once_with(page_ids)
     mock_pages_repo.delete_pages_by_ids.assert_called_once_with(page_ids)
