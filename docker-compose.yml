@@ -39,5 +39,23 @@ services:
     command: pytest tests/
     restart: "no"
 
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    environment:
+      - NODE_ENV=development
+      - ANGULAR_CLI_ANALYTICS=false
+    depends_on:
+      - app
+    volumes:
+      - ./frontend/src:/app/src
+      - ./frontend/public:/app/public
+      - /app/node_modules
+    command: npm start
+    ports:
+      - "4200:4200"
+    restart: unless-stopped
+
 volumes:
   db_data:
