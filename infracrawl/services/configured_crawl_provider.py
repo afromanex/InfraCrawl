@@ -102,7 +102,7 @@ class ConfiguredCrawlProvider:
         pages_crawled = 0
         stopped = False
 
-        def cb(link_url):
+        def cb(child_page):
             nonlocal pages_crawled, stopped
             if stopped:
                 return
@@ -112,8 +112,6 @@ class ConfiguredCrawlProvider:
                 return
             prev_depth = self.context.current_depth
             self.context.set_current_depth(child_depth)
-            # Create new page for the discovered link
-            child_page = Page(page_url=link_url)
             result = self.crawl_from(child_page)
             self.context.set_current_depth(prev_depth)
             pages_crawled += result[0]

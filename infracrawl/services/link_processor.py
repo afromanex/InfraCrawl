@@ -25,10 +25,10 @@ class LinkProcessor:
             # CLAUDE: Returning False treats parse errors as external links - conservative and safe.
             return False
 
-    def process(self, page: Page, context: CrawlSession, *, crawl_callback: Optional[Callable[[str], None]] = None) -> None:
+    def process(self, page: Page, context: CrawlSession, *, crawl_callback: Optional[Callable[[Page], None]] = None) -> None:
         """Extract links from the page, persist them, and optionally schedule crawls.
 
-        `crawl_callback(link_url)` is invoked for links to be crawled.
+        `crawl_callback(page)` is invoked for links to be crawled.
         """
         links = self.content_review_service.extract_links(page.page_url, page.page_content)
         
@@ -49,4 +49,5 @@ class LinkProcessor:
         # Schedule crawls for next depth
         if context.current_depth - 1 >= 0 and crawl_callback is not None:
             for link_url, _ in same_host_links:
-                crawl_callback(link_url)
+                child_page = Page(page_url=link_url)
+                crawl_callback(child_page)
