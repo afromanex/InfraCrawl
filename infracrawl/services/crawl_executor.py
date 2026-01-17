@@ -39,10 +39,10 @@ class CrawlExecutor:
         provider = self.provider_factory.build(session)
         context = provider.context
         config = session.config
-        logger.info("Crawl started for config %s", getattr(config, "config_id", None))
+        logger.info("Crawl started for config %s", config.config_id)
 
         stopped = False
-        roots = getattr(config, "root_urls", []) or []
+        roots = config.root_urls or []
         for root_url in roots:
             # Create page object for root URL
             page = Page(page_url=root_url)
@@ -57,7 +57,7 @@ class CrawlExecutor:
 
         logger.info(
             "Crawl completed for config %s: pages=%s stopped=%s",
-            getattr(config, "config_id", None),
+            config.config_id,
             context.pages_crawled,
             stopped,
         )

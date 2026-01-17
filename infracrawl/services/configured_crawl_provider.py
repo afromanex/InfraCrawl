@@ -43,7 +43,7 @@ class ConfiguredCrawlProvider:
         return self.fetcher.fetch(url, stop_event=stop_event)
 
     def is_stopped(self, stop_event) -> bool:
-        return stop_event is not None and getattr(stop_event, "is_set", lambda: False)()
+        return stop_event is not None and stop_event.is_set()
 
     def fetch_and_store(self, url: str, stop_event=None) -> Optional[str]:
         """Fetch a URL and persist the result.
@@ -54,7 +54,7 @@ class ConfiguredCrawlProvider:
             if self.is_stopped(stop_event):
                 logger.info("Fetch cancelled for %s", url)
                 return None
-            if self.context is None or getattr(self.context, "config", None) is None:
+            if self.context.config is None:
                 raise ValueError("context.config is required")
             
             response: HttpResponse = self.fetch(url, stop_event=stop_event)
