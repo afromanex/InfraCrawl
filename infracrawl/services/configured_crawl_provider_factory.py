@@ -37,7 +37,6 @@ class ConfiguredCrawlProviderFactory:
         """
         config = session.config
         fetcher = self.fetcher_factory.get(config.fetch_mode, config=config)
-        session.set_current_depth(session.max_depth)
         return ConfiguredCrawlProvider(
             fetcher=fetcher,
             context=session,
