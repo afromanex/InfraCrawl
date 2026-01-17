@@ -1,5 +1,4 @@
 import logging
-from dataclasses import dataclass
 from typing import Callable, Optional
 from urllib.parse import urlparse
 
@@ -8,12 +7,6 @@ from infracrawl.domain.crawl_session import CrawlSession
 from infracrawl.domain.page import Page
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass(frozen=True)
-class LinkProcessRequest:
-    page: Page
-    context: CrawlSession
 
 
 class LinkProcessor:
@@ -32,18 +25,18 @@ class LinkProcessor:
             # CLAUDE: Returning False treats parse errors as external links - conservative and safe.
             return False
 
-    def process(self, req: LinkProcessRequest, *, crawl_callback: Optional[Callable[[str], None]] = None) -> None:
+    def process(self, page: Page, context: CrawlSession, *, crawl_callback: Optional[Callable[[str], None]] = None) -> None:
         """Extract links from the page, persist them, and optionally schedule crawls.
 
         `crawl_callback(link_url)` is invoked for links to be crawled.
         """
-        links = self.content_review_service.extract_links(req.page.page_url, req.page.page_content)
+        links = self.content_review_service.extract_links(page.page_url, page.page_content)
         
         # Filter to same-host links only
         same_host_links = []
         for link_url, anchor in links:
-            if not self._same_host(req.context.current_root, link_url):
-                logger.debug("Skipping (external) %s -> not same host as %s", link_url, req.context.current_root)
+            if not self._same_host(context.current_root, link_url):
+                logger.debug("Skipping (external) %s -> not same host as %s", link_url, context.current_root)
                 continue
             same_host_links.append((link_url, anchor))
         
@@ -51,9 +44,9 @@ class LinkProcessor:
             return
 
         # Persist links (batch DB work)
-        self.link_persister.persist_links(from_id=req.page.page_id, links=same_host_links)
+        self.link_persister.persist_links(from_id=page.page_id, links=same_host_links)
         
         # Schedule crawls for next depth
-        if req.context.current_depth - 1 >= 0 and crawl_callback is not None:
+        if context.current_depth - 1 >= 0 and crawl_callback is not None:
             for link_url, _ in same_host_links:
                 crawl_callback(link_url)

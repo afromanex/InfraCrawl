@@ -10,7 +10,6 @@ from infracrawl.domain.http_response import HttpResponse
 from infracrawl.domain.page import Page
 from infracrawl.exceptions import HttpFetchError
 from infracrawl.services.fetcher import Fetcher
-from infracrawl.services.link_processor import LinkProcessRequest
 
 logger = logging.getLogger(__name__)
 
@@ -121,10 +120,7 @@ class ConfiguredCrawlProvider:
             if result[1]:
                 stopped = True
 
-        self.link_processor.process(
-            LinkProcessRequest(page=page, context=self.context),
-            crawl_callback=cb,
-        )
+        self.link_processor.process(page, self.context, crawl_callback=cb)
         return (pages_crawled, stopped)
 
     def crawl_from(self, page: Page) -> tuple[int, bool]:
