@@ -104,6 +104,7 @@ class SchedulerService:
         if mode_norm in {"off", "0", "false", "none"}:
             return
         
+        logger.info("Checking for jobs to restart")
         self._recovery.recover()
 
     def shutdown(self, wait: bool = True):
@@ -120,6 +121,9 @@ class SchedulerService:
         if not self._sched:
             logger.warning("Scheduler not started; cannot load schedules")
             return
+        
+        logger.info("Loading scheduled jobs from configs")
+        
         # Remove existing schedule jobs we previously added
         for job in list(self._sched.get_jobs()):
             if job.id.startswith("schedule:"):

@@ -1,13 +1,15 @@
 import os
 
+import logging
 from infracrawl.services.scheduler_service import SchedulerService
 
 
 class DummyConfig:
-    def __init__(self, config_id: int, config_path: str, resume_on_application_restart: bool = False):
+    def __init__(self, config_id: int, config_path: str, resume_on_application_restart: bool = False, schedule=None):
         self.config_id = config_id
         self.config_path = config_path
         self.resume_on_application_restart = resume_on_application_restart
+        self.schedule = schedule  # Optional schedule for job scheduling tests
 
 
 class DummyConfigProvider:
@@ -18,7 +20,11 @@ class DummyConfigProvider:
         return self._configs
 
     def get_config(self, config_path: str):
-        raise NotImplementedError()
+        """Return the matching config from the list."""
+        for cfg in self._configs:
+            if cfg.config_path == config_path:
+                return cfg
+        raise FileNotFoundError(f"Config {config_path} not found")
 
     def sync_configs_with_disk(self) -> None:
         raise NotImplementedError()
@@ -49,6 +55,9 @@ class DummyScheduler:
             "id": id,
             "replace_existing": replace_existing,
         })
+    
+    def get_jobs(self):
+        return []
 
 
 def test_recovery_mark_mode_marks_incomplete_runs():
@@ -106,6 +115,61 @@ def test_recovery_restart_mode_schedules_restart_for_configs_with_incomplete():
 
     # Jobs are no longer automatically scheduled; logging indicates what should be restarted
     assert len(sched.added) == 0
+
+
+def test_recovery_logs_startup_and_per_config(caplog):
+    provider = DummyConfigProvider([
+        DummyConfig(1, "a.yml", resume_on_application_restart=False),
+    ])
+    crawls_repo = DummyCrawlsRepo({1: 1})
+
+    svc = SchedulerService(
+        provider,
+        None,  # session_factory
+        start_crawl_callback=lambda *a, **k: None,
+        crawls_repo=crawls_repo,
+        recovery_mode="restart",
+        recovery_within_seconds=None,
+        recovery_message="startup recovery",
+    )
+    svc._sched = DummyScheduler()
+
+    caplog.set_level(logging.INFO)
+    svc._recover_incomplete_runs_on_startup()
+
+    # Expect high-level startup log and recovery scanning
+    scheduler_logs = " ".join(r.message for r in caplog.records if r.name.endswith("scheduler_service"))
+    recovery_logs = " ".join(r.message for r in caplog.records if r.name.endswith("crawl_run_recovery"))
+
+    assert "Checking for jobs to restart" in scheduler_logs
+    assert "Recovery: scanning configs for incomplete runs" in recovery_logs
+    assert "Recovered 1 incomplete run(s) for a.yml" in recovery_logs
+    # Since resume flag is False, expect fallback restart guidance log
+    assert "Job for config a.yml (id=1) should be restarted" in recovery_logs
+
+
+def test_recovery_logs_initiating_resume(caplog):
+    provider = DummyConfigProvider([
+        DummyConfig(1, "a.yml", resume_on_application_restart=True),
+    ])
+    crawls_repo = DummyCrawlsRepo({1: 1}, has_incomplete_map={1: False})
+
+    svc = SchedulerService(
+        provider,
+        None,  # session_factory
+        start_crawl_callback=lambda *a, **k: None,
+        crawls_repo=crawls_repo,
+        recovery_mode="restart",
+        recovery_within_seconds=None,
+        recovery_message="startup recovery",
+    )
+    svc._sched = DummyScheduler()
+
+    caplog.set_level(logging.INFO)
+    svc._recover_incomplete_runs_on_startup()
+
+    recovery_logs = " ".join(r.message for r in caplog.records if r.name.endswith("crawl_run_recovery"))
+    assert "Recovery: initiating resume for config a.yml (id=1)" in recovery_logs
 
 
 def test_recovery_off_mode_does_nothing():
@@ -188,3 +252,25 @@ def test_recovery_restart_schedules_when_resume_false():
     ]
     # Should not schedule restart because resume_on_application_restart is False (logging indicates what to do)
     assert len(sched.added) == 0
+
+def test_load_and_schedule_logs_loading_message(caplog):
+    provider = DummyConfigProvider([
+        DummyConfig(1, "a.yml"),
+    ])
+    crawls_repo = DummyCrawlsRepo({})
+
+    svc = SchedulerService(
+        provider,
+        None,  # session_factory
+        start_crawl_callback=lambda *a, **k: None,
+        crawls_repo=crawls_repo,
+        recovery_mode="off",  # Disable recovery to isolate scheduling logs
+    )
+    sched = DummyScheduler()
+    svc._sched = sched
+
+    caplog.set_level(logging.INFO)
+    svc.load_and_schedule_all()
+
+    scheduler_logs = " ".join(r.message for r in caplog.records if r.name.endswith("scheduler_service"))
+    assert "Loading scheduled jobs from configs" in scheduler_logs

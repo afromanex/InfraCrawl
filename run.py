@@ -2,6 +2,7 @@ import json
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import urlparse, parse_qs
 from typing import Optional
+import logging
 
 from infracrawl.container import Container
 from infracrawl.api.server import create_app
@@ -17,6 +18,9 @@ def main(container: Optional[Container] = None):
         container: Optional Container instance for dependency injection.
                   If None, a new container will be created with default configuration.
     """
+    # Configure logging to show app INFO logs
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+
     # Create container if not provided (dependency injection)
     if container is None:
         container = Container()

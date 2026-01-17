@@ -15,6 +15,13 @@ class DummyConfigProvider:
 
     def list_configs(self):
         return self._configs
+    
+    def get_config(self, config_path: str):
+        """Return the matching config from the list."""
+        for cfg in self._configs:
+            if cfg.config_path == config_path:
+                return cfg
+        raise FileNotFoundError(f"Config {config_path} not found")
 
 
 class DummyCrawlsRepo:

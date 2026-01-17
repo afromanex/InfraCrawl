@@ -29,6 +29,7 @@ class CrawlRunRecovery:
         if self.crawls_repo is None:
             return
 
+        logger.info("Recovery: scanning configs for incomplete runs")
         configs = self.config_provider.list_configs()
 
         for db_cfg in configs:
@@ -52,21 +53,20 @@ class CrawlRunRecovery:
 
             logger.info("Recovered %s incomplete run(s) for %s", count, cfg_path)
 
-            # Check config's resume_on_application_restart setting (from full YAML config)
-            resume: bool = getattr(db_cfg, "resume_on_application_restart", False)
-            if not resume:
-                # Fallback to full config load to read resume flag when DB row lacks it
-                try:
-                    full_cfg = self.config_provider.get_config(cfg_path)
-                    resume = bool(getattr(full_cfg, "resume_on_application_restart", False))
-                except Exception:
-                    # If a specific config can't be loaded, don't crash recovery – just log and continue.
-                    logger.exception("Recovery: could not load full config for %s to check resume flag", cfg_path)
-                    resume = False
+            # Always load full config to check resume flag (may have been updated since DB last synced)
+            resume: bool = False
+            try:
+                full_cfg = self.config_provider.get_config(cfg_path)
+                resume = bool(getattr(full_cfg, "resume_on_application_restart", False))
+            except Exception:
+                logger.exception("Recovery: could not load full config for %s to check resume flag", cfg_path)
+                resume = False
+            
             if resume:
                 # Skip restart if there are already incomplete (running) runs for this config
                 try:
-                    if self.crawls_repo.has_incomplete_runs(cfg_id, within_seconds=self.within_seconds):
+                    has_incomplete = self.crawls_repo.has_incomplete_runs(cfg_id, within_seconds=self.within_seconds)
+                    if has_incomplete:
                         logger.info(
                             "Skipping recovery restart for %s (resume_on_application_restart enabled, incomplete runs exist)",
                             cfg_path,
