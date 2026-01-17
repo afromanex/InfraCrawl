@@ -1,5 +1,6 @@
 import logging
 from typing import Optional
+from concurrent.futures import ThreadPoolExecutor
 
 from infracrawl.repository.crawls import CrawlsRepository
 from infracrawl.services.protocols import ConfigProvider
@@ -19,10 +20,14 @@ class CrawlRunRecovery:
         config_provider: ConfigProvider,
         crawls_repo: CrawlsRepository,
         within_seconds: Optional[int],
+        pages_repo=None,
     ) -> None:
         self.config_provider = config_provider
         self.crawls_repo = crawls_repo
         self.within_seconds = within_seconds
+        self.pages_repo = pages_repo
+        # Offload resume callbacks to avoid blocking recovery loop
+        self._resume_executor = ThreadPoolExecutor(max_workers=4)
 
     def recover(self) -> None:
         """Mark incomplete crawl runs as complete."""
@@ -49,21 +54,34 @@ class CrawlRunRecovery:
                 logger.exception("Failed marking incomplete runs for config %s", cfg_path)
                 continue
 
-            if count <= 0:
-                logger.debug("Recovery: no incomplete runs for config %s (id=%s)", cfg_path, cfg_id)
+            unvisited_exists: bool = False
+            if self.pages_repo is not None:
+                try:
+                    unvisited_exists = self.pages_repo.has_unvisited_urls_by_config(cfg_id)
+                    logger.info(
+                        "Recovery: unvisited pages exist for %s (id=%s): %s",
+                        cfg_path,
+                        cfg_id,
+                        unvisited_exists,
+                    )
+                except Exception:
+                    logger.exception("Recovery: failed checking unvisited pages for %s", cfg_path)
+
+            if count <= 0 and not unvisited_exists:
+                logger.debug("Recovery: no incomplete runs or unvisited pages for config %s (id=%s)", cfg_path, cfg_id)
                 continue
 
             logger.info("Recovery: marked %d incomplete run(s) for %s", count, cfg_path)
 
             # Always load full config to check resume flag (may have been updated since DB last synced)
-            resume: bool = False
+            resume: bool = True
             try:
                 full_cfg = self.config_provider.get_config(cfg_path)
-                resume = bool(getattr(full_cfg, "resume_on_application_restart", False))
+                resume = bool(getattr(full_cfg, "resume_on_application_restart", True))
                 logger.info("Resume flag for %s: %s", cfg_path, resume)
             except Exception:
                 logger.exception("Recovery: could not load full config for %s to check resume flag", cfg_path)
-                resume = False
+                resume = True
             
             if resume:
                 # Skip restart if there are already incomplete (running) runs for this config
@@ -85,11 +103,11 @@ class CrawlRunRecovery:
                 if callable(resume_cb):
                     try:
                         logger.info(
-                            "Recovery: initiating resume for config %s (id=%s)",
+                            "Recovery: dispatching resume for config %s (id=%s) asynchronously",
                             cfg_path,
                             cfg_id,
                         )
-                        resume_cb(db_cfg)
+                        self._resume_executor.submit(resume_cb, db_cfg)
                         continue
                     except Exception:
                         logger.exception("Error invoking resume callback for %s", cfg_path)

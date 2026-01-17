@@ -1,11 +1,12 @@
 import os
-
 import logging
+import threading
+import time
 from infracrawl.services.scheduler_service import SchedulerService
 
 
 class DummyConfig:
-    def __init__(self, config_id: int, config_path: str, resume_on_application_restart: bool = False, schedule=None):
+    def __init__(self, config_id: int, config_path: str, resume_on_application_restart: bool = True, schedule=None):
         self.config_id = config_id
         self.config_path = config_path
         self.resume_on_application_restart = resume_on_application_restart
@@ -44,6 +45,16 @@ class DummyCrawlsRepo:
         return self.has_incomplete_map.get(config_id, False)
 
 
+class DummyPagesRepo:
+    def __init__(self, unvisited_map=None):
+        self.unvisited_map = unvisited_map or {}
+        self.calls = []
+
+    def has_unvisited_urls_by_config(self, config_id: int) -> bool:
+        self.calls.append(config_id)
+        return self.unvisited_map.get(config_id, False)
+
+
 class DummyScheduler:
     def __init__(self):
         self.added = []
@@ -66,6 +77,7 @@ def test_recovery_mark_mode_marks_incomplete_runs():
         DummyConfig(2, "b.yml"),
     ])
     crawls_repo = DummyCrawlsRepo({1: 2, 2: 0})
+    pages_repo = DummyPagesRepo({1: False, 2: False})
 
     svc = SchedulerService(
         provider,
@@ -75,6 +87,7 @@ def test_recovery_mark_mode_marks_incomplete_runs():
         recovery_mode="mark",
         recovery_within_seconds=None,
         recovery_message="startup recovery",
+        pages_repo=pages_repo,
     )
     svc._sched = DummyScheduler()
 
@@ -93,6 +106,7 @@ def test_recovery_restart_mode_schedules_restart_for_configs_with_incomplete():
         DummyConfig(2, "b.yml"),
     ])
     crawls_repo = DummyCrawlsRepo({1: 1, 2: 0})
+    pages_repo = DummyPagesRepo({1: False, 2: False})
 
     svc = SchedulerService(
         provider,
@@ -102,6 +116,7 @@ def test_recovery_restart_mode_schedules_restart_for_configs_with_incomplete():
         recovery_mode="restart",
         recovery_within_seconds=3600,
         recovery_message="startup recovery",
+        pages_repo=pages_repo,
     )
     sched = DummyScheduler()
     svc._sched = sched
@@ -122,6 +137,7 @@ def test_recovery_logs_startup_and_per_config(caplog):
         DummyConfig(1, "a.yml", resume_on_application_restart=False),
     ])
     crawls_repo = DummyCrawlsRepo({1: 1})
+    pages_repo = DummyPagesRepo({1: False})
 
     svc = SchedulerService(
         provider,
@@ -131,6 +147,7 @@ def test_recovery_logs_startup_and_per_config(caplog):
         recovery_mode="restart",
         recovery_within_seconds=None,
         recovery_message="startup recovery",
+        pages_repo=pages_repo,
     )
     svc._sched = DummyScheduler()
 
@@ -153,6 +170,7 @@ def test_recovery_logs_initiating_resume(caplog):
         DummyConfig(1, "a.yml", resume_on_application_restart=True),
     ])
     crawls_repo = DummyCrawlsRepo({1: 1}, has_incomplete_map={1: False})
+    pages_repo = DummyPagesRepo({1: False})
 
     svc = SchedulerService(
         provider,
@@ -162,6 +180,7 @@ def test_recovery_logs_initiating_resume(caplog):
         recovery_mode="restart",
         recovery_within_seconds=None,
         recovery_message="startup recovery",
+        pages_repo=pages_repo,
     )
     svc._sched = DummyScheduler()
 
@@ -169,7 +188,7 @@ def test_recovery_logs_initiating_resume(caplog):
     svc._recover_incomplete_runs_on_startup()
 
     recovery_logs = " ".join(r.message for r in caplog.records if r.name.endswith("crawl_run_recovery"))
-    assert "Recovery: initiating resume for config a.yml (id=1)" in recovery_logs
+    assert "Recovery: dispatching resume for config a.yml (id=1) asynchronously" in recovery_logs
 
 
 def test_recovery_off_mode_does_nothing():
@@ -198,6 +217,7 @@ def test_recovery_restart_skips_if_incomplete_runs_in_db():
         {1: 1},
         has_incomplete_map={1: True},  # Already has incomplete runs
     )
+    pages_repo = DummyPagesRepo({1: False})
 
     svc = SchedulerService(
         provider,
@@ -207,6 +227,7 @@ def test_recovery_restart_skips_if_incomplete_runs_in_db():
         recovery_mode="restart",
         recovery_within_seconds=None,
         recovery_message="startup recovery",
+        pages_repo=pages_repo,
     )
     sched = DummyScheduler()
     svc._sched = sched
@@ -231,6 +252,7 @@ def test_recovery_restart_schedules_when_resume_false():
         {1: 1},
         has_incomplete_map={1: True},  # Already has incomplete runs
     )
+    pages_repo = DummyPagesRepo({1: False})
 
     svc = SchedulerService(
         provider,
@@ -240,6 +262,7 @@ def test_recovery_restart_schedules_when_resume_false():
         recovery_mode="restart",
         recovery_within_seconds=None,
         recovery_message="startup recovery",
+        pages_repo=pages_repo,
     )
     sched = DummyScheduler()
     svc._sched = sched
@@ -252,6 +275,91 @@ def test_recovery_restart_schedules_when_resume_false():
     ]
     # Should not schedule restart because resume_on_application_restart is False (logging indicates what to do)
     assert len(sched.added) == 0
+
+
+def test_recovery_resume_dispatches_async_and_does_not_block():
+    """Resume callbacks should be dispatched without blocking other configs."""
+    provider = DummyConfigProvider([
+        DummyConfig(1, "a.yml", resume_on_application_restart=True),
+        DummyConfig(2, "b.yml", resume_on_application_restart=True),
+    ])
+    crawls_repo = DummyCrawlsRepo({1: 1, 2: 1}, has_incomplete_map={1: False, 2: False})
+    pages_repo = DummyPagesRepo({1: True, 2: True})
+
+    svc = SchedulerService(
+        provider,
+        None,  # session_factory
+        start_crawl_callback=lambda *a, **k: None,
+        crawls_repo=crawls_repo,
+        recovery_mode="restart",
+        recovery_within_seconds=None,
+        recovery_message="startup recovery",
+        pages_repo=pages_repo,
+    )
+    svc._sched = DummyScheduler()
+
+    calls = []
+    ready = threading.Event()
+
+    def blocking_resume(cfg):
+        calls.append(cfg.config_id)
+        ready.wait(timeout=0.5)  # simulate long-running resume
+
+    # Wire the blocking callback to simulate real resume behavior
+    svc._recovery._resume_callback = blocking_resume
+
+    start = time.time()
+    svc._recover_incomplete_runs_on_startup()
+    duration = time.time() - start
+
+    # Allow executor to start threads
+    time.sleep(0.05)
+
+    # Even though callbacks block, both should be dispatched without delaying recover
+    assert duration < 0.2
+    assert set(calls) == {1, 2}
+    # Unblock threads to avoid dangling waits
+    ready.set()
+
+
+def test_recovery_resumes_when_unvisited_pages_exist_even_if_no_incomplete_runs(caplog):
+    provider = DummyConfigProvider([
+        DummyConfig(1, "a.yml", resume_on_application_restart=True),
+        DummyConfig(2, "b.yml", resume_on_application_restart=True),
+    ])
+    # Config 1 has incomplete runs; config 2 has none but has unvisited pages.
+    crawls_repo = DummyCrawlsRepo({1: 1, 2: 0}, has_incomplete_map={1: False, 2: False})
+    pages_repo = DummyPagesRepo({1: False, 2: True})
+
+    svc = SchedulerService(
+        provider,
+        None,  # session_factory
+        start_crawl_callback=lambda *a, **k: None,
+        crawls_repo=crawls_repo,
+        recovery_mode="restart",
+        recovery_within_seconds=None,
+        recovery_message="startup recovery",
+        pages_repo=pages_repo,
+    )
+    svc._sched = DummyScheduler()
+
+    calls = []
+
+    class ImmediateExecutor:
+        def submit(self, fn, *args, **kwargs):
+            return fn(*args, **kwargs)
+
+    svc._recovery._resume_callback = lambda cfg: calls.append(cfg.config_id)
+    svc._recovery._resume_executor = ImmediateExecutor()
+
+    caplog.set_level(logging.INFO)
+    svc._recover_incomplete_runs_on_startup()
+
+    # Both configs should be resumed: cfg1 via incomplete run, cfg2 via unvisited pages
+    assert set(calls) == {1, 2}
+    recovery_logs = " ".join(r.message for r in caplog.records if r.name.endswith("crawl_run_recovery"))
+    assert "unvisited pages exist for b.yml" in recovery_logs
+    assert "dispatching resume for config b.yml" in recovery_logs
 
 def test_load_and_schedule_logs_loading_message(caplog):
     provider = DummyConfigProvider([

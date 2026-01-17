@@ -9,6 +9,7 @@ from apscheduler.triggers.interval import IntervalTrigger
 from infracrawl.services.crawl_run_recovery import CrawlRunRecovery
 from infracrawl.services.scheduled_crawl_job_runner import ScheduledCrawlJobRunner
 from infracrawl.services.protocols import ConfigProvider
+from infracrawl.repository.pages import PagesRepository
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +45,7 @@ class SchedulerService:
         recovery_mode: str = "restart",
         recovery_within_seconds: Optional[int] = None,
         recovery_message: str = "job found incomplete on startup",
+        pages_repo=None,
     ):
         self.config_service = config_provider
         self.session_factory = session_factory
@@ -54,6 +56,9 @@ class SchedulerService:
         self._recovery_mode = (recovery_mode or "restart").strip().lower()
         self._recovery_within_seconds = recovery_within_seconds
         self._recovery_message = recovery_message
+
+        # Build pages repo if not provided and we have a session factory
+        self.pages_repo = pages_repo or (PagesRepository(self.session_factory) if self.session_factory else None)
 
         self._job_runner = ScheduledCrawlJobRunner(
             config_provider=self.config_service,
@@ -66,6 +71,7 @@ class SchedulerService:
             config_provider=self.config_service,
             crawls_repo=self.crawls_repo,
             within_seconds=self._recovery_within_seconds,
+            pages_repo=self.pages_repo,
         )
         # Wire resume callback so recovery can trigger an actual resumed job
         try:

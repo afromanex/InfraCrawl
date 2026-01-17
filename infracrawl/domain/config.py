@@ -29,7 +29,7 @@ class CrawlerConfigData:
     http_options: Optional[dict] = None
     headless_options: Optional[dict] = None
     delay_seconds: float = 1.0
-    resume_on_application_restart: bool = False
+    resume_on_application_restart: bool = True
 
 
 class CrawlerConfig:
@@ -55,7 +55,7 @@ class CrawlerConfig:
         http_options: Optional[dict] = None,
         headless_options: Optional[dict] = None,
         delay_seconds: float = 1.0,
-        resume_on_application_restart: bool = False,
+        resume_on_application_restart: bool = True,
     ):
         if fetch_mode is None or (isinstance(fetch_mode, str) and fetch_mode.strip() == ""):
             raise ValueError("fetch_mode is required")

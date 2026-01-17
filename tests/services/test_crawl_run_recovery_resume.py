@@ -3,7 +3,7 @@ from infracrawl.services.crawl_run_recovery import CrawlRunRecovery
 
 
 class DummyConfig:
-    def __init__(self, config_id: int, config_path: str, resume_on_application_restart: bool = False):
+    def __init__(self, config_id: int, config_path: str, resume_on_application_restart: bool = True):
         self.config_id = config_id
         self.config_path = config_path
         self.resume_on_application_restart = resume_on_application_restart

@@ -28,6 +28,7 @@ def test_parse_defaults_root_urls_and_robots():
     assert cfg is not None
     assert cfg.root_urls == []
     assert cfg.robots is True
+    assert cfg.resume_on_application_restart is True
 
 
 def test_parse_with_nested_fetch_options():

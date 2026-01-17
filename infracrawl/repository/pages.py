@@ -259,7 +259,7 @@ class PagesRepository:
             rows = session.execute(q).scalars().all()
             return list(rows)
     
-    def get_unvisited_urls_by_config(self, config_id: int) -> List[str]:
+    def get_unvisited_urls_by_config(self, config_id: int, limit: Optional[int] = None) -> List[str]:
         """Get all page URLs that exist but have no content (unvisited) for a config.
         
         These are pages that were discovered (inserted into DB) but not yet fetched.
@@ -276,8 +276,20 @@ class PagesRepository:
                 (DBPage.config_id == config_id) &
                 (DBPage.page_content.is_(None))
             )
+            if limit is not None:
+                q = q.limit(limit)
             rows = session.execute(q).scalars().all()
             return list(rows)
+
+    def has_unvisited_urls_by_config(self, config_id: int) -> bool:
+        """Fast check for any unvisited pages for the given config."""
+        with self.get_session() as session:
+            q = select(DBPage.page_id).where(
+                (DBPage.config_id == config_id) &
+                (DBPage.page_content.is_(None))
+            ).limit(1)
+            row = session.execute(q).scalars().first()
+            return row is not None
 
     def get_undiscovered_urls_by_depth(self, config_id: int, discovered_depth: int, limit: int = 1000) -> List[str]:
         """Get page URLs at a specific depth that haven't been fetched yet.
