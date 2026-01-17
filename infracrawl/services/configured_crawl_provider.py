@@ -98,7 +98,6 @@ class ConfiguredCrawlProvider:
 
         Returns (pages_crawled, stopped) tuple for child pages.
         """
-        parent_depth = self.context.current_depth
         pages_crawled = 0
         stopped = False
 
@@ -106,17 +105,13 @@ class ConfiguredCrawlProvider:
             nonlocal pages_crawled, stopped
             if stopped:
                 return
-            # Determine remaining depth budget for the child.
-            child_depth = parent_depth - 1 if parent_depth is not None else None
-            if child_depth is not None and child_depth < 0:
-                return
-            prev_depth = self.context.current_depth
-            self.context.set_current_depth(child_depth)
-            result = self.crawl_from(child_page)
-            self.context.set_current_depth(prev_depth)
-            pages_crawled += result[0]
-            if result[1]:
-                stopped = True
+            with self.context.child_depth_scope() as can_crawl:
+                if not can_crawl:
+                    return
+                result = self.crawl_from(child_page)
+                pages_crawled += result[0]
+                if result[1]:
+                    stopped = True
 
         self.link_processor.process(page, self.context, crawl_callback=cb)
         return (pages_crawled, stopped)

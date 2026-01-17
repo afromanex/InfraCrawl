@@ -1,4 +1,5 @@
 import threading
+from contextlib import contextmanager
 from typing import Optional
 from infracrawl.domain.config import CrawlerConfig
 from infracrawl.domain.visited_tracker import VisitedTracker
@@ -95,4 +96,27 @@ class CrawlSession:
     def is_visited(self, url: str) -> bool:
         """Delegate to visited tracker."""
         return self.visited_tracker.is_visited(url)
+
+    @contextmanager
+    def child_depth_scope(self):
+        """Context manager for crawling a child page with decremented depth.
+        
+        Yields True if crawling should proceed (depth allows it), False otherwise.
+        Automatically manages depth save/restore.
+        """
+        if self.current_depth is None:
+            yield True  # No depth limit
+            return
+        
+        child_depth = self.current_depth - 1
+        if child_depth < 0:
+            yield False  # Depth exceeded, don't crawl
+            return
+        
+        prev_depth = self.current_depth
+        self.current_depth = child_depth
+        try:
+            yield True  # Can proceed with crawl
+        finally:
+            self.current_depth = prev_depth
 
