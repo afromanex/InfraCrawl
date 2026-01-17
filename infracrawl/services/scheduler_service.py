@@ -47,7 +47,6 @@ class SchedulerService:
         config_provider: ConfigProvider,
         session_factory,
         start_crawl_callback,
-        crawl_registry,
         crawls_repo,
         *,
         config_watch_interval_seconds: int = 60,
@@ -58,7 +57,6 @@ class SchedulerService:
         self.config_service = config_provider
         self.session_factory = session_factory
         self.start_crawl_callback = start_crawl_callback
-        self.crawl_registry = crawl_registry
         self.crawls_repo = crawls_repo
         self._sched: Optional[BackgroundScheduler] = None
         self._config_watch_interval = int(config_watch_interval_seconds)
@@ -70,7 +68,6 @@ class SchedulerService:
             config_provider=self.config_service,
             session_factory=self.session_factory,
             start_crawl_callback=self.start_crawl_callback,
-            crawl_registry=self.crawl_registry,
             crawls_repo=self.crawls_repo,
         )
         self._recovery = CrawlRunRecovery(

@@ -9,6 +9,7 @@ class ScheduledCrawlJobRunner:
 
     This extracts the "execute a scheduled crawl" responsibility out of
     SchedulerService. Uses a CrawlSessionFactory to create tracked sessions.
+    The session handles all registry tracking operations via finish_tracking().
     """
 
     def __init__(
@@ -17,13 +18,11 @@ class ScheduledCrawlJobRunner:
         config_provider,
         session_factory,
         start_crawl_callback,
-        crawl_registry,
         crawls_repo,
     ):
         self.config_provider = config_provider
         self.session_factory = session_factory
         self.start_crawl_callback = start_crawl_callback
-        self.crawl_registry = crawl_registry
         self.crawls_repo = crawls_repo
 
     def run(self, cfg_path: str) -> None:
@@ -59,9 +58,8 @@ class ScheduledCrawlJobRunner:
                 # Call crawl callback with session (may block; scheduler runs worker thread).
                 self.start_crawl_callback(session)
 
-                # Finish registry tracking if session was tracked
-                if session.crawl_id and self.crawl_registry is not None:
-                    self.crawl_registry.finish(session.crawl_id, status="finished")
+                # Finish registry tracking via session
+                session.finish_tracking(status="finished")
 
                 if run_id is not None and self.crawls_repo is not None:
                     try:
@@ -70,9 +68,8 @@ class ScheduledCrawlJobRunner:
                         logger.exception("Could not finish run record for %s run=%s", cfg_path, run_id)
 
             except Exception as e:
-                # Finish registry tracking with failure status
-                if session.crawl_id and self.crawl_registry is not None:
-                    self.crawl_registry.finish(session.crawl_id, status="failed", error=str(e))
+                # Finish registry tracking via session with failure status
+                session.finish_tracking(status="failed", error=str(e))
 
                 if run_id is not None and self.crawls_repo is not None:
                     try:

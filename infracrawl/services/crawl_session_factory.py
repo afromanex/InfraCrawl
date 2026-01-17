@@ -26,33 +26,24 @@ class CrawlSessionFactory:
     def create(self, config: CrawlerConfig) -> CrawlSession:
         """Create a new crawl session for the given config.
         
-        If a registry is configured, the session will be registered for tracking
-        and will receive a crawl_id and stop_event for cancellation support.
+        If a registry is configured, the session will automatically begin tracking
+        and will have a crawl_id and stop_event for cancellation support.
         
         Args:
             config: The crawler configuration for this session
             
         Returns:
-            A fully configured CrawlSession ready to start crawling
+            A fully configured CrawlSession, already tracking if registry exists
         """
-        crawl_id = None
-        stop_event = None
-        
-        # Register with tracking system if available
-        if self.registry is not None:
-            handle = self.registry.start(
-                config_name=config.config_path,
-                config_id=config.config_id,
-            )
-            crawl_id = handle.crawl_id
-            stop_event = handle.stop_event
-        
-        # Create session with tracking details
+        # Create session with registry reference (tracking not started yet)
         session = CrawlSession(
             config=config,
             visited_tracker=VisitedTracker(max_size=self.visited_tracker_max_urls),
-            crawl_id=crawl_id,
-            stop_event=stop_event,
+            registry=self.registry,
         )
+        
+        # Start tracking immediately if registry is available
+        # This makes the session "hot" - ready to be used with tracking active
+        session.start_tracking()
         
         return session

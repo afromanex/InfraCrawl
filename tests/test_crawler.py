@@ -39,7 +39,11 @@ def test_crawl_executor_updates_registry_with_page_count(mock_repos):
     fetcher_factory = FetcherFactory(http_fetcher=dummy_fetcher, headless_fetcher=dummy_fetcher)
     
     mock_registry = MagicMock()
-    crawl_id = "test-crawl-123"
+    # Mock the handle that registry.start() returns
+    mock_handle = MagicMock()
+    mock_handle.crawl_id = "test-crawl-123"
+    mock_handle.stop_event = None
+    mock_registry.start.return_value = mock_handle
     
     # Mock pages_repo to return a page_id on ensure_page
     mock_repos['pages_repo'].ensure_page.return_value = 1
@@ -81,17 +85,21 @@ def test_crawl_executor_updates_registry_with_page_count(mock_repos):
         delay_seconds=0,
     )
     
-    # Create executor with registry
+    # Create executor (no registry wired)
     executor = CrawlExecutor(
         provider_factory=provider_factory,
-        crawl_registry=mock_registry,
     )
     
-    # Create session with crawl_id (simulating what the job runner would do)
-    session = CrawlSession(config, crawl_id=crawl_id)
+    # Create session with registry injected
+    session = CrawlSession(config, registry=mock_registry)
+    # Manually call start_tracking since test doesn't use factory
+    session.start_tracking()
     
     # Execute the crawl
     result = executor.crawl(session)
+    
+    # Verify that registry.start was called
+    assert mock_registry.start.called, "registry.start should have been called"
     
     # Verify that registry.update was called with pages_fetched > 0
     assert mock_registry.update.called, "registry.update should have been called"

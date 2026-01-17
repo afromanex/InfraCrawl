@@ -221,7 +221,6 @@ class Container(containers.DeclarativeContainer):
     crawl_executor = providers.Factory(
         CrawlExecutor,
         provider_factory=configured_crawl_provider_factory,
-        crawl_registry=crawl_registry,
     )
 
     # Scheduler - Singleton instance
@@ -230,7 +229,6 @@ class Container(containers.DeclarativeContainer):
         config_provider=config_service,
         session_factory=crawl_session_factory,
         start_crawl_callback=crawl_executor.provided.crawl,
-        crawl_registry=crawl_registry,
         crawls_repo=crawls_repository,
         config_watch_interval_seconds=config.INFRACRAWL_CONFIG_WATCH_INTERVAL.as_(int),
         recovery_mode=config.INFRACRAWL_RECOVERY_MODE.as_(str),

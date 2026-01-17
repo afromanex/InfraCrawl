@@ -10,8 +10,8 @@ class CrawlExecutor:
     """Thin orchestration layer for multi-root crawls.
 
     Accepts a pre-configured CrawlSession, builds a provider, and coordinates
-    high-level concerns (logging, registry updates, result aggregation).
-    The session carries all configuration and tracking state.
+    high-level concerns (logging, result aggregation).
+    The session carries all configuration and tracking state, including registry updates.
     The provider owns all crawl traversal logic.
     """
 
@@ -19,25 +19,11 @@ class CrawlExecutor:
         self,
         *,
         provider_factory: ConfiguredCrawlProviderFactory,
-        crawl_registry=None,
     ):
         self.provider_factory = provider_factory
-        self.crawl_registry = crawl_registry
 
     def _is_stopped(self, stop_event) -> bool:
         return stop_event is not None and getattr(stop_event, "is_set", lambda: False)()
-
-    def _update_registry_progress(self, crawl_id: str, pages_fetched: int, links_found: int = 0) -> None:
-        """Update the crawl registry with current progress."""
-        if self.crawl_registry is not None and crawl_id is not None:
-            try:
-                self.crawl_registry.update(
-                    crawl_id,
-                    pages_fetched=pages_fetched,
-                    links_found=links_found,
-                )
-            except Exception as e:
-                logger.warning("Failed to update registry progress: %s", e)
 
     def crawl(self, session: CrawlSession) -> CrawlResult:
         """Execute a crawl for the given session.
@@ -71,9 +57,9 @@ class CrawlExecutor:
                 stopped = True
                 break
 
-        # Update registry with final page count
-        if session.crawl_id is not None:
-            self._update_registry_progress(session.crawl_id, context.pages_crawled)
+        # Update registry with final page count via session
+        # Note: session.pages_crawled is already maintained by the provider
+        session.update_progress()
 
         logger.info(
             "Crawl completed for config %s: pages=%s stopped=%s",
