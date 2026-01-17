@@ -103,7 +103,7 @@ class ConfiguredCrawlProvider:
         pages_crawled = 0
         stopped = False
 
-        def cb(link_url, next_depth):
+        def cb(link_url):
             nonlocal pages_crawled, stopped
             if stopped:
                 return
