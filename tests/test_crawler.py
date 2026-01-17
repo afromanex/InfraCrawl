@@ -2,6 +2,7 @@ import pytest
 from unittest.mock import MagicMock, call
 from infracrawl.services.crawl_executor import CrawlExecutor
 from infracrawl.services.fetcher_factory import FetcherFactory
+from infracrawl.services.configured_crawl_provider import ConfiguredCrawlProviderFactory
 from infracrawl.domain.config import CrawlerConfig
 from infracrawl.domain.crawl_result import CrawlResult
 from infracrawl.domain.http_response import HttpResponse
@@ -16,15 +17,19 @@ def mock_repos():
 def test_crawl_executor_init_uses_injected_collaborators(mock_repos):
     dummy_fetcher = MagicMock()
     fetcher_factory = FetcherFactory(http_fetcher=dummy_fetcher, headless_fetcher=dummy_fetcher)
-    executor = CrawlExecutor(
+    provider_factory = ConfiguredCrawlProviderFactory(
+        fetcher_factory=fetcher_factory,
         pages_repo=mock_repos['pages_repo'],
         crawl_policy=MagicMock(),
         link_processor=MagicMock(),
         fetch_persist_service=MagicMock(),
         delay_seconds=0.1,
-        fetcher_factory=fetcher_factory,
+        visited_tracker_max_urls=100_000,
     )
-    assert executor.pages_repo is mock_repos['pages_repo']
+    executor = CrawlExecutor(
+        provider_factory=provider_factory,
+    )
+    assert executor.provider_factory is provider_factory
 
 
 def test_crawl_executor_updates_registry_with_page_count(mock_repos):
@@ -67,20 +72,24 @@ def test_crawl_executor_updates_registry_with_page_count(mock_repos):
     # Don't process any links so crawl stays simple
     mock_link_processor.process = MagicMock()
     
-    # Create executor with registry
-    executor = CrawlExecutor(
+    provider_factory = ConfiguredCrawlProviderFactory(
+        fetcher_factory=fetcher_factory,
         pages_repo=mock_repos['pages_repo'],
         crawl_policy=mock_crawl_policy,
         link_processor=mock_link_processor,
         fetch_persist_service=mock_fetch_persist,
         delay_seconds=0,
-        fetcher_factory=fetcher_factory,
+        visited_tracker_max_urls=100_000,
+    )
+    
+    # Create executor with registry
+    executor = CrawlExecutor(
+        provider_factory=provider_factory,
         crawl_registry=mock_registry,
-        crawl_id=crawl_id,
     )
     
     # Execute the crawl
-    result = executor.crawl(config)
+    result = executor.crawl(config, crawl_id=crawl_id)
     
     # Verify that registry.update was called with pages_fetched > 0
     assert mock_registry.update.called, "registry.update should have been called"

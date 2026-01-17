@@ -17,8 +17,18 @@ class CrawlContext:
         self.max_depth = config.max_depth if config else None
         # current_root is set when iterating multiple root URLs
         self.current_root: Optional[str] = None
+        # track the current depth budget for the active traversal path
+        self.current_depth: Optional[int] = None
         # Visited URL tracking delegated to separate class (SRP fix)
         self.visited_tracker = visited_tracker if visited_tracker is not None else VisitedTracker()
+        # Track pages fetched within the current crawl
+        self.pages_crawled: int = 0
+
+    def increment_pages_crawled(self, count: int = 1) -> None:
+        self.pages_crawled += int(count)
+
+    def set_current_depth(self, depth: Optional[int]) -> None:
+        self.current_depth = depth
 
     def set_root(self, root: str):
         self.current_root = root

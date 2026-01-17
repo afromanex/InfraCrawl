@@ -12,6 +12,7 @@ from infracrawl.services.http_service import HttpService
 from infracrawl.services.fetcher import HttpServiceFetcher
 from infracrawl.services.fetcher_factory import FetcherFactory
 from infracrawl.services.headless_browser_fetcher import PlaywrightHeadlessFetcher, PlaywrightHeadlessOptions
+from infracrawl.services.configured_crawl_provider import ConfiguredCrawlProviderFactory
 from infracrawl.services.robots_service import RobotsService
 from infracrawl.services.robots_cache import RobotsCache
 from infracrawl.services.page_fetch_persist_service import PageFetchPersistService
@@ -194,6 +195,17 @@ class Container(containers.DeclarativeContainer):
         content_review_service=content_review_service,
         link_persister=link_persister,
     )
+
+    configured_crawl_provider_factory = providers.Singleton(
+        ConfiguredCrawlProviderFactory,
+        fetcher_factory=fetcher_factory,
+        pages_repo=pages_repository,
+        crawl_policy=crawl_policy,
+        link_processor=link_processor,
+        fetch_persist_service=page_fetch_persist_service,
+        delay_seconds=config.CRAWL_DELAY.as_(float),
+        visited_tracker_max_urls=config.INFRACRAWL_VISITED_MAX_URLS.as_(int),
+    )
     
     config_service = providers.Singleton(
         ConfigService,
@@ -202,13 +214,7 @@ class Container(containers.DeclarativeContainer):
 
     crawl_executor = providers.Factory(
         CrawlExecutor,
-        pages_repo=pages_repository,
-        crawl_policy=crawl_policy,
-        link_processor=link_processor,
-        fetch_persist_service=page_fetch_persist_service,
-        delay_seconds=config.CRAWL_DELAY.as_(float),
-        fetcher_factory=fetcher_factory,
-        visited_tracker_max_urls=config.INFRACRAWL_VISITED_MAX_URLS.as_(int),
+        provider_factory=configured_crawl_provider_factory,
     )
 
     # Scheduler - Singleton instance
