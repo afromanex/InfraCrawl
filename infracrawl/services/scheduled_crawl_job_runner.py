@@ -95,6 +95,7 @@ class ScheduledCrawlJobRunner:
         crawl continues where it left off.
         """
         cfg_path = getattr(cfg, "config_path", None)
+        logger.info("Starting resumed crawl job for %s", cfg_path)
         try:
             run_id: Optional[int] = None
             try:
@@ -122,6 +123,7 @@ class ScheduledCrawlJobRunner:
                         self.crawls_repo.finish_run(run_id)
                     except Exception:
                         logger.exception("Could not finish run record for %s run=%s", cfg_path, run_id)
+                logger.info("Resumed crawl job finished for %s", cfg_path)
 
             except Exception as e:
                 # Finish registry tracking via session with failure status

@@ -70,6 +70,11 @@ class CrawlRunRecovery:
                 resume_cb = getattr(self, "_resume_callback", None)
                 if callable(resume_cb):
                     try:
+                        logger.info(
+                            "Recovery: initiating resume for config %s (id=%s)",
+                            cfg_path,
+                            cfg_id,
+                        )
                         resume_cb(db_cfg)
                         continue
                     except Exception:
