@@ -228,6 +228,15 @@ class ConfiguredCrawlProvider:
         # Ensure page exists in DB (should already exist for resume case)
         self.pages_repo.ensure_page(page)
         
+        # Load page content from database if not already in memory
+        if page.page_content is None:
+            existing_page = self.pages_repo.get_page_by_url(url)
+            if existing_page:
+                page.page_content = existing_page.page_content
+            else:
+                logger.warning("Could not load page content for resume of %s", url)
+                return False
+        
         if self.context.is_stopped():
             logger.info("Crawl cancelled during traversal of %s", url)
             return True
