@@ -59,8 +59,7 @@ def test_session_has_correct_max_depth():
     
     session = factory.create(config)
     
-    assert session.max_depth == 5
-    assert session.current_depth is None  # Not set until crawl starts
+    assert session.config.max_depth == 5
 
 
 def test_visited_tracker_respects_max_urls():

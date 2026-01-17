@@ -44,7 +44,7 @@ class CrawlExecutor:
         for root_url in roots:
             # Create page object for root URL
             page = Page(page_url=root_url)
-            stopped = provider.crawl_from(page)
+            stopped = provider.crawl_from(page, session.config.max_depth)
             if stopped:
                 break
 

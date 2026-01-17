@@ -93,39 +93,45 @@ class ConfiguredCrawlProvider:
     def process_links(
         self,
         page: Page,
+        depth: Optional[int],
     ) -> bool:
         """Extract and process links from page body.
 
         Returns stopped status.
         """
-        def cb(child_page):
+        # Check if we can crawl children
+        child_depth = depth - 1 if depth is not None else None
+        if depth is not None and child_depth < 0:
+            return self.context.should_stop()
+        
+        def crawl_child_page(child_page):
             if self.context.should_stop():
                 return
-            prev_depth = self.context.current_depth
-            if not self.context.can_crawl_child():
-                return
-            stopped = self.crawl_from(child_page)
-            self.context.restore_depth(prev_depth)
+            stopped = self.crawl_from(child_page, child_depth)
             if stopped:
                 self.context.mark_stopped()
 
-        self.link_processor.process(page, self.context, crawl_callback=cb)
+        self.link_processor.process(page, self.context, crawl_child_page=crawl_child_page)
         return self.context.should_stop()
 
-    def crawl_from(self, page: Page) -> bool:
+    def crawl_from(self, page: Page, depth: Optional[int]) -> bool:
         """Crawl a single page and its children.
 
         The page object is enriched as we go (page_id, page_content).
-        Sets up root and depth context for this crawl.
-        Returns stopped status.
+        Recursively processes children at depth-1 until depth limit is reached.
+        
+        Args:
+            page: Page to crawl
+            depth: Current depth budget (None for unlimited)
+            
+        Returns:
+            stopped status.
         """
         url = page.page_url
         
-        # Set up context for this root traversal
+        # Set up root for link extraction
         self.context.set_root(url)
-        self.context.set_current_depth(self.context.max_depth)
         
-        depth = self.context.current_depth
         if self.context.is_visited(url):
             logger.debug("Skipping (visited) %s", url)
             return False
@@ -138,7 +144,8 @@ class ConfiguredCrawlProvider:
             logger.info("Crawl cancelled during traversal of %s", url)
             return True
 
-        if depth is not None and self.crawl_policy.should_skip_due_to_depth(depth):
+        if depth is not None and depth < 0:
+            logger.debug("Skipping (max depth reached) %s", url)
             return False
         if self.crawl_policy.should_skip_due_to_robots(url, self.context):
             return False
@@ -154,6 +161,6 @@ class ConfiguredCrawlProvider:
         self.context.increment_pages_crawled(1)
 
         time.sleep(self.context.config.delay_seconds)
-        stopped = self.process_links(page)
+        stopped = self.process_links(page, depth)
 
         return stopped

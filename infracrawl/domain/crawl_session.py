@@ -1,4 +1,5 @@
 import threading
+from contextlib import contextmanager
 from typing import Optional
 from infracrawl.domain.config import CrawlerConfig
 from infracrawl.domain.visited_tracker import VisitedTracker
@@ -30,12 +31,9 @@ class CrawlSession:
         
         # Configuration
         self.config = config
-        self.max_depth = config.max_depth if config else None
         
         # Execution state - current_root is set when iterating multiple root URLs
         self.current_root: Optional[str] = None
-        # track the current depth budget for the active traversal path
-        self.current_depth: Optional[int] = None
         # Visited URL tracking delegated to separate class (SRP fix)
         self.visited_tracker = visited_tracker if visited_tracker is not None else VisitedTracker()
         # Track pages fetched within the current crawl
@@ -84,9 +82,6 @@ class CrawlSession:
     def increment_pages_crawled(self, count: int = 1) -> None:
         self.pages_crawled += int(count)
 
-    def set_current_depth(self, depth: Optional[int]) -> None:
-        self.current_depth = depth
-
     def set_root(self, root: str):
         self.current_root = root
 
@@ -97,26 +92,6 @@ class CrawlSession:
     def is_visited(self, url: str) -> bool:
         """Delegate to visited tracker."""
         return self.visited_tracker.is_visited(url)
-
-    def can_crawl_child(self) -> bool:
-        """Check if we can crawl a child page (depth allows it) and decrement depth if so.
-        
-        Returns True if crawling should proceed, False if max depth reached.
-        Automatically decrements current_depth if crawling is allowed.
-        """
-        if self.current_depth is None:
-            return True  # No depth limit
-        
-        child_depth = self.current_depth - 1
-        if child_depth < 0:
-            return False  # Max depth reached
-        
-        self.current_depth = child_depth
-        return True
-
-    def restore_depth(self, depth: Optional[int]) -> None:
-        """Restore depth to previous value after crawling a child."""
-        self.current_depth = depth
 
     def should_stop(self) -> bool:
         """Check if crawling should stop (either external or internal signal)."""
