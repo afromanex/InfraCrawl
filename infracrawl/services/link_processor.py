@@ -5,18 +5,15 @@ from urllib.parse import urlparse
 
 from infracrawl.services.link_persister import LinkPersister
 from infracrawl.domain.crawl_session import CrawlSession
+from infracrawl.domain.page import Page
 
 logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
 class LinkProcessRequest:
-    current_root: str
-    base_url: str
-    html: str
-    from_id: int
+    page: Page
     context: CrawlSession
-    depth: int
 
 
 class LinkProcessor:
@@ -40,13 +37,13 @@ class LinkProcessor:
 
         `crawl_callback(link_url)` is invoked for links to be crawled.
         """
-        links = self.content_review_service.extract_links(req.base_url, req.html)
+        links = self.content_review_service.extract_links(req.page.page_url, req.page.page_content)
         
         # Filter to same-host links only
         same_host_links = []
         for link_url, anchor in links:
-            if not self._same_host(req.current_root, link_url):
-                logger.debug("Skipping (external) %s -> not same host as %s", link_url, req.current_root)
+            if not self._same_host(req.context.current_root, link_url):
+                logger.debug("Skipping (external) %s -> not same host as %s", link_url, req.context.current_root)
                 continue
             same_host_links.append((link_url, anchor))
         
@@ -54,9 +51,9 @@ class LinkProcessor:
             return
 
         # Persist links (batch DB work)
-        self.link_persister.persist_links(from_id=req.from_id, links=same_host_links)
+        self.link_persister.persist_links(from_id=req.page.page_id, links=same_host_links)
         
         # Schedule crawls for next depth
-        if req.depth - 1 >= 0 and crawl_callback is not None:
+        if req.context.current_depth - 1 >= 0 and crawl_callback is not None:
             for link_url, _ in same_host_links:
                 crawl_callback(link_url)

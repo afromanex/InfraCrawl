@@ -122,14 +122,7 @@ class ConfiguredCrawlProvider:
                 stopped = True
 
         self.link_processor.process(
-            LinkProcessRequest(
-                current_root=self.context.current_root,
-                base_url=page.page_url,
-                html=page.page_content,
-                from_id=page.page_id,
-                context=self.context,
-                depth=parent_depth,
-            ),
+            LinkProcessRequest(page=page, context=self.context),
             crawl_callback=cb,
         )
         return (pages_crawled, stopped)
