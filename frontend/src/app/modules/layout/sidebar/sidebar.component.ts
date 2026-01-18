@@ -15,6 +15,7 @@ export class SidebarComponent {
     { label: 'Configurations', route: '/configs', icon: 'settings' },
     { label: 'Active Jobs', route: '/jobs/active', icon: 'play_circle' },
     { label: 'Job History', route: '/jobs/history', icon: 'history' },
+    { label: 'Schedule', route: '/jobs/schedule', icon: 'schedule' },
     { label: 'Admin', route: '/admin', icon: 'admin_panel_settings' },
   ];
 }

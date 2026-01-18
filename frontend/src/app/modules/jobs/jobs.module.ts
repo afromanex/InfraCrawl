@@ -2,6 +2,7 @@ import { NgModule } from '@angular/core';
 import { RouterModule, Routes } from '@angular/router';
 import { JobsComponent } from './jobs.component';
 import { JobHistoryComponent } from './history/job-history.component';
+import { ScheduleComponent } from './schedule/schedule.component';
 
 const routes: Routes = [
   {
@@ -13,6 +14,10 @@ const routes: Routes = [
     component: JobHistoryComponent,
   },
   {
+    path: 'schedule',
+    component: ScheduleComponent,
+  },
+  {
     path: '',
     redirectTo: 'active',
     pathMatch: 'full',
@@ -20,6 +25,6 @@ const routes: Routes = [
 ];
 
 @NgModule({
-  imports: [RouterModule.forChild(routes), JobsComponent, JobHistoryComponent],
+  imports: [RouterModule.forChild(routes), JobsComponent, JobHistoryComponent, ScheduleComponent],
 })
 export class JobsModule {}

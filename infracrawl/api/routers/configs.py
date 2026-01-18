@@ -8,12 +8,18 @@ def create_configs_router(config_service: ConfigService):
     @router.get("/")
     def list_configs():
         configs = config_service.list_configs()
-        # Return a flat dict with the fields the UI expects.
+        # Return config details including schedule, max_depth, etc.
         return [
             {
                 "config_id": getattr(c, "config_id", None),
                 "config_path": getattr(c, "config_path", None),
-                # created_at/updated_at are optional in UI; omit if unavailable
+                "root_urls": getattr(c, "root_urls", []),
+                "max_depth": getattr(c, "max_depth", 0),
+                "schedule": getattr(c, "schedule", None),
+                "resume_on_application_restart": getattr(c, "resume_on_application_restart", False),
+                "fetch_mode": getattr(c, "fetch_mode", "http"),
+                "robots": getattr(c, "robots", True),
+                "refresh_days": getattr(c, "refresh_days", None),
             }
             for c in configs
         ]
