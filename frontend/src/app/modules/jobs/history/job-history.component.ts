@@ -25,7 +25,6 @@ import { CrawlRun } from '../../../core/models';
             <tr>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Run ID</th>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Config</th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Start</th>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">End</th>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Exception</th>
@@ -35,9 +34,6 @@ import { CrawlRun } from '../../../core/models';
             <tr *ngFor="let r of runs">
               <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ r.run_id }}</td>
               <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ r.config_path || r.config_id }}</td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm">
-                <span [ngClass]="getStatusClass(r.status)">{{ r.status }}</span>
-              </td>
               <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatTime(r.start_timestamp) }}</td>
               <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatTime(r.end_timestamp) }}</td>
               <td class="px-6 py-4 text-xs">
@@ -118,22 +114,6 @@ export class JobHistoryComponent implements OnInit, OnDestroy {
           this.loading = false;
         },
       });
-  }
-
-  getStatusClass(status: string): string {
-    const base = 'px-2 py-1 rounded-full text-xs font-semibold';
-    switch (status) {
-      case 'running':
-        return base + ' bg-blue-100 text-blue-800';
-      case 'completed':
-        return base + ' bg-green-100 text-green-800';
-      case 'failed':
-        return base + ' bg-red-100 text-red-800';
-      case 'stopped':
-        return base + ' bg-yellow-100 text-yellow-800';
-      default:
-        return base + ' bg-gray-100 text-gray-800';
-    }
   }
 
   formatTime(timestamp: string | null): string {
