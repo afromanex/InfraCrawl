@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { takeUntil, Subject } from 'rxjs';
 import { APIService } from '../../../core/api/api.service';
-import { CrawlRun } from '../../../core/models';
+import { CrawlRun, CrawlerConfig } from '../../../core/models';
 
 @Component({
   selector: 'app-job-history',
@@ -13,6 +13,15 @@ import { CrawlRun } from '../../../core/models';
     <div class="p-6">
       <h1 class="text-3xl font-bold text-gray-900 mb-4">Job History</h1>
 
+      <div class="bg-white rounded-lg shadow p-4 mb-4">
+        <div class="flex items-center gap-4">
+          <label class="text-sm font-medium text-gray-700">Filter by config:</label>
+          <select [(ngModel)]="selectedConfigId" (change)="onConfigChange()" class="px-3 py-2 border border-gray-300 rounded-md">
+            <option [value]="undefined">All Configs</option>
+            <option *ngFor="let cfg of configs" [value]="cfg.config_id">{{ cfg.config_path }}</option>
+          </select>
+        </div>
+      </div>
 
       <div *ngIf="loading" class="text-gray-600">Loading job history...</div>
       <div *ngIf="error" class="rounded-md bg-red-50 p-3 text-sm text-red-800 mb-4">{{ error }}</div>
@@ -70,6 +79,8 @@ import { CrawlRun } from '../../../core/models';
 })
 export class JobHistoryComponent implements OnInit, OnDestroy {
   runs: CrawlRun[] = [];
+  configs: CrawlerConfig[] = [];
+  selectedConfigId: number | undefined = undefined;
   loading = false;
   error: string | null = null;
   limit = 10;
@@ -79,12 +90,32 @@ export class JobHistoryComponent implements OnInit, OnDestroy {
   constructor(private api: APIService) {}
 
   ngOnInit(): void {
+    this.fetchConfigs();
     this.fetchRuns();
   }
 
   ngOnDestroy(): void {
     this.destroy$.next();
     this.destroy$.complete();
+  }
+
+  private fetchConfigs(): void {
+    this.api
+      .getConfigs()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (configs: CrawlerConfig[]) => {
+          this.configs = configs;
+        },
+        error: (err: any) => {
+          console.error('Failed to load configs:', err);
+        },
+      });
+  }
+
+  onConfigChange(): void {
+    this.offset = 0;
+    this.fetchRuns();
   }
 
   prevPage(): void {
@@ -102,7 +133,7 @@ export class JobHistoryComponent implements OnInit, OnDestroy {
     this.loading = true;
     this.error = null;
     this.api
-      .getJobRuns(undefined, this.limit, this.offset)
+      .getJobRuns(this.selectedConfigId, this.limit, this.offset)
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: (runs: CrawlRun[]) => {
