@@ -16,16 +16,16 @@ const routes: Routes = [
     children: [
       {
         path: 'dashboard',
-        loadChildren: () =>
-          import('./modules/dashboard/dashboard.module').then(
-            (m) => m.DashboardModule
+        loadComponent: () =>
+          import('./modules/dashboard/dashboard.component').then(
+            (m) => m.DashboardComponent
           ),
       },
       {
         path: 'configs',
-        loadChildren: () =>
-          import('./modules/configs/configs.module').then(
-            (m) => m.ConfigsModule
+        loadComponent: () =>
+          import('./modules/configs/configs.component').then(
+            (m) => m.ConfigsComponent
           ),
       },
       {
@@ -35,8 +35,8 @@ const routes: Routes = [
       },
       {
         path: 'admin',
-        loadChildren: () =>
-          import('./modules/admin/admin.module').then((m) => m.AdminModule),
+        loadComponent: () =>
+          import('./modules/admin/admin.component').then((m) => m.AdminComponent),
       },
       {
         path: '',
