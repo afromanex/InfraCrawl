@@ -82,6 +82,9 @@ class CrawlExecutor:
                     else:
                         # Fresh: fetch and discover links
                         was_cancelled = provider.crawl_from(page, max_depth)
+                    
+                    # Update registry progress after each root (for real-time visibility)
+                    session.update_progress()
             else:
                 # Phase 2+: Crawl all discovered pages at current depth
                 logger.info("Crawling depth %s: discovered pages", current_depth)
@@ -105,6 +108,9 @@ class CrawlExecutor:
                     page.discovered_depth = current_depth
                     logger.info("  Crawling: %s (depth %s)", page_url, current_depth)
                     was_cancelled = provider.crawl_from(page, max_depth)
+                    
+                    # Update registry progress after each page (for real-time visibility)
+                    session.update_progress()
             
             current_depth += 1
 

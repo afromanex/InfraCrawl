@@ -57,13 +57,17 @@ def test_session_update_progress_calls_registry_update():
     
     # Simulate pages being crawled
     session.pages_crawled = 15
+    session.links_discovered = 42
+    session.current_root = "http://example.com/page"
     
     session.update_progress()
     
-    # Verify registry.update was called with current page count
+    # Verify registry.update was called with current stats
     registry.update.assert_called_once_with(
         "crawl-xyz-456",
-        pages_fetched=15
+        pages_fetched=15,
+        links_found=42,
+        current_url="http://example.com/page"
     )
 
 

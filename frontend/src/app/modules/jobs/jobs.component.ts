@@ -1,7 +1,9 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { Subject, takeUntil, interval } from 'rxjs';
 import { APIService } from '../../core/api/api.service';
+import { CrawlerConfig } from '../../core/models';
 
 interface ActiveJob {
   id: string;
@@ -20,10 +22,40 @@ interface ActiveJob {
 @Component({
   selector: 'app-jobs',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, FormsModule],
   template: `
     <div class="p-6">
       <h1 class="text-3xl font-bold text-gray-900 mb-4">Active Jobs</h1>
+
+      <!-- Start New Job Card -->
+      <div class="bg-white rounded-lg shadow p-6 mb-6">
+        <h2 class="text-lg font-semibold text-gray-900 mb-4">Start New Crawl</h2>
+        <div class="flex gap-4 items-end">
+          <div class="flex-1">
+            <label for="config-select" class="block text-sm font-medium text-gray-700 mb-2">
+              Select Configuration
+            </label>
+            <select
+              id="config-select"
+              [(ngModel)]="selectedConfigPath"
+              class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+            >
+              <option value="">-- Choose a configuration --</option>
+              <option *ngFor="let cfg of configs" [value]="cfg.config_path">
+                {{ cfg.config_path }}
+              </option>
+            </select>
+          </div>
+          <button
+            type="button"
+            (click)="startCrawl()"
+            [disabled]="!selectedConfigPath || startingCrawl"
+            class="px-6 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {{ startingCrawl ? 'Starting...' : 'Start Crawl' }}
+          </button>
+        </div>
+      </div>
 
       <div *ngIf="loading" class="text-gray-600">Loading jobs...</div>
 
@@ -46,10 +78,10 @@ interface ActiveJob {
                 Status
               </th>
               <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Pages Fetched
+                Pages (Session)
               </th>
               <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Links Found
+                Links (Session)
               </th>
               <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Started
@@ -113,6 +145,9 @@ interface ActiveJob {
 })
 export class JobsComponent implements OnInit, OnDestroy {
   jobs: ActiveJob[] = [];
+  configs: CrawlerConfig[] = [];
+  selectedConfigPath: string = '';
+  startingCrawl = false;
   loading = false;
   error: string | null = null;
   expanded = new Set<string>();
@@ -122,6 +157,7 @@ export class JobsComponent implements OnInit, OnDestroy {
   constructor(private api: APIService) {}
 
   ngOnInit(): void {
+    this.fetchConfigs();
     this.fetchJobs();
     // Poll for job updates
     interval(this.pollInterval)
@@ -132,6 +168,20 @@ export class JobsComponent implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     this.destroy$.next();
     this.destroy$.complete();
+  }
+
+  private fetchConfigs(): void {
+    this.api
+      .getConfigs()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (configs: CrawlerConfig[]) => {
+          this.configs = configs;
+        },
+        error: (err: any) => {
+          console.error('Failed to load configs:', err);
+        },
+      });
   }
 
   private fetchJobs(): void {
@@ -164,6 +214,31 @@ export class JobsComponent implements OnInit, OnDestroy {
         },
         error: (err: any) => {
           this.error = err?.error?.detail || 'Failed to cancel job';
+        },
+      });
+  }
+
+  startCrawl(): void {
+    if (!this.selectedConfigPath) {
+      return;
+    }
+
+    this.startingCrawl = true;
+    this.error = null;
+
+    this.api
+      .startCrawl(this.selectedConfigPath)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: () => {
+          this.startingCrawl = false;
+          this.selectedConfigPath = '';
+          // Give the job a moment to appear in the registry
+          setTimeout(() => this.fetchJobs(), 500);
+        },
+        error: (err: any) => {
+          this.startingCrawl = false;
+          this.error = err?.error?.detail || 'Failed to start crawl';
         },
       });
   }

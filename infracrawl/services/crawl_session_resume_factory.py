@@ -20,6 +20,7 @@ class CrawlSessionResumeFactory:
         self,
         *,
         pages_repo: PagesRepository,
+        links_repo=None,
         registry=None,
         visited_tracker_max_urls: int = 100_000,
     ):
@@ -27,10 +28,12 @@ class CrawlSessionResumeFactory:
         
         Args:
             pages_repo: Repository for loading visited URLs from database
+            links_repo: Optional repository for loading link counts
             registry: Optional crawl registry for tracking/cancellation
             visited_tracker_max_urls: Maximum URLs to track as visited per session
         """
         self.pages_repo = pages_repo
+        self.links_repo = links_repo
         self.registry = registry
         self.visited_tracker_max_urls = int(visited_tracker_max_urls)
     
@@ -70,6 +73,19 @@ class CrawlSessionResumeFactory:
             visited_tracker=visited_tracker,
             registry=self.registry,
         )
+        
+        # Pre-populate session with existing page and link counts from database
+        if config.config_id is not None:
+            # Get count of already-fetched pages
+            fetched_page_ids = self.pages_repo.get_fetched_page_ids_by_config(config.config_id)
+            session.pages_crawled = len(fetched_page_ids) if fetched_page_ids else 0
+            
+            # Get count of existing links if links_repo is available
+            if self.links_repo is not None and fetched_page_ids:
+                session.links_discovered = self.links_repo.count_links_for_page_ids(fetched_page_ids)
+            
+            logger.info("Resume factory: pre-populated session counts: pages=%d, links=%d",
+                       session.pages_crawled, session.links_discovered)
         
         # Start tracking if registry is available
         session.start_tracking()

@@ -207,6 +207,7 @@ class Container(containers.DeclarativeContainer):
     crawl_session_resume_factory = providers.Singleton(
         CrawlSessionResumeFactory,
         pages_repo=pages_repository,
+        links_repo=links_repository,
         registry=crawl_registry,
         visited_tracker_max_urls=config.INFRACRAWL_VISITED_MAX_URLS.as_(int),
     )

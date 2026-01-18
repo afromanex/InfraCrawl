@@ -54,6 +54,10 @@ export class APIService {
   }
 
   // Job Controls
+  startCrawl(configPath: string): Observable<any> {
+    return this.http.post(`${this.baseUrl}/crawlers/crawl/${encodeURIComponent(configPath)}/start`, {});
+  }
+
   stopCrawl(configId: number): Observable<any> {
     return this.http.post(`${this.baseUrl}/crawlers/${configId}/stop`, {});
   }

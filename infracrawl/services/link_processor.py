@@ -56,6 +56,10 @@ class LinkProcessor:
             from_depth=page.discovered_depth,
             config_id=page.config_id
         )
+        
+        # Update session stats
+        context.links_discovered += len(same_host_links)
+        
         logger.info("Persisted %d links from %s at depth %s (will be crawled at depth %s)", 
                    len(same_host_links), page.page_url, page.discovered_depth, (page.discovered_depth + 1) if page.discovered_depth is not None else "?")
 

@@ -38,6 +38,8 @@ class CrawlSession:
         self.visited_tracker = visited_tracker if visited_tracker is not None else VisitedTracker()
         # Track pages fetched within the current crawl
         self.pages_crawled: int = 0
+        # Track links discovered
+        self.links_discovered: int = 0
 
     def start_tracking(self) -> None:
         """Begin registry tracking if registry is configured.
@@ -59,6 +61,8 @@ class CrawlSession:
             self._registry.update(
                 self.crawl_id,
                 pages_fetched=self.pages_crawled,
+                links_found=self.links_discovered,
+                current_url=self.current_root,
             )
 
     def finish_tracking(self, status: str = "finished", error: Optional[str] = None) -> None:
