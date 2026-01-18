@@ -54,31 +54,44 @@ import { CrawlRun, CrawlerConfig } from '../../../core/models';
         </table>
       </div>
 
-      <div class="flex items-center gap-2 mt-4" *ngIf="runs.length > 0">
+      <div class="flex items-center gap-1 mt-4" *ngIf="runs.length > 0">
         <button
           type="button"
-          class="px-3 py-1 bg-gray-100 text-gray-800 rounded hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
-          [disabled]="offset === 0 || loading"
+          class="px-2 py-1 text-gray-700 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+          [disabled]="currentPage === 1 || loading"
           (click)="firstPage()"
+          title="First page"
         >
-          First
+          &laquo;
         </button>
         <button
           type="button"
-          class="px-3 py-1 bg-gray-100 text-gray-800 rounded hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
-          [disabled]="offset === 0 || loading"
+          class="px-2 py-1 text-gray-700 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+          [disabled]="currentPage === 1 || loading"
           (click)="prevPage()"
+          title="Previous page"
         >
-          Previous
+          &lsaquo;
         </button>
-        <span class="text-sm text-gray-600">Page {{ (offset / limit) + 1 }}</span>
+        
+        <button
+          *ngFor="let page of getPageNumbers()"
+          type="button"
+          [class]="page === currentPage ? 'px-3 py-1 bg-blue-600 text-white rounded font-semibold' : 'px-3 py-1 text-gray-700 rounded hover:bg-gray-100'"
+          [disabled]="loading"
+          (click)="goToPage(page)"
+        >
+          {{ page }}
+        </button>
+        
         <button
           type="button"
-          class="px-3 py-1 bg-gray-100 text-gray-800 rounded hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+          class="px-2 py-1 text-gray-700 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
           [disabled]="runs.length < limit || loading"
           (click)="nextPage()"
+          title="Next page"
         >
-          Next
+          &rsaquo;
         </button>
       </div>
     </div>
@@ -123,6 +136,31 @@ export class JobHistoryComponent implements OnInit, OnDestroy {
 
   onConfigChange(): void {
     this.offset = 0;
+    this.fetchRuns();
+  }
+
+  get currentPage(): number {
+    return Math.floor(this.offset / this.limit) + 1;
+  }
+
+  getPageNumbers(): number[] {
+    const current = this.currentPage;
+    const pages: number[] = [];
+    
+    // Show up to 5 pages centered around current page
+    let start = Math.max(1, current - 2);
+    let end = start + 4;
+    
+    // Generate page numbers
+    for (let i = start; i <= end; i++) {
+      pages.push(i);
+    }
+    
+    return pages;
+  }
+
+  goToPage(page: number): void {
+    this.offset = (page - 1) * this.limit;
     this.fetchRuns();
   }
 
