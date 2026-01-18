@@ -47,7 +47,7 @@ def create_app(container: Container) -> FastAPI:
 
     app = FastAPI(title="InfraCrawl Control API", lifespan=_lifespan)
 
-    app.include_router(create_systems_router())
+    app.include_router(create_systems_router(container.config()))
     app.include_router(create_auth_router())
     # Protect configuration and crawler control endpoints with admin token.
     app.include_router(create_configs_router(config_service), dependencies=[Depends(require_admin)])

@@ -88,4 +88,11 @@ export class APIService {
       `${this.baseUrl}/crawlers/stats/${encodeURIComponent(configPath)}`
     );
   }
+
+  // Systems
+  getSystemConfig(): Observable<{ environment: Record<string, string | null> }> {
+    return this.http.get<{ environment: Record<string, string | null> }>(
+      `${this.baseUrl}/systems/config`
+    );
+  }
 }
