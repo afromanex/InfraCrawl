@@ -59,6 +59,14 @@ import { CrawlRun, CrawlerConfig } from '../../../core/models';
           type="button"
           class="px-3 py-1 bg-gray-100 text-gray-800 rounded hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
           [disabled]="offset === 0 || loading"
+          (click)="firstPage()"
+        >
+          First
+        </button>
+        <button
+          type="button"
+          class="px-3 py-1 bg-gray-100 text-gray-800 rounded hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+          [disabled]="offset === 0 || loading"
           (click)="prevPage()"
         >
           Previous
@@ -114,6 +122,11 @@ export class JobHistoryComponent implements OnInit, OnDestroy {
   }
 
   onConfigChange(): void {
+    this.offset = 0;
+    this.fetchRuns();
+  }
+
+  firstPage(): void {
     this.offset = 0;
     this.fetchRuns();
   }
