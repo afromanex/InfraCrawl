@@ -19,13 +19,39 @@ def _get_endpoint(router, path: str, method: str):
 
 
 def test_list_configs_returns_dicts():
-    cfg = SimpleNamespace(config_id=1, config_path="configs/x.yml")
-    config_service = Mock(list_configs=Mock(return_value=[cfg]))
+    meta = SimpleNamespace(config_id=1, config_path="configs/x.yml")
+    full = SimpleNamespace(
+        config_id=1,
+        config_path="configs/x.yml",
+        root_urls=["https://example.org"],
+        max_depth=2,
+        schedule="0 2 * * *",
+        resume_on_application_restart=True,
+        fetch_mode="http",
+        robots=True,
+        refresh_days=7,
+    )
+    config_service = Mock(
+        list_configs=Mock(return_value=[meta]),
+        get_config=Mock(return_value=full),
+    )
 
     router = create_configs_router(config_service)
     endpoint = _get_endpoint(router, "/configs/", "GET")
 
-    assert endpoint() == [{"config_id": 1, "config_path": "configs/x.yml"}]
+    assert endpoint() == [
+        {
+            "config_id": 1,
+            "config_path": "configs/x.yml",
+            "root_urls": ["https://example.org"],
+            "max_depth": 2,
+            "schedule": "0 2 * * *",
+            "resume_on_application_restart": True,
+            "fetch_mode": "http",
+            "robots": True,
+            "refresh_days": 7,
+        }
+    ]
 
 
 def test_list_configs_flattens_crawler_config():
@@ -37,13 +63,26 @@ def test_list_configs_flattens_crawler_config():
         robots=True,
         refresh_days=7,
         fetch_mode="http",
+        schedule="0 3 * * *",
     )
-    config_service = Mock(list_configs=Mock(return_value=[cfg]))
+    config_service = Mock(list_configs=Mock(return_value=[cfg]), get_config=Mock(return_value=cfg))
 
     router = create_configs_router(config_service)
     endpoint = _get_endpoint(router, "/configs/", "GET")
 
-    assert endpoint() == [{"config_id": 2, "config_path": "configs/y.yml"}]
+    assert endpoint() == [
+        {
+            "config_id": 2,
+            "config_path": "configs/y.yml",
+            "root_urls": ["https://example.org"],
+            "max_depth": 1,
+            "schedule": "0 3 * * *",
+            "resume_on_application_restart": True,
+            "fetch_mode": "http",
+            "robots": True,
+            "refresh_days": 7,
+        }
+    ]
 
 
 def test_get_config_returns_yaml_response():

@@ -13,9 +13,9 @@ export class SidebarComponent {
   menuItems = [
     { label: 'Dashboard', route: '/dashboard', icon: 'dashboard' },
     { label: 'Configurations', route: '/configs', icon: 'settings' },
+    { label: 'Schedule', route: '/jobs/schedule', icon: 'schedule' },
     { label: 'Active Jobs', route: '/jobs/active', icon: 'play_circle' },
     { label: 'Job History', route: '/jobs/history', icon: 'history' },
-    { label: 'Schedule', route: '/jobs/schedule', icon: 'schedule' },
     { label: 'Admin', route: '/admin', icon: 'admin_panel_settings' },
   ];
 }

@@ -25,40 +25,21 @@ import { CrawlerConfig } from '../../../core/models';
           <div class="flex items-start justify-between">
             <div class="flex-1">
               <h3 class="text-lg font-semibold text-gray-900 mb-2">{{ cfg.config_path }}</h3>
-              <div class="space-y-2 text-sm">
+              <div class="space-y-3 text-sm">
                 <div class="flex items-center gap-2">
-                  <span class="font-medium text-gray-700">Schedule:</span>
+                  <span class="font-medium text-gray-700">Cron:</span>
                   <code class="px-2 py-1 bg-gray-100 rounded text-gray-800">{{ cfg.schedule }}</code>
-                  <span class="text-gray-500">(cron format)</span>
                 </div>
-                <div class="flex items-center gap-2">
-                  <span class="font-medium text-gray-700">Max Depth:</span>
-                  <span class="text-gray-900">{{ cfg.max_depth }}</span>
+                <div class="text-gray-800">
+                  <span class="font-medium text-gray-700">Human:</span>
+                  <span class="ml-2">{{ humanReadable[cfg.config_path] || '—' }}</span>
                 </div>
-                <div class="flex items-center gap-2">
-                  <span class="font-medium text-gray-700">Fetch Mode:</span>
-                  <span class="text-gray-900">{{ cfg.fetch_mode }}</span>
-                </div>
-                <div class="flex items-center gap-2">
-                  <span class="font-medium text-gray-700">Resume on Restart:</span>
-                  <span [class]="cfg.resume_on_application_restart ? 'text-green-600' : 'text-gray-500'">
-                    {{ cfg.resume_on_application_restart ? 'Yes' : 'No' }}
-                  </span>
-                </div>
-                <div class="flex items-center gap-2">
-                  <span class="font-medium text-gray-700">Root URLs:</span>
-                  <span class="text-gray-900">{{ cfg.root_urls.length }} URL(s)</span>
+                <div class="text-gray-800">
+                  <span class="font-medium text-gray-700">Next Run:</span>
+                  <span class="ml-2">{{ nextRunText[cfg.config_path] || 'Calculating...' }}</span>
                 </div>
               </div>
             </div>
-          </div>
-          <div class="mt-4 pt-4 border-t border-gray-200">
-            <details class="text-sm">
-              <summary class="cursor-pointer text-blue-600 hover:text-blue-800">Show root URLs</summary>
-              <ul class="mt-2 space-y-1 pl-4">
-                <li *ngFor="let url of cfg.root_urls" class="text-gray-700 font-mono text-xs break-all">{{ url }}</li>
-              </ul>
-            </details>
           </div>
         </div>
       </div>
@@ -81,6 +62,8 @@ export class ScheduleComponent implements OnInit, OnDestroy {
   unscheduledConfigs: CrawlerConfig[] = [];
   loading = false;
   error: string | null = null;
+  humanReadable: Record<string, string> = {};
+  nextRunText: Record<string, string> = {};
   private destroy$ = new Subject<void>();
 
   constructor(private api: APIService) {}
@@ -105,6 +88,7 @@ export class ScheduleComponent implements OnInit, OnDestroy {
           this.configs = configs;
           this.scheduledConfigs = configs.filter(c => c.schedule && c.schedule.trim() !== '');
           this.unscheduledConfigs = configs.filter(c => !c.schedule || c.schedule.trim() === '');
+          this.computeDescriptions();
           this.loading = false;
         },
         error: (err: any) => {
@@ -112,5 +96,73 @@ export class ScheduleComponent implements OnInit, OnDestroy {
           this.loading = false;
         },
       });
+  }
+
+  private computeDescriptions(): void {
+    for (const cfg of this.scheduledConfigs) {
+      const cron = cfg.schedule || '';
+      this.humanReadable[cfg.config_path] = this.describeCron(cron);
+      this.nextRunText[cfg.config_path] = this.computeNextRun(cron);
+    }
+  }
+
+  // Minimal 5-field cron parsing: supports '*' or comma-separated numbers per field.
+  private parseCronField(field: string, min: number, max: number): Set<number> | null {
+    if (field.trim() === '*') {
+      const all = new Set<number>();
+      for (let i = min; i <= max; i++) all.add(i);
+      return all;
+    }
+    const out = new Set<number>();
+    const parts = field.split(',').map(p => p.trim()).filter(Boolean);
+    for (const p of parts) {
+      const n = Number(p);
+      if (Number.isFinite(n) && n >= min && n <= max) {
+        out.add(n);
+      }
+    }
+    return out.size > 0 ? out : null;
+  }
+
+  private matchesCron(date: Date, cron: string): boolean {
+    const parts = cron.trim().split(/\s+/);
+    if (parts.length !== 5) return false;
+    const [minF, hourF, domF, monF, dowF] = parts;
+    const mins = this.parseCronField(minF, 0, 59);
+    const hours = this.parseCronField(hourF, 0, 23);
+    const dom = this.parseCronField(domF, 1, 31);
+    const mon = this.parseCronField(monF, 1, 12);
+    const dow = this.parseCronField(dowF, 0, 6);
+    return (!!mins && mins.has(date.getMinutes())) &&
+           (!!hours && hours.has(date.getHours())) &&
+           (!!dom && dom.has(date.getDate())) &&
+           (!!mon && mon.has(date.getMonth() + 1)) &&
+           (!!dow && dow.has(date.getDay()));
+  }
+
+  private computeNextRun(cron: string): string {
+    const parts = cron.trim().split(/\s+/);
+    if (parts.length !== 5) return 'Invalid cron';
+    let cursor = new Date();
+    // Start searching from the next minute
+    cursor.setSeconds(0, 0);
+    cursor = new Date(cursor.getTime() + 60000);
+    for (let i = 0; i < 50000; i++) {
+      if (this.matchesCron(cursor, cron)) {
+        return cursor.toLocaleString();
+      }
+      cursor = new Date(cursor.getTime() + 60000);
+    }
+    return 'Not found soon';
+  }
+
+  private describeCron(cron: string): string {
+    const parts = cron.trim().split(/\s+/);
+    if (parts.length !== 5) return 'Invalid cron format';
+    const [m, h, dom, mon, dow] = parts;
+    const time = `${h === '*' ? 'every hour' : `at ${h.padStart(2, '0')}:${m.padStart(2, '0')}`}`;
+    const day = dom === '*' ? (dow === '*' ? 'every day' : `on day-of-week ${dow}`) : `on day ${dom}`;
+    const month = mon === '*' ? '' : ` in month ${mon}`;
+    return `${time} ${day}${month}`.trim();
   }
 }
