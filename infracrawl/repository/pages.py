@@ -239,6 +239,20 @@ class PagesRepository:
             rows = session.execute(q).scalars().all()
             return rows
 
+    def get_recent_fetched_urls_by_config(self, config_id: int, limit: int = 10) -> List[str]:
+        """Return the most recent fetched page URLs for a given config.
+
+        Only includes pages with non-null content (actually crawled). Ordered by
+        fetched_at descending, then by page_id descending as a stable tie-breaker.
+        """
+        with self.get_session() as session:
+            q = select(DBPage.page_url).where(
+                (DBPage.config_id == config_id) &
+                (DBPage.page_content.is_not(None))
+            ).order_by(DBPage.fetched_at.desc(), DBPage.page_id.desc()).limit(limit)
+            rows = session.execute(q).scalars().all()
+            return list(rows)
+
     def get_visited_urls_by_config(self, config_id: int) -> List[str]:
         """Get all page URLs that have been visited for a given config.
         

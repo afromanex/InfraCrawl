@@ -86,6 +86,66 @@ def create_crawlers_router(
             raise HTTPException(status_code=404, detail="crawl not found")
         return rec
 
+    @router.get("/active/{crawl_id}/log")
+    def get_crawl_log(crawl_id: str):
+        if crawl_registry is None:
+            raise HTTPException(status_code=404, detail="no registry configured")
+        rec = crawl_registry.get(crawl_id)
+        if not rec:
+            raise HTTPException(status_code=404, detail="crawl not found")
+        config_id = rec.get("config_id")
+        if config_id is None:
+            return {"crawl_id": crawl_id, "recent_urls": []}
+        try:
+            urls = pages_repo.get_recent_fetched_urls_by_config(config_id, limit=10)
+        except Exception:
+            raise HTTPException(status_code=500, detail="could not load crawl log")
+        return {"crawl_id": crawl_id, "recent_urls": urls}
+
+    @router.get("/log/{config}")
+    def get_config_log(config: str):
+        """Return latest crawled URLs for a given config path.
+
+        This avoids dependency on a specific running crawl ID and works
+        even if the registry entry has been evicted.
+        """
+        if not config:
+            raise HTTPException(status_code=400, detail="missing config")
+        # Prefer in-memory recent URLs if an active crawl is found for this config
+        if crawl_registry is not None:
+            try:
+                active = crawl_registry.list_active() or []
+                if not isinstance(active, list):
+                    active = []
+            except Exception:
+                active = []
+            for rec in active:
+                if rec.get("config_name") == config:
+                    urls = crawl_registry.get_recent_urls(rec.get("id")) or []
+                    return {"config": config, "recent_urls": urls}
+        try:
+            cfg = config_service.get_config(config)
+        except Exception:
+            raise HTTPException(status_code=404, detail="config not found")
+        try:
+            urls = pages_repo.get_recent_fetched_urls_by_config(cfg.config_id, limit=10)
+        except Exception:
+            raise HTTPException(status_code=500, detail="could not load crawl log")
+        return {"config": config, "recent_urls": urls}
+
+    @router.get("/log/id/{config_id}")
+    def get_config_log_by_id(config_id: int):
+        """Return latest crawled URLs for a given config id.
+
+        Useful when the client already has the config_id and wants to avoid
+        an extra lookup by config path.
+        """
+        try:
+            urls = pages_repo.get_recent_fetched_urls_by_config(config_id, limit=10)
+        except Exception:
+            raise HTTPException(status_code=500, detail="could not load crawl log")
+        return {"config_id": config_id, "recent_urls": urls}
+
     @router.post("/cancel/{crawl_id}")
     def cancel_crawl(crawl_id: str):
         if crawl_registry is None:

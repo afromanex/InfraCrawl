@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import threading
-from dataclasses import dataclass
+from collections import deque
+from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional
+from typing import Deque, List, Optional
 
 
 @dataclass
@@ -19,6 +20,11 @@ class CrawlRecord:
     links_found: int = 0
     current_url: Optional[str] = None
     error: Optional[str] = None
+    recent_urls: Deque[str] = field(default_factory=lambda: deque(maxlen=20))
+
+    def get_recent_urls(self) -> List[str]:
+        """Return recent URLs as a list (most recent first)."""
+        return list(reversed(self.recent_urls))
 
 
 @dataclass(frozen=True)

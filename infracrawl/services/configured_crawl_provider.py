@@ -184,8 +184,9 @@ class ConfiguredCrawlProvider:
         """
         url = page.page_url
         
-        # Set current page for link extraction
+        # Set current page for link extraction and push to registry immediately
         self.context.set_current_page(page)
+        self.context.update_progress()
         
         # Check if we should fetch this page
         should_fetch, reason = self._should_fetch_page(page, depth)
@@ -219,8 +220,9 @@ class ConfiguredCrawlProvider:
         """
         url = page.page_url
         
-        # Set current page for link extraction
+        # Set current page for link extraction and push to registry immediately
         self.context.set_current_page(page)
+        self.context.update_progress()
         
         # Mark as visited to prevent re-crawling
         self.context.mark_visited(page)

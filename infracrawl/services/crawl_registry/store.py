@@ -61,6 +61,9 @@ class CrawlRecordStore:
             rec.links_found = links_found
         if current_url is not None:
             rec.current_url = current_url
+            # Add to recent URLs history
+            if current_url and current_url not in rec.recent_urls:
+                rec.recent_urls.append(current_url)
 
         rec.last_seen = now
         return True

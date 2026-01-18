@@ -1,7 +1,7 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Subject, takeUntil, interval } from 'rxjs';
+import { Subject, takeUntil, interval, fromEvent, EMPTY, startWith, map, switchMap } from 'rxjs';
 import { APIService } from '../../core/api/api.service';
 import { CrawlerConfig } from '../../core/models';
 
@@ -87,9 +87,6 @@ interface ActiveJob {
                 Started
               </th>
               <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Current URL
-              </th>
-              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Actions
               </th>
             </tr>
@@ -106,28 +103,53 @@ interface ActiveJob {
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ job.pages_fetched }}</td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ job.links_found }}</td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatTime(job.started_at) }}</td>
-                <td class="px-6 py-4 text-sm text-gray-600 truncate max-w-xs" [title]="job.current_url || ''">
-                  {{ job.current_url ? (job.current_url | slice:0:50) + '...' : '—' }}
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm">
+                <td class="px-6 py-4 whitespace-nowrap text-sm space-x-2">
+                  <span
+                    role="button"
+                    tabindex="0"
+                    class="text-blue-600 hover:underline cursor-pointer"
+                    (click)="toggleLog(job.id)"
+                    (keydown.enter)="toggleLog(job.id)"
+                    (keydown.space)="toggleLog(job.id)"
+                  >
+                    {{ showingLog === job.id ? 'Hide Log' : 'See Log' }}
+                  </span>
                   <button
                     *ngIf="job.status === 'running'"
                     type="button"
-                    class="text-red-600 hover:text-red-800"
+                    class="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1"
                     (click)="cancelJob(job.id)"
                   >
                     Cancel
                   </button>
-                  <span *ngIf="job.status !== 'running'" class="text-gray-400">—</span>
+                </td>
+              </tr>
+              <tr *ngIf="showingLog === job.id" class="bg-gray-50">
+                <td colspan="6" class="px-6 py-4">
+                  <div class="text-sm">
+                    <div class="mb-2">
+                      <strong class="text-gray-700">Recent Pages (Most Recent First):</strong>
+                    </div>
+                    <div *ngIf="loadingLog === job.id" class="text-gray-500">Loading...</div>
+                    <div *ngIf="logError === job.id" class="text-red-600">Failed to load log</div>
+                    <div *ngIf="!crawlLogs[job.id] || crawlLogs[job.id].length === 0" class="text-gray-500">
+                      No pages crawled yet
+                    </div>
+                    <ul *ngIf="crawlLogs[job.id] && crawlLogs[job.id].length > 0" class="space-y-1 max-h-64 overflow-y-auto">
+                      <li *ngFor="let url of crawlLogs[job.id]" class="text-xs break-all font-mono text-gray-700">
+                        {{ url }}
+                      </li>
+                    </ul>
+                  </div>
                 </td>
               </tr>
               <tr *ngIf="job.error && expanded.has(job.id)">
-                <td colspan="7" class="px-6 py-4 bg-red-50 text-sm text-red-700">
+                <td colspan="6" class="px-6 py-4 bg-red-50 text-sm text-red-700">
                   <strong>Error:</strong> {{ job.error }}
                 </td>
               </tr>
               <tr *ngIf="expanded.has(job.id)" class="bg-gray-50">
-                <td colspan="7" class="px-6 py-4 text-sm">
+                <td colspan="6" class="px-6 py-4 text-sm">
                   <div class="space-y-2">
                     <div><strong>Job ID:</strong> {{ job.id }}</div>
                     <div><strong>Last Updated:</strong> {{ formatTime(job.last_seen) }}</div>
@@ -151,17 +173,27 @@ export class JobsComponent implements OnInit, OnDestroy {
   loading = false;
   error: string | null = null;
   expanded = new Set<string>();
+  showingLog: string | null = null;
+  loadingLog: string | null = null;
+  logError: string | null = null;
+  crawlLogs: { [crawlId: string]: string[] } = {};
   private destroy$ = new Subject<void>();
-  private pollInterval = 5000; // Poll every 5 seconds
+  private pollInterval = 2000; // Poll every 2 seconds
+  private initialLoad = true;
 
   constructor(private api: APIService) {}
 
   ngOnInit(): void {
     this.fetchConfigs();
     this.fetchJobs();
-    // Poll for job updates
-    interval(this.pollInterval)
-      .pipe(takeUntil(this.destroy$))
+    // Poll for job updates; pause when tab is hidden
+    fromEvent(document, 'visibilitychange')
+      .pipe(
+        startWith(0),
+        map(() => !document.hidden),
+        switchMap((visible: boolean) => (visible ? interval(this.pollInterval) : EMPTY)),
+        takeUntil(this.destroy$)
+      )
       .subscribe(() => this.fetchJobs());
   }
 
@@ -185,7 +217,7 @@ export class JobsComponent implements OnInit, OnDestroy {
   }
 
   private fetchJobs(): void {
-    if (!this.loading) {
+    if (this.initialLoad) {
       this.loading = true;
     }
     this.api
@@ -196,6 +228,11 @@ export class JobsComponent implements OnInit, OnDestroy {
           this.jobs = response.active || [];
           this.error = null;
           this.loading = false;
+          this.initialLoad = false;
+          // If a log is open, refresh it on each poll
+          if (this.showingLog) {
+            this.loadLog(this.showingLog);
+          }
         },
         error: (err: any) => {
           this.error = err?.error?.detail || 'Failed to load active jobs';
@@ -217,7 +254,50 @@ export class JobsComponent implements OnInit, OnDestroy {
         },
       });
   }
+  toggleLog(jobId: string): void {
+    if (this.showingLog === jobId) {
+      this.showingLog = null;
+    } else {
+      this.showingLog = jobId;
+      this.loadLog(jobId);
+    }
+  }
 
+  refreshLog(jobId: string): void {
+    this.loadLog(jobId);
+  }
+
+  private loadLog(jobId: string): void {
+    const hasExisting = !!this.crawlLogs[jobId] && this.crawlLogs[jobId].length > 0;
+    if (!hasExisting) {
+      this.loadingLog = jobId;
+    }
+    this.logError = null;
+    const job = this.jobs.find(j => j.id === jobId);
+    const configPath = job?.config_name || '';
+    this.api
+      .getCrawlLogByConfig(configPath)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (response: { config: string; recent_urls: string[] }) => {
+          this.crawlLogs[jobId] = (response.recent_urls || []).slice(0, 10);
+          this.loadingLog = null;
+        },
+        error: (err: any) => {
+          console.error('Failed to load crawl log:', err);
+          // If the crawl is missing (404), show an empty log instead of error
+          if (err && (err.status === 404 || err.statusCode === 404)) {
+            this.crawlLogs[jobId] = [];
+            this.logError = null;
+          } else {
+            this.logError = jobId;
+          }
+          this.loadingLog = null;
+        },
+      });
+  }
+
+  // Removed fallback helper to strictly show backend-provided recent URLs
   startCrawl(): void {
     if (!this.selectedConfigPath) {
       return;

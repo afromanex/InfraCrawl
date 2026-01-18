@@ -37,6 +37,10 @@ export class APIService {
     return this.http.get<any>(`${this.baseUrl}/crawlers/active`);
   }
 
+  getCrawlLogByConfig(configPath: string): Observable<{ config: string; recent_urls: string[] }> {
+    return this.http.get<{ config: string; recent_urls: string[] }>(`${this.baseUrl}/crawlers/log/${encodeURIComponent(configPath)}`);
+  }
+
   getJobRuns(
     configId?: number,
     limit: number = 20,

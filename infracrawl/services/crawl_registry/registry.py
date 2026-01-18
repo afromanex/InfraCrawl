@@ -92,3 +92,14 @@ class InMemoryCrawlRegistry:
     def list_active(self) -> List[Dict]:
         with self._lock:
             return [asdict(r) for r in self._records.list_active()]
+
+    def get_recent_urls(self, crawl_id: str) -> Optional[List[str]]:
+        """Return recent URLs for a crawl, most recent first.
+
+        Returns None if the crawl record does not exist.
+        """
+        with self._lock:
+            rec = self._records.get(crawl_id)
+            if not rec:
+                return None
+            return rec.get_recent_urls()

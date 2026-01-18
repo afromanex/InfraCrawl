@@ -126,3 +126,131 @@ def test_list_runs_500_without_leaking_exception():
         endpoint(limit=20)
     assert exc.value.status_code == 500
     assert exc.value.detail == "could not list runs"
+
+
+def test_get_crawl_log_happy_path():
+    pages_repo = Mock(get_recent_fetched_urls_by_config=Mock(return_value=["u10", "u9", "u8"]))
+    links_repo = Mock()
+    config_service = Mock()
+    crawl_registry = Mock(get=Mock(return_value={"config_id": 42}))
+    crawls_repo = Mock()
+
+    router = create_crawlers_router(
+        pages_repo, links_repo, config_service, Mock(), Mock(), crawl_registry, crawls_repo
+    )
+    endpoint = _get_endpoint(router, "/crawlers/active/{crawl_id}/log", "GET")
+
+    result = endpoint(crawl_id="abc")
+    assert result == {"crawl_id": "abc", "recent_urls": ["u10", "u9", "u8"]}
+
+
+def test_get_crawl_log_404_when_missing_or_no_registry():
+    pages_repo = Mock()
+    links_repo = Mock()
+    config_service = Mock()
+    crawls_repo = Mock()
+
+    # No registry configured
+    router = create_crawlers_router(
+        pages_repo, links_repo, config_service, Mock(), Mock(), None, crawls_repo
+    )
+    endpoint = _get_endpoint(router, "/crawlers/active/{crawl_id}/log", "GET")
+
+    with pytest.raises(HTTPException) as exc:
+        endpoint(crawl_id="abc")
+    assert exc.value.status_code == 404
+    assert exc.value.detail == "no registry configured"
+
+    # Registry returns None for missing crawl
+    crawl_registry = Mock(get=Mock(return_value=None))
+    router = create_crawlers_router(
+        pages_repo, links_repo, config_service, Mock(), Mock(), crawl_registry, crawls_repo
+    )
+    endpoint = _get_endpoint(router, "/crawlers/active/{crawl_id}/log", "GET")
+
+    with pytest.raises(HTTPException) as exc:
+        endpoint(crawl_id="missing")
+    assert exc.value.status_code == 404
+    assert exc.value.detail == "crawl not found"
+
+
+def test_get_config_log_happy_path():
+    pages_repo = Mock(get_recent_fetched_urls_by_config=Mock(return_value=["x3", "x2", "x1"]))
+    links_repo = Mock()
+    cfg = SimpleNamespace(config_id=7)
+    config_service = Mock(get_config=Mock(return_value=cfg))
+    crawl_registry = Mock()
+    crawls_repo = Mock()
+
+    router = create_crawlers_router(
+        pages_repo, links_repo, config_service, Mock(), Mock(), crawl_registry, crawls_repo
+    )
+    endpoint = _get_endpoint(router, "/crawlers/log/{config}", "GET")
+
+    result = endpoint(config="my.yml")
+    assert result == {"config": "my.yml", "recent_urls": ["x3", "x2", "x1"]}
+
+
+def test_get_config_log_prefers_active_registry_recent_urls():
+    pages_repo = Mock(get_recent_fetched_urls_by_config=Mock(return_value=["db3", "db2"]))
+    links_repo = Mock()
+    config_service = Mock(get_config=Mock(return_value=SimpleNamespace(config_id=7)))
+    crawl_registry = Mock(
+        list_active=Mock(return_value=[{"id": "abc", "config_name": "my.yml"}]),
+        get_recent_urls=Mock(return_value=["mem2", "mem1"]),
+    )
+    crawls_repo = Mock()
+
+    router = create_crawlers_router(
+        pages_repo, links_repo, config_service, Mock(), Mock(), crawl_registry, crawls_repo
+    )
+    endpoint = _get_endpoint(router, "/crawlers/log/{config}", "GET")
+
+    result = endpoint(config="my.yml")
+    # Should return in-memory recent URLs, not DB
+    assert result == {"config": "my.yml", "recent_urls": ["mem2", "mem1"]}
+
+
+def test_get_config_log_errors():
+    pages_repo = Mock(get_recent_fetched_urls_by_config=Mock(side_effect=RuntimeError("db error")))
+    links_repo = Mock()
+    config_service = Mock(get_config=Mock(side_effect=RuntimeError("missing")))
+    crawl_registry = Mock()
+    crawls_repo = Mock()
+
+    router = create_crawlers_router(
+        pages_repo, links_repo, config_service, Mock(), Mock(), crawl_registry, crawls_repo
+    )
+    endpoint = _get_endpoint(router, "/crawlers/log/{config}", "GET")
+
+    with pytest.raises(HTTPException) as exc:
+        endpoint(config="bad.yml")
+    assert exc.value.status_code == 404
+    assert exc.value.detail == "config not found"
+
+    # Now config resolves but repository errors
+    config_service = Mock(get_config=Mock(return_value=SimpleNamespace(config_id=1)))
+    router = create_crawlers_router(
+        pages_repo, links_repo, config_service, Mock(), Mock(), crawl_registry, crawls_repo
+    )
+    endpoint = _get_endpoint(router, "/crawlers/log/{config}", "GET")
+    with pytest.raises(HTTPException) as exc:
+        endpoint(config="ok.yml")
+    assert exc.value.status_code == 500
+    assert exc.value.detail == "could not load crawl log"
+
+
+def test_get_crawl_log_returns_empty_if_no_config_id():
+    pages_repo = Mock()
+    links_repo = Mock()
+    config_service = Mock()
+    crawl_registry = Mock(get=Mock(return_value={"config_id": None}))
+    crawls_repo = Mock()
+
+    router = create_crawlers_router(
+        pages_repo, links_repo, config_service, Mock(), Mock(), crawl_registry, crawls_repo
+    )
+    endpoint = _get_endpoint(router, "/crawlers/active/{crawl_id}/log", "GET")
+
+    result = endpoint(crawl_id="abc")
+    assert result == {"crawl_id": "abc", "recent_urls": []}
