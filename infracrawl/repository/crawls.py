@@ -50,10 +50,10 @@ class CrawlsRepository:
                 cfg_path = cfg.config_path
         return DomainCrawlRun(r.run_id, r.config_id, cfg_path, r.start_timestamp, r.end_timestamp, r.exception)
 
-    def list_runs(self, limit: int = 20):
+    def list_runs(self, limit: int = 20, offset: int = 0):
         """Return recent runs as domain objects, including config path if available."""
         with self.get_session() as session:
-            q = select(DBCrawlRun).order_by(DBCrawlRun.run_id.desc()).limit(limit)
+            q = select(DBCrawlRun).order_by(DBCrawlRun.run_id.desc()).limit(limit).offset(offset)
             rows = session.execute(q).scalars().all()
         # Resolve config paths using ConfigsRepository (may return None)
         cfg_repo = ConfigsRepository(self.session_factory)

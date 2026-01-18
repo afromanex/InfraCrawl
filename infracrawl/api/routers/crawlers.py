@@ -188,10 +188,10 @@ def create_crawlers_router(
         }
 
     @router.get("/runs")
-    def list_runs(limit: Optional[int] = 20):
-        """Return the last `limit` crawl runs (most recent first)."""
+    def list_runs(limit: Optional[int] = 20, offset: Optional[int] = 0):
+        """Return the last `limit` crawl runs (most recent first), starting at `offset`."""
         try:
-            runs = crawls_repo.list_runs(limit=limit)
+            runs = crawls_repo.list_runs(limit=limit, offset=offset)
         except Exception:
             raise HTTPException(status_code=500, detail="could not list runs")
 

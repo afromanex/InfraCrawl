@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { takeUntil, Subject } from 'rxjs';
@@ -52,15 +52,16 @@ import { CrawlRun } from '../../../core/models';
       <div class="flex items-center gap-2 mt-4" *ngIf="runs.length > 0">
         <button
           type="button"
-          class="px-3 py-1 bg-gray-100 text-gray-800 rounded hover:bg-gray-200"
+          class="px-3 py-1 bg-gray-100 text-gray-800 rounded hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
           [disabled]="offset === 0 || loading"
           (click)="prevPage()"
         >
           Previous
         </button>
+        <span class="text-sm text-gray-600">Page {{ (offset / limit) + 1 }}</span>
         <button
           type="button"
-          class="px-3 py-1 bg-gray-100 text-gray-800 rounded hover:bg-gray-200"
+          class="px-3 py-1 bg-gray-100 text-gray-800 rounded hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
           [disabled]="runs.length < limit || loading"
           (click)="nextPage()"
         >
@@ -71,7 +72,7 @@ import { CrawlRun } from '../../../core/models';
   `,
   styles: [],
 })
-export class JobHistoryComponent implements OnInit {
+export class JobHistoryComponent implements OnInit, OnDestroy {
   runs: CrawlRun[] = [];
   loading = false;
   error: string | null = null;
@@ -83,6 +84,11 @@ export class JobHistoryComponent implements OnInit {
 
   ngOnInit(): void {
     this.fetchRuns();
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 
   prevPage(): void {
