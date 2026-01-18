@@ -8,21 +8,36 @@ def create_configs_router(config_service: ConfigService):
     @router.get("/")
     def list_configs():
         configs = config_service.list_configs()
-        # Return config details including schedule, max_depth, etc.
-        return [
-            {
-                "config_id": getattr(c, "config_id", None),
-                "config_path": getattr(c, "config_path", None),
-                "root_urls": getattr(c, "root_urls", []),
-                "max_depth": getattr(c, "max_depth", 0),
-                "schedule": getattr(c, "schedule", None),
-                "resume_on_application_restart": getattr(c, "resume_on_application_restart", False),
-                "fetch_mode": getattr(c, "fetch_mode", "http"),
-                "robots": getattr(c, "robots", True),
-                "refresh_days": getattr(c, "refresh_days", None),
-            }
-            for c in configs
-        ]
+        # Load full config from YAML for each config to get schedule and other fields
+        result = []
+        for c in configs:
+            try:
+                full_config = config_service.get_config(c.config_path)
+                result.append({
+                    "config_id": full_config.config_id,
+                    "config_path": full_config.config_path,
+                    "root_urls": full_config.root_urls,
+                    "max_depth": full_config.max_depth,
+                    "schedule": full_config.schedule,
+                    "resume_on_application_restart": full_config.resume_on_application_restart,
+                    "fetch_mode": full_config.fetch_mode,
+                    "robots": full_config.robots,
+                    "refresh_days": full_config.refresh_days,
+                })
+            except Exception as e:
+                # If we can't load the full config, return metadata only
+                result.append({
+                    "config_id": c.config_id,
+                    "config_path": c.config_path,
+                    "root_urls": [],
+                    "max_depth": 0,
+                    "schedule": None,
+                    "resume_on_application_restart": False,
+                    "fetch_mode": "http",
+                    "robots": True,
+                    "refresh_days": None,
+                })
+        return result
 
     @router.get("/{name}")
     def get_config(name: str):
